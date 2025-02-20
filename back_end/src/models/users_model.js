@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const users_schema = new Schema({
-  role_id: {
-    type: Schema.Types.ObjectId,
-    required: true
-  },
+  // role_id: {
+  //   type: Schema.Types.ObjectId,
+  //   required: true,
+  //   ref: 'roles'
+  // },
   name: {
     type: String
   },

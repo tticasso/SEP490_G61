@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 const DBconnect = require("./src/config/db_config");
 const bodyParser = require("body-parser");
 const httpErrors = require("http-errors");
@@ -17,7 +18,7 @@ DBconnect();
 // Middleware xử lý JSON và URL-encoded data
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
+app.use(cors());
 // Middleware log request
 app.use(morgan("dev"));
 

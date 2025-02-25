@@ -91,11 +91,11 @@ const ProductDetail = () => {
                             <div className="flex items-center justify-between border rounded-lg p-3 mb-4">
                                 <div className="flex items-center">
                                     <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden mr-3">
-                                        <img src={ShopOwner} alt="Seller avatar" className="w-full h-full object-cover" />
+                                        <a href='shop-detail'><img src={ShopOwner} alt="Seller avatar" className="w-full h-full object-cover" /></a>
                                     </div>
                                     <div>
                                         <div className="flex items-center">
-                                            <span className="font-medium text-sm">Đồng hồ cũ Hào Lực</span>
+                                            <a href='shop-detail' className="font-medium text-sm">Đồng hồ cũ Hào Lực</a>
                                             <Check size={14} className="ml-1 text-blue-500" />
                                         </div>
                                         <p className="text-xs text-gray-500">Trên 10 năm</p>

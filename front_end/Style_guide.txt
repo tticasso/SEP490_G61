@@ -1,0 +1,21 @@
+Khoảng cách chính: 
+    -max-w-7xl mx-auto
+
+Màu nền chính: 
+    -bg-[#F1F5F9]
+
+Font chữ:
+    -Font:
+    -Kích thước:
+        -Văn bản bình thường:
+        -Tiêu đề:
+        -Chú thích
+
+Button:
+    -Màu nền:
+    -Màu chữ:
+    -Bo góc:
+
+Khoảng cách:
+    -Padding chung:
+    -

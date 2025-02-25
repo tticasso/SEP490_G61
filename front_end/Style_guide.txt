@@ -1,8 +1,7 @@
 Khoảng cách chính: 
     -max-w-7xl mx-auto
 
-Màu nền chính: 
-    -bg-[#F1F5F9]
+Màu nền chính: bg-[#F1F5F9]
 
 Font chữ:
     -Font:

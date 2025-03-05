@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Star, MapPin, MessageCircle, Calendar, CheckCircle, Plus, MoreHorizontal, Clock } from 'lucide-react';
-import dongho from '../assets/dongho.png'
-import ShopAvatar from '../assets/ShopAvatar.png'
-import ShopBackground from '../assets/ShopBackground.png'
+import dongho from '../../assets/dongho.png'
+import ShopAvatar from '../../assets/ShopAvatar.png'
+import ShopBackground from '../../assets/ShopBackground.png'
 
 
 const ShopDetail = () => {

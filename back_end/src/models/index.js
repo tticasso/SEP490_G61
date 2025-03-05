@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 const User = require('./user.model')
 const Role = require('./role.model')
 const Categories = require('./categories.model')
+const Brand = require('./brand.model')
 // Cau hinh mongoose dang global
 mongoose.Promise = global.Promise
 // Dinh nghia doi tuong DB
@@ -14,7 +15,7 @@ db.user = User
 db.role = Role
 db.ROLES = ["MEMBER", "SELLER", "ADMIN"]
 db.categories = Categories
-
+db.brand = Brand
 // Thuoc tinh tham chieu toi action ket noi CSDL
 db.connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, {

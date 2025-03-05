@@ -15,4 +15,6 @@ userRouter.get("/all", userController.accessAll)
 userRouter.get("/member", [VerifyJwt.verifyToken] ,userController.accessByMember)
 userRouter.get("/admin", [VerifyJwt.verifyToken], [VerifyJwt.isAdmin] ,userController.accessByAdmin)
 userRouter.get("/seller", [VerifyJwt.verifyToken], [VerifyJwt.isSeller] ,userController.accessBySeller)
+userRouter.post('/forgot-password', userController.forgotPassword);
+userRouter.post('/reset-password', userController.resetPassword);
 module.exports = userRouter

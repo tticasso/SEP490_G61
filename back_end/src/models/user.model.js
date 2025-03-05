@@ -15,7 +15,7 @@ const userSchema = new Schema({
         type: String,
         validate: {
             validator: function (v) {
-                return /(84|0[3|5|7|8|9])+([0-9]{8})\b/.test(v)
+                return /^(84|0[3-9])[0-9]{8,9}$/.test(v); // Hỗ trợ cả số 9 và 10 chữ số
             },
             message: props => `${props.value} is not a valid phone number`
         },
@@ -49,7 +49,9 @@ const userSchema = new Schema({
     roles: [{
         type: Schema.Types.ObjectId,
         ref: 'Role'
-    }]
+    }],
+    resetPasswordToken: { type: String },
+    resetPasswordExpire: { type: Date }
 }, {
     timestamps: true
 })

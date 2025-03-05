@@ -9,6 +9,14 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 require('dotenv').config();
 
+function formatPhoneNumber(phone) {
+    if (!phone.startsWith('84') && phone.startsWith('0')) {
+        return '84' + phone.substring(1); // Thay 0 bằng 84
+    }
+    return phone;
+}
+
+
 async function signUp(req, res, next) {
     try {
         const newUser = new User({
@@ -16,7 +24,7 @@ async function signUp(req, res, next) {
             password: bcrypt.hashSync(req.body.password, parseInt(process.env.PASSWORD_KEY)),
             firstName: req.body.firstName,
             lastName: req.body.lastName,
-            phone: req.body.phone
+            phone: formatPhoneNumber(req.body.phone)
         })
 
         if (req.body.roles) {

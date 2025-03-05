@@ -10,6 +10,12 @@ import UserProfile from "./pages/UserProfile/UserProfile";
 import Categories from "./pages/Categories/Categories";
 import Cart from "./pages/cart/Cart";
 import CheckoutPage from "./pages/checkout/Checkout";
+import SellerDashboard from "./pages/Seller/SellerDashboard";
+import ProductList from "./pages/Seller/ProductList";
+import AddProduct from "./pages/Seller/AddProduct";
+import DiscountProducts from "./pages/Seller/DiscountProduct";
+import AddDiscount from "./pages/Seller/AddDiscount";
+import AllDiscounts from "./pages/Seller/AllDiscount";
 
 
 
@@ -31,6 +37,12 @@ function App() {
           <Route path="/categories" element={<Categories />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/seller-dashboard" element={<SellerDashboard />} />
+          <Route path="/seller-dashboard/product" element={<ProductList />} />
+          <Route path="/seller-dashboard/add-product" element={<AddProduct />} />
+          <Route path="/seller-dashboard/discount-product" element={<DiscountProducts />} />
+          <Route path="/seller-dashboard/discount-product/add-discount" element={<AddDiscount />} />
+          <Route path="/seller-dashboard/discounts" element={<AllDiscounts />} />
           
         </Routes>
         <Footer/>

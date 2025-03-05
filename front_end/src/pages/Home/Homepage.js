@@ -1,11 +1,11 @@
 import React from 'react';
 import { SearchIcon, UserIcon, HeartIcon, ShoppingCartIcon, ClockIcon, LocationIcon } from 'lucide-react';
-import image from '../assets/image1.png'
-import dongho from '../assets/dongho.png'
+import image from '../../assets/image1.png'
+import dongho from '../../assets/dongho.png'
 
 const TroocEcommerce = () => {
     return (
-        <div className='bg-[#F1F5F9]'>
+        <div className='bg-[#F1F5F9] pb-20'>
             <div className="max-w-7xl mx-auto">
 
                 {/* Main Content */}

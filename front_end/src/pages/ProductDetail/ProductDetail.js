@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { MapPin, Clock, ShoppingCart, MessageCircle, Heart, Share2, Check } from 'lucide-react';
 import { SearchIcon, UserIcon, HeartIcon, ShoppingCartIcon, ClockIcon, LocationIcon, MessageSquareText } from 'lucide-react';
-import dongho from '../assets/ProductDetail.png'
-import ShopOwner from '../assets/ShopOwner.png'
+import dongho from '../../assets/ProductDetail.png'
+import ShopOwner from '../../assets/ShopOwner.png'
 // Import Swiper React components
 import { Swiper, SwiperSlide } from 'swiper/react';
 

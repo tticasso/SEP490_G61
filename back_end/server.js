@@ -1,47 +1,43 @@
-const express = require("express");
-const cors = require("cors");
-const DBconnect = require("./src/config/db_config");
-const bodyParser = require("body-parser");
-const httpErrors = require("http-errors");
-const morgan = require("morgan");
-const session = require("express-session");
-const passport = require("passport");
-const authRoutes = require("./src/routes/authRoutes");
+const express = require('express');
+const morgan = require('morgan');
+const bodyParser = require('body-parser');
+const httpErrors = require('http-errors');
+const db = require('./src/models');
+require('dotenv').config();
+const { AuthRouter, UserRouter, roleRouter } = require('./src/routes');
+const session = require('express-session');
+const passport = require('passport');
 
-require("dotenv").config();
-require("./src/config/passport"); // Khởi tạo Passport cấu hình Google OAuth
-
+// Khởi tạo Express trước khi dùng app.use()
 const app = express();
 
-DBconnect();
-
-// Middleware xử lý JSON và URL-encoded data
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(cors());
-// Middleware log request
-app.use(morgan("dev"));
-
-// Cấu hình session (cần thiết cho Passport)
+// Cấu hình session và passport
 app.use(session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET || 'default_secret',
     resave: false,
     saveUninitialized: true
 }));
-
-// Khởi tạo Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Sử dụng routes authentication
-app.use("/auth", authRoutes);
+// Bổ sung middleware kiểm soát hoạt động của Web server
+app.use(bodyParser.json());
+app.use(morgan("dev"));
 
-// Xử lý lỗi 404
+// Định tuyến cho root router
+app.get("/", (req, res, next) => {
+    res.status(200).json({
+        message: "Welcome to RESTFul API - NodeJS"
+    });
+});
+app.use('/api/auth', AuthRouter);
+app.use('/api/user', UserRouter);
+app.use('/api/role', roleRouter);
+
+// Kiểm soát các lỗi trong Express web server
 app.use(async (req, res, next) => {
     next(httpErrors.NotFound());
 });
-
-// Xử lý lỗi server
 app.use((err, req, res, next) => {
     res.status(err.status || 500);
     res.send({
@@ -52,7 +48,8 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Khởi động server
-app.listen(process.env.PORT, process.env.HOST_NAME, () => {
-    console.log(`Server is running at http://${process.env.HOST_NAME}:${process.env.PORT}`);
+// Lắng nghe request từ client
+app.listen(process.env.PORT || 9999, process.env.HOST_NAME || 'localhost', () => {
+    console.log(`Server is running at: http://${process.env.HOST_NAME || 'localhost'}:${process.env.PORT || 9999}`);
+    db.connectDB();
 });

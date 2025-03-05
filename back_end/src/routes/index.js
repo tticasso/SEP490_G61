@@ -1,8 +1,10 @@
 const AuthRouter = require('./auth.routes')
 const UserRouter = require('./user.routes')
-const roleRouter = require('./role.routes')
+const RoleRouter = require('./role.routes')
+const CategoriesRouter = require('./categories.routes')
 module.exports = {
     AuthRouter,
     UserRouter,
-    roleRouter
+    RoleRouter,
+    CategoriesRouter
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Clock, ShoppingCart, MessageCircle, Heart, Share2, Check } from 'lucide-react';
+import { MapPin, Clock, ShoppingCart, MessageCircle, Heart, Share2, Check, Star } from 'lucide-react';
 import { SearchIcon, UserIcon, HeartIcon, ShoppingCartIcon, ClockIcon, LocationIcon, MessageSquareText } from 'lucide-react';
 import dongho from '../../assets/ProductDetail.png'
 import ShopOwner from '../../assets/ShopOwner.png'
@@ -12,6 +12,7 @@ import 'swiper/css/navigation';
 
 const ProductDetail = () => {
     const [selectedImage, setSelectedImage] = useState(0);
+    const [activeTab, setActiveTab] = useState('details');
 
     // In a real app, you would use actual image URLs here
     const images = [
@@ -22,6 +23,93 @@ const ProductDetail = () => {
         'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQnX1-uqeeSC-XwHbJgTpZJTh5LsWGFdPNb6g&s',
         'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQgT9q0SMcbdv0YnOvN_eMgI6AvdtFSSwSS1w&s',
     ];
+
+    // Sample comments for the review tab
+
+    // Function to render the active tab content
+    const renderTabContent = () => {
+        switch (activeTab) {
+            case 'details':
+                return (
+                    <div className="py-6">
+                        <h2 className="font-bold text-lg mb-4">Đồng Hồ Đeo Tay Điện Tử Mặt Vuông Họa Tiết Hoạt Hình Trái Đất Có Đèn Led Dành Cho Học Sinh Button cell</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="font-medium mb-2">Thông số kỹ thuật:</h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-700 text-sm">
+                                    <li>Thương hiệu: Rolex</li>
+                                    <li>Model: GMT-Master</li>
+                                    <li>Năm sản xuất: 2020</li>
+                                    <li>Đường kính: 40mm</li>
+                                    <li>Chất liệu: Thép không gỉ 904L</li>
+                                    <li>Bezel: Ceramic xoay 2 chiều</li>
+                                    <li>Mặt số: Đen</li>
+                                    <li>Dây đeo: Jubilee</li>
+                                    <li>Bộ máy: Automatic Caliber 3285</li>
+                                    <li>Chống nước: 100m</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h3 className="font-medium mb-2">Tình trạng:</h3>
+                                <p className="text-sm text-gray-700">Đồng hồ đã qua sử dụng, tình trạng 95% như mới. Máy chạy chuẩn, đang trong thời gian bảo hành của hãng. Các mặt kính, bezel, dây đeo đều trong tình trạng tốt, không có vết xước đáng kể.</p>
+                            </div>
+                            <div>
+                                <h3 className="font-medium mb-2">Phụ kiện đi kèm:</h3>
+                                <p className="text-sm text-gray-700">Sản phẩm không kèm hộp và giấy tờ gốc, chỉ bao gồm đồng hồ và phiếu bảo hành của cửa hàng (12 tháng).</p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            case 'shipping':
+                return (
+                    <div className="py-6">
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="font-bold mb-3">VẬN CHUYỂN</h3>
+                                <p className="text-sm text-gray-700">Miễn phí vận chuyển mặt đất trong vòng 1 đến 7 ngày làm việc. Nhận hàng tại cửa hàng trong vòng 1 đến 7 ngày làm việc. Tùy chọn giao hàng vào ngày hôm sau và chuyển phát nhanh cũng có sẵn. Hàng mua được giao trong hộp màu cam buộc bằng ruy băng Bolduc, ngoại trừ một số mặt hàng nhất định.</p>
+                                <p className="text-sm text-gray-700 mt-2">Xem Câu hỏi thường gặp về giao hàng để biết chi tiết về phương thức vận chuyển, chi phí và thời gian giao hàng.</p>
+                            </div>
+                            
+                            <div>
+                                <h3 className="font-bold mb-3">TRẢ LẠI VÀ ĐỔI HÀNG</h3>
+                                <p className="text-sm text-gray-700">Dễ dàng và miễn phí, trong vòng 14 ngày. Xem các điều kiện và thủ tục trong Câu hỏi thường gặp về việc hoàn trả của chúng tôi.</p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            case 'reviews':
+                return (
+                    <div className="py-6">
+                        <div className="flex items-center mb-6">
+                            <div className="flex items-center">
+                                <span className="text-xl font-bold mr-2">0.0</span>
+                                <span className="text-gray-500">Của 5</span>
+                            </div>
+                            <span className="mx-2 text-gray-300">|</span>
+                            <span className="text-gray-500">0 đánh giá</span>
+                        </div>
+                        
+                        <div className="space-y-2 mb-8">
+                            {[5, 4, 3, 2, 1].map(rating => (
+                                <div key={rating} className="flex items-center">
+                                    <div className="w-10 flex items-center">
+                                        <span>{rating}</span>
+                                        <Star className="h-4 w-4 text-yellow-400 ml-1" fill="#FBBF24" />
+                                    </div>
+                                    <div className="flex-grow h-2 mx-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div className="h-full bg-yellow-400 rounded-full" style={{ width: '0%' }}></div>
+                                    </div>
+                                    <span className="w-8 text-right text-gray-500">0%</span>
+                                </div>
+                            ))}
+                        </div>
+                        
+                    </div>
+                );
+            default:
+                return null;
+        }
+    };
 
     return (
         <div className="bg-[#F1F5F9]">
@@ -139,6 +227,30 @@ const ProductDetail = () => {
                     </div>
                 </div>
 
+                {/* Product Information Tabs */}
+                <div className="bg-white mt-6 rounded-lg overflow-hidden">
+                    {/* Tab Navigation */}
+                    <div className="flex border-b">
+                        <button 
+                            className={`py-4 px-6 text-sm font-medium border-b-2 ${activeTab === 'details' ? 'text-indigo-600 border-indigo-600' : 'text-gray-600 border-transparent'}`}
+                            onClick={() => setActiveTab('details')}
+                        >
+                            CHI TIẾT SẢN PHẨM
+                        </button>
+                        <button 
+                            className={`py-4 px-6 text-sm font-medium border-b-2 ${activeTab === 'shipping' ? 'text-indigo-600 border-indigo-600' : 'text-gray-600 border-transparent'}`}
+                            onClick={() => setActiveTab('shipping')}
+                        >
+                            VẬN CHUYỂN & TRẢ HÀNG
+                        </button>
+                    </div>
+                    
+                    {/* Tab Content */}
+                    <div className="px-6">
+                        {renderTabContent()}
+                    </div>
+                </div>
+
                 {/* Similar products */}
                 <div className="pt-10">
                     <div className="flex items-center mb-4 bg-white p-4">
@@ -168,7 +280,6 @@ const ProductDetail = () => {
                 </div>
             </div>
         </div>
-
     );
 };
 

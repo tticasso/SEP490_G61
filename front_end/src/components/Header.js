@@ -214,7 +214,7 @@ const Header = () => {
                     <a href="categories" className="hover:text-purple-600">Danh mục</a>
                     <a href="#" className="hover:text-purple-600">Bài viết</a>
                     <a href="#" className="hover:text-purple-600">Hỗ trợ</a>
-                    <a href="#" className="text-red-500 font-semibold">Đăng ký bán hàng</a>
+                    <a href="shop-registration" className="text-red-500 font-semibold">Đăng ký bán hàng</a>
                     <span className="ml-auto text-red-500 font-semibold items-center flex gap-2">
                         <PiggyBank size={30} className='color-red'></PiggyBank> Khuyến mại 20% cho đơn hàng đầu tiên
                     </span>

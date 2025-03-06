@@ -10,35 +10,38 @@ import UserProfile from "./pages/UserProfile/UserProfile";
 import Categories from "./pages/Categories/Categories";
 import Cart from "./pages/cart/Cart";
 import CheckoutPage from "./pages/checkout/Checkout";
-import SellerDashboard from "./pages/Seller/SellerDashboard";
-import ProductList from "./pages/Seller/ProductList";
-import AddProduct from "./pages/Seller/AddProduct";
-import DiscountProducts from "./pages/Seller/DiscountProduct";
-import AddDiscount from "./pages/Seller/AddDiscount";
-import AllDiscounts from "./pages/Seller/AllDiscount";
-import InventoryStock from "./pages/Seller/InventoryStock";
-import ImportHistory from "./pages/Seller/ImportHistory";
-import AddStock from "./pages/Seller/AddStock";
-import RegisteredUsers from "./pages/Seller/RegistedUser";
-import AllOrders from "./pages/Seller/AllOrder";
+import SellerDashboard from "./Seller/SellerDashboard";
+import ProductList from "./Seller/ProductList";
+import AddProduct from "./Seller/AddProduct";
+import DiscountProducts from "./Seller/DiscountProduct";
+import AddDiscount from "./Seller/AddDiscount";
+import AllDiscounts from "./Seller/AllDiscount";
+import InventoryStock from "./Seller/InventoryStock";
+import ImportHistory from "./Seller/ImportHistory";
+import AddStock from "./Seller/AddStock";
+import RegisteredUsers from "./Seller/RegistedUser";
+import AllOrders from "./Seller/AllOrder";
+import TroocAdminDashboard from "./admin/Sidebar";
+import ShopRegistration from "./sellerRegistration/ShopRegistration";
 
 
 
 function App() {
   const location = useLocation();
+  
+  const noHeaderPaths = ['/register', '/login', '/admin'];
+const noHeaderPage = noHeaderPaths.includes(location.pathname) || location.pathname.startsWith('/admin/');
 
-  const isLoginPage = location.pathname === '/login';
-  const isRegisterPage = location.pathname === '/register';
   return (
     <div className="font-bold">
-      {!isLoginPage && !isRegisterPage && <Header />} 
+      {!noHeaderPage && <Header />} 
         <Routes>
           <Route path="/" element={<Homepage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/product-detail" element={<ProductDetail />} />
           <Route path="/shop-detail" element={<ShopDetail />} />
-          <Route path="/user-profile" element={<UserProfile />} />
+          <Route path="/user-profile/*" element={<UserProfile />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<CheckoutPage />} />
@@ -61,9 +64,12 @@ function App() {
           <Route path="/seller-dashboard/registed-user" element={<RegisteredUsers />} />
           {/* Routes cho quản lí order của seller */}
           <Route path="/seller-dashboard/orders" element={<AllOrders />} />
+          {/* Admin routers */}
+          <Route path="/admin" element={<TroocAdminDashboard />} />
+          <Route path="/shop-registration" element={<ShopRegistration />} />
           
         </Routes>
-        <Footer/>
+        {!noHeaderPage && <Footer />} 
     </div>
   );
 }

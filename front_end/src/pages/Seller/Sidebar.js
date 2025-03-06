@@ -22,9 +22,12 @@ const Sidebar = ({ onNavigate }) => {
   const isInPromotionSection = location.pathname.includes('/discounts') || 
                               location.pathname.includes('/create-discount-code');
   
+  const isInInventorySection = location.pathname.includes('/inventory');
+  
   const [openMenu, setOpenMenu] = useState(
     isInProductSection ? 'Sản phẩm' : 
-    isInPromotionSection ? 'Khuyến mại' : null
+    isInPromotionSection ? 'Khuyến mại' : 
+    isInInventorySection ? 'Quản lý kho hàng' : null
   );
 
   const toggleMenu = (menuName) => {
@@ -64,9 +67,34 @@ const Sidebar = ({ onNavigate }) => {
         { label: 'Tạo mã giảm giá', path: '/seller-dashboard/create-discount-code' }
       ]
     },
-    { icon: <Package className="mr-3 text-gray-500" />, label: 'Quản lý kho hàng', path: '/seller-dashboard/inventory' },
-    { icon: <Users className="mr-3 text-gray-500" />, label: 'Khách hàng', path: '/seller-dashboard/customers' },
-    { icon: <ShoppingCart className="mr-3 text-gray-500" />, label: 'Đơn hàng', path: '/seller-dashboard/orders' },
+    { 
+      icon: <Package className="mr-3 text-gray-500" />, 
+      label: 'Quản lý kho hàng', 
+      expandable: true,
+      subItems: [
+        { label: 'Thống kê hàng tồn kho', path: '/seller-dashboard/inventory-stock' },
+        { label: 'Lịch sử nhập hàng', path: '/seller-dashboard/import-history' },
+        { label: 'Lịch sử xuất hàng', path: '/seller-dashboard/export-history' },
+        { label: 'Nhập thêm hàng', path: '/seller-dashboard/create-import' }
+      ]
+    },
+    { 
+      icon: <Users className="mr-3 text-gray-500" />, 
+      label: 'Khách hàng',
+      expandable: true,
+      subItems: [
+        { label: 'Khách hàng đăng ký', path: '/seller-dashboard/registed-user' },
+        { label: 'Hỗ trợ', path: '/seller-dashboard/support' }
+      ]
+    },
+    { 
+      icon: <ShoppingCart className="mr-3 text-gray-500" />, 
+      label: 'Đơn hàng',
+      expandable: true,
+      subItems: [
+        { label: 'Tất cả đơn hàng', path: '/seller-dashboard/orders' }
+      ]
+    },
     { icon: <HelpCircle className="mr-3 text-gray-500" />, label: 'Hỗ trợ', path: '/seller-dashboard/support' },
     { icon: <Settings className="mr-3 text-gray-500" />, label: 'Cài đặt', path: '/seller-dashboard/settings' }
   ];

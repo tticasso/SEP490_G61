@@ -1,26 +1,19 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   Edit, 
   Trash2, 
   Search,
   ChevronDown,
   ChevronRight,
-  ShoppingCart, 
-  Users, 
-  Package, 
-  Settings, 
-  HelpCircle,
   Copy,
   Plus
 } from 'lucide-react';
+import Sidebar from './Sidebar';
 
 const AllDiscounts = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   
-  // Sidebar state
-  const [openMenu, setOpenMenu] = useState('Khuyến mại');
   const [selectedDiscounts, setSelectedDiscounts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -52,41 +45,6 @@ const AllDiscounts = () => {
     discount.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  // Sidebar menu items
-  const menuItems = [
-    { 
-      icon: <Package className="mr-3 text-gray-500" />, 
-      label: 'Sản phẩm',
-      subItems: [
-        { label: 'Tất cả sản phẩm', path: '/seller-dashboard/product' },
-        { label: 'Thêm mới sản phẩm', path: '/seller-dashboard/add-product' },
-        { label: 'Giảm giá sản phẩm', path: '/seller-dashboard/discount-product' },
-        { label: 'Danh sách biến thể', path: '/seller-dashboard/variants' }
-      ]
-    },
-    { 
-      icon: <Package className="mr-3 text-gray-500" />, 
-      label: 'Khuyến mại',
-      subItems: [
-        { label: 'Tất cả khuyến mại', path: '/seller-dashboard/discounts' },
-        { label: 'Tạo mã giảm giá', path: '/seller-dashboard/create-discount-code' }
-      ]
-    },
-    { icon: <Package className="mr-3 text-gray-500" />, label: 'Quản lý kho hàng', path: '/seller-dashboard/inventory' },
-    { icon: <Users className="mr-3 text-gray-500" />, label: 'Khách hàng', path: '/seller-dashboard/customers' },
-    { icon: <ShoppingCart className="mr-3 text-gray-500" />, label: 'Đơn hàng', path: '/seller-dashboard/orders' },
-    { icon: <HelpCircle className="mr-3 text-gray-500" />, label: 'Hỗ trợ', path: '/seller-dashboard/support' },
-    { icon: <Settings className="mr-3 text-gray-500" />, label: 'Cài đặt', path: '/seller-dashboard/settings' }
-  ];
-
-  const toggleMenu = (menuName) => {
-    setOpenMenu(openMenu === menuName ? null : menuName);
-  };
-
-  const isActive = (path) => {
-    return location.pathname === path;
-  };
-  
   const toggleDiscountSelection = (discountId) => {
     if (selectedDiscounts.includes(discountId)) {
       setSelectedDiscounts(selectedDiscounts.filter(id => id !== discountId));
@@ -110,62 +68,7 @@ const AllDiscounts = () => {
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* Sidebar */}
-      <div className="w-64 bg-white border-r flex-shrink-0 overflow-y-auto">
-        <h1 
-          className="text-xl font-bold p-4 cursor-pointer"
-          onClick={() => navigate('/seller-dashboard')}
-        >
-          Bảng điều khiển
-        </h1>
-        <nav className="overflow-y-auto">
-          <ul>
-            {menuItems.map((item, index) => (
-              <li key={index}>
-                <div 
-                  className={`flex justify-between items-center p-3 cursor-pointer hover:bg-gray-100 ${
-                    (item.path && isActive(item.path)) || 
-                    (item.subItems && item.subItems.some(subItem => isActive(subItem.path))) 
-                      ? 'bg-blue-50' : ''
-                  }`}
-                  onClick={() => {
-                    if (item.subItems) {
-                      toggleMenu(item.label);
-                    } else if (item.path) {
-                      navigate(item.path);
-                    }
-                  }}
-                >
-                  <div className="flex items-center">
-                    {item.icon}
-                    <span className="text-gray-700">{item.label}</span>
-                  </div>
-                  {item.subItems && (
-                    openMenu === item.label 
-                      ? <ChevronDown size={20} className="text-gray-500" /> 
-                      : <ChevronRight size={20} className="text-gray-500" />
-                  )}
-                </div>
-                
-                {item.subItems && openMenu === item.label && (
-                  <ul className="border-t">
-                    {item.subItems.map((subItem, subIndex) => (
-                      <li 
-                        key={subIndex} 
-                        className={`flex items-center p-3 hover:bg-gray-100 cursor-pointer ${
-                          isActive(subItem.path) ? 'bg-blue-50' : ''
-                        }`}
-                        onClick={() => navigate(subItem.path)}
-                      >
-                        <span className="pl-10 text-gray-700">{subItem.label}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </div>
+      <Sidebar onNavigate={(path) => navigate(path)} />
 
       {/* Main content */}
       <div className="flex-1 overflow-auto">
@@ -238,7 +141,11 @@ const AllDiscounts = () => {
                     <td className="p-4">
                       <div className="flex items-center">
                         <div className="bg-red-50 text-red-500 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                          <Package size={12} />
+                          <div className="w-3 h-3">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M21 10H3M16 4v6M8 4v6M10 16l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
                         </div>
                         <span>{discount.code}</span>
                         <Copy size={16} className="ml-2 text-gray-400 cursor-pointer" />

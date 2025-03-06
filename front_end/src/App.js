@@ -16,6 +16,11 @@ import AddProduct from "./pages/Seller/AddProduct";
 import DiscountProducts from "./pages/Seller/DiscountProduct";
 import AddDiscount from "./pages/Seller/AddDiscount";
 import AllDiscounts from "./pages/Seller/AllDiscount";
+import InventoryStock from "./pages/Seller/InventoryStock";
+import ImportHistory from "./pages/Seller/ImportHistory";
+import AddStock from "./pages/Seller/AddStock";
+import RegisteredUsers from "./pages/Seller/RegistedUser";
+import AllOrders from "./pages/Seller/AllOrder";
 
 
 
@@ -37,12 +42,25 @@ function App() {
           <Route path="/categories" element={<Categories />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+
+           {/* Routes cho seller dashboard */}
           <Route path="/seller-dashboard" element={<SellerDashboard />} />
           <Route path="/seller-dashboard/product" element={<ProductList />} />
           <Route path="/seller-dashboard/add-product" element={<AddProduct />} />
           <Route path="/seller-dashboard/discount-product" element={<DiscountProducts />} />
           <Route path="/seller-dashboard/discount-product/add-discount" element={<AddDiscount />} />
           <Route path="/seller-dashboard/discounts" element={<AllDiscounts />} />
+          
+
+          {/* Routes cho quản lý kho hàng  của seller*/}
+          <Route path="/seller-dashboard/inventory-stock" element={<InventoryStock />} />
+          <Route path="/seller-dashboard/import-history" element={<ImportHistory />} />
+          <Route path="/seller-dashboard/create-import" element={<AddStock />} />
+          
+          {/* /Routes cho quản lí khách hàng của seller */}
+          <Route path="/seller-dashboard/registed-user" element={<RegisteredUsers />} />
+          {/* Routes cho quản lí order của seller */}
+          <Route path="/seller-dashboard/orders" element={<AllOrders />} />
           
         </Routes>
         <Footer/>

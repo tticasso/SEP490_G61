@@ -102,8 +102,8 @@ const AddAddressPopup = ({ onClose, onSave }) => {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-      <div className="bg-white p-6 rounded-md w-96">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-20">
+      <div className="bg-white p-6 rounded-md w-1/2 h-1/2">
         <h2 className="text-lg font-semibold mb-4">Thêm địa chỉ nhận hàng</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex space-x-2">

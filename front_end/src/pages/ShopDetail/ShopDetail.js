@@ -1,182 +1,247 @@
 import React, { useState } from 'react';
-import { Star, MapPin, MessageCircle, Calendar, CheckCircle, Plus, MoreHorizontal, Clock } from 'lucide-react';
+import { Star, Grid, List, Heart, Flame } from 'lucide-react';
+import donghoAvatar from '../../assets/donghoAvatar.jpg'
 import dongho from '../../assets/dongho.png'
-import ShopAvatar from '../../assets/ShopAvatar.png'
-import ShopBackground from '../../assets/ShopBackground.png'
-
+import ShopDetailTabs from './component/ShopDetailTabs';
 
 const ShopDetail = () => {
-    const [activeTab, setActiveTab] = useState('current'); // 'current' or 'sold'
+    const [viewMode, setViewMode] = useState('grid');
+    const [sortOption, setSortOption] = useState('Đặc sắc');
 
-    // Product data based on tab selection
-    const productsData = {
-        current: [
-            { id: 1, title: 'iPhone 13 - VNA - 128GB', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTKTHQUeMyrxYEsSIP5_6d2b9I2ggJQDLgrOg&s', condition: 'Đã qua sử dụng', percent: '99%', price: '10.000.000 đ', time: '22 giờ trước', location: 'Hà Nội' },
-            { id: 2, title: 'iPhone 13 - VNA - 128GB', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5hgsEU1J769SQUrjUoRchulbdk_5h6XWAeg&s', condition: 'Đã qua sử dụng', percent: '99%', price: '10.000.000 đ', time: '22 giờ trước', location: 'Hà Nội' },
-            { id: 3, title: 'iPhone 13 - VNA - 128GB', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQQTgViYnzNv5X64p6p_MALsGF0K8xQgbu2bw&s', condition: 'Đã qua sử dụng', percent: '99%', price: '10.000.000 đ', time: '22 giờ trước', location: 'Hà Nội' },
-            { id: 4, title: 'iPhone 13 - VNA - 128GB', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSG0RN0j9Jbq8C9I_KlO_TDnYt70Q8j06jhHw&s', condition: 'Đã qua sử dụng', percent: '99%', price: '10.000.000 đ', time: '22 giờ trước', location: 'Hà Nội' },
-            { id: 5, title: 'iPhone 13 - VNA - 128GB', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSv6fOYQFDYUkvKm3fr-svoMgp9btSH4uTX9Q&s', condition: 'Đã qua sử dụng', percent: '99%', price: '10.000.000 đ', time: '22 giờ trước', location: 'Hà Nội' },
-            { id: 6, title: 'iPhone 13 - VNA - 128GB', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSaVINBafcG_aXBY7HuKfKwJMY9Y2WjfXFpjw&s', condition: 'Đã qua sử dụng', percent: '99%', price: '10.000.000 đ', time: '22 giờ trước', location: 'Hà Nội' },
-        ],
-        sold: [
-            { id: 7, title: 'Apple Watch Series 8', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQvMirBhijAC1K7cs95xtOMEqIqfX8CTaCUSA&s', condition: 'Đã qua sử dụng', percent: '95%', price: '8.500.000 đ', time: '5 ngày trước', location: 'Hà Nội' },
-            { id: 8, title: 'AirPods Pro 2', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS6lLIBb2h-0kYLgIsk2aSTQkXEfnWnVWi5-w&s', condition: 'Mới', percent: '100%', price: '5.200.000 đ', time: '1 tuần trước', location: 'Hà Nội' },
-            { id: 9, title: 'Macbook Air M2', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTZy0fiReypEemjsJaz5WnuEvRHmpWyTlRc5Q&s', condition: 'Đã qua sử dụng', percent: '98%', price: '22.500.000 đ', time: '2 tuần trước', location: 'Hà Nội' },
-            { id: 10, title: 'iPad Pro 12.9" 2022', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQiRmughNCryRijKl-Mcta-uZEOnQmyojmEiQ&s', condition: 'Đã qua sử dụng', percent: '97%', price: '25.000.000 đ', time: '3 tuần trước', location: 'Hà Nội' },
-            { id: 11, title: 'iPhone 14 Pro Max', image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsOPdLv9j1Ca9SW9lyayohX1ra-fD4sSi1hQ&s', condition: 'Đã qua sử dụng', percent: '96%', price: '24.000.000 đ', time: '1 tháng trước', location: 'Hà Nội' },
-            { id: 12, title: 'Sạc MagSafe', image: 'https://transustore.com/wp-content/uploads/2023/02/Adapter-Sac-Macbook-45w-Magsafe-2.jpg', condition: 'Mới', percent: '100%', price: '750.000 đ', time: '1 tháng trước', location: 'Hà Nội' },
-        ]
+    const shopDetails = {
+        name: 'hieuLa',
+        email: 'lahieutx@gmail.com',
+        address: '66-69 Mục uyên, Tân Xã, Thạch hòa, Thạch Thất, Hà Nội',
+        phone: '0966768150',
+        followers: 100,
+        products: 19,
+        joinedDaysAgo: 13,
+        soldProduct: 22,
+        joinedDay: 110,
+        phoneNumber: '0966768150',
+        profileImage: donghoAvatar
     };
 
-    // Get current products based on active tab
-    const currentProducts = productsData[activeTab];
+    const productCategories = [
+        'Tất cả sản phẩm',
+        'Điện thoại & phụ kiện',
+        'Sắc đẹp',
+        'Thiết bị điện tử',
+        'Nhà sách online',
+        'Thời trang nam'
+    ];
+
+    const products = [
+        {
+            id: 1,
+            name: 'Apple iPhone 15 Plus 128GB',
+            rating: 5,
+            ratingCount: 0,
+            image: dongho,
+            sold: 2,
+            isNew: false
+        },
+        {
+            id: 2,
+            name: 'Sữa rửa mặt CERAVE Cho da dầu da mụn và Da khô nhạy cảm',
+            rating: 5,
+            ratingCount: 0,
+            image: dongho,
+            sold: 3,
+            isNew: true
+        },
+        {
+            id: 3,
+            name: 'Sữa Chống Nắng Cực Mạnh Sunplay Super Block SPF88+',
+            rating: 5,
+            ratingCount: 0,
+            image: dongho,
+            sold: 4,
+            isNew: false
+        },
+        {
+            id: 4,
+            name: 'Bộ Mặc Nhà Nam Nữ Unisex Trơn Dài Tay Chất Lụa Siêu Mát',
+            rating: 5,
+            ratingCount: 5,
+            image: dongho,
+            sold: 9,
+            isNew: true
+        },
+        {
+            id: 5,
+            name: 'Áo POLO nam nữ với tùng co giãn 4 chiều đen cao cấp',
+            rating: 5,
+            ratingCount: 5,
+            image: dongho,
+            sold: 10,
+            isNew: true
+        },
+        {
+            id: 6,
+            name: 'Áo KHOÁC KAKI JEAN NAM ĐẸP THỜI TRANG MỚI NHẤT',
+            rating: 5,
+            ratingCount: 11,
+            image: dongho,
+            sold: 12,
+            isNew: true
+        }
+    ];
+
+    const renderStars = (rating) => {
+        return [...Array(5)].map((_, index) => (
+            <Star
+                key={index}
+                size={16}
+                className={`${index < rating ? 'text-yellow-500 fill-current' : 'text-gray-300'}`}
+            />
+        ));
+    };
 
     return (
-        <div className='bg-[#F1F5F9] pt-10'>
-            <div className="bg-[#F1F5F9] flex flex-col md:flex-row gap-4 max-w-7xl mx-auto">
-                {/* Left Column - Profile Section */}
-                <div className="w-full md:w-2/5 h-full bg-white rounded-lg shadow-sm">
-                    <div className="relative">
-                        {/* Banner Image */}
-                        <div className="h-32 w-full rounded-lg overflow-hidden">
-                            <img
-                                src={ShopBackground}
-                                alt="Mount Fuji with red autumn leaves"
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
-
-                        {/* More Options Icon */}
-                        <button className="absolute top-2 right-2 bg-white/80 rounded-full p-1">
-                            <MoreHorizontal size={18} className="text-gray-700" />
-                        </button>
-
-                        {/* Profile Picture */}
-                        <div className="absolute -bottom-10 left-8">
-                            <div className="rounded-full w-32 h-32 border-4 border-white overflow-hidden">
-                                <img
-                                    src={ShopAvatar}
-                                    alt="Profile"
-                                    className="w-full h-full object-cover"
-                                />
+        <div className='bg-[#E7E9EA] pb-10'>
+            <div className="mx-auto max-w-7xl pt-10">
+                {/* Shop Header */}
+                <div className="flex gap-4 items-center bg-white p-4 rounded-lg shadow-md mb-4">
+                    <div className='mr-6 flex gap-4'>
+                        <img
+                            src={shopDetails.profileImage}
+                            alt={shopDetails.name}
+                            className="w-20 h-20 rounded-full "
+                        />
+                        <div>
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h1 className="text-2xl font-bold">{shopDetails.name}</h1>
+                                    <p className="text-gray-600">@{shopDetails.name}</p>
+                                    <p>{shopDetails.followers} Người theo dõi</p>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Profile Info */}
-                    <div className="mt-8 p-6">
-                        <h2 className="text-lg font-semibold">Lã Hiếu đẹp trai</h2>
-
-                        {/* Rating */}
-                        <div className="flex items-center my-1">
-                            <span className="font-bold mr-2">5.0</span>
-                            <div className="flex">
-                                {[1, 2, 3, 4, 5].map(star => (
-                                    <Star key={star} size={16} className="fill-yellow-400 text-yellow-400" />
-                                ))}
+                    <div className="mt-2 grid grid-cols-3 gap-4 text-sm text-gray-600">
+                        <div className="mt-2 text-sm text-gray-600">
+                            <div className='mb-4 flex gap-4 items-center'>
+                                <p> {shopDetails.email}</p>
+                                <button onClick={() => window.location.href = '/user-profile/messages'} className="bg-purple-200 px-4 py-2 rounded-full">
+                                    Nhắn tin
+                                </button>
                             </div>
-                            <span className="text-gray-500 text-sm ml-2">(150 đánh giá)</span>
+
+                            <div className='flex gap-6 items-center'>
+                                <div className='flex items-center'>
+                                    <p><Flame /></p>
+                                    <p>
+                                        {shopDetails.products} Sản phẩm
+                                    </p>
+                                </div>
+                                <button className="bg-gray-200 px-4 py-2 rounded-full">
+                                    Bỏ Theo Dõi
+                                </button>
+                            </div>
                         </div>
+                        <div className=''>
+                            <p className='mb-2'>Địa chỉ: {shopDetails.address}</p>
 
-                        {/* Followers */}
-                        <div className="text-sm text-gray-600 mb-2">
-                            <span>Người theo dõi: 99</span>
-                            <span className="mx-2">|</span>
-                            <span>Đang theo dõi: 20</span>
+                            <p className='mb-2'>Số điện thoại: {shopDetails.phoneNumber}</p>
+                            <p>Email: {shopDetails.email}</p>
                         </div>
-
-                        {/* Description */}
-                        <p className="text-sm text-gray-800 mb-4">Bán Hàng Trung Thực Và Trách Nhiệm</p>
-
-                        {/* Follow Button */}
-                        <button className="w-full bg-blue-600 text-white py-2 rounded-md flex items-center justify-center gap-1">
-                            <Plus size={18} />
-                            <span>Theo dõi</span>
-                        </button>
-
-                        {/* Additional Info */}
-                        <div className="mt-4 space-y-2">
-                            <div className="flex items-center text-sm text-gray-600">
-                                <MessageCircle size={16} className="mr-2" />
-                                <span>Tỉ lệ phản hồi chat: 87% (Trong 2 giờ)</span>
-                            </div>
-
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Calendar size={16} className="mr-2" />
-                                <span>Đã tham gia: 4 năm trước</span>
-                            </div>
-
-                            <div className="flex items-center text-sm text-teal-600">
-                                <CheckCircle size={16} className="mr-2" />
-                                <span>Nhà bán hàng đã xác thực</span>
-                            </div>
-
-                            <div className="flex items-center text-sm text-gray-600">
-                                <MapPin size={16} className="mr-2" />
-                                <span>Địa chỉ: Ba Chẽ - Quảng Ninh</span>
-                            </div>
+                        <div>
+                            <p className='mb-2'>Sản phẩm đã bán: {shopDetails.soldProduct}</p>
+                            <p className='mb-2'>Tham gia: {shopDetails.joinedDaysAgo} ngày trước</p>
+                            <p>Thời gian hoạt động: 24/7</p>
                         </div>
                     </div>
                 </div>
 
-                {/* Right Column - Products */}
-                <div className="w-full md:w-3/5 bg-white rounded-lg shadow-sm p-4">
-                    {/* Clickable Tabs */}
-                    <div className="flex border-b mb-4">
+                {/* Shop Detail Tabs Component */}
+                <ShopDetailTabs shopDetails={shopDetails} />
+
+                {/* Product Categories */}
+                <div className="flex overflow-x-auto mb-4 bg-white p-2 rounded-lg mt-6">
+                    {productCategories.map((category) => (
                         <button
-                            onClick={() => setActiveTab('current')}
-                            className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'current'
-                                    ? 'border-b-2 border-blue-600 text-blue-600 font-semibold'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                }`}
+                            key={category}
+                            className="px-4 py-2 whitespace-nowrap hover:bg-gray-100 rounded-lg"
                         >
-                            Đang hiển thị (9)
+                            {category}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Product Sorting and View */}
+                <div className="flex justify-between items-center mb-4 px-4 bg-white p-3">
+                    <div>
+                        <p>{shopDetails.products} sản phẩm</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-2 ${viewMode === 'grid' ? 'bg-gray-200' : ''}`}
+                        >
+                            <Grid size={20} />
                         </button>
                         <button
-                            onClick={() => setActiveTab('sold')}
-                            className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'sold'
-                                    ? 'border-b-2 border-blue-600 text-blue-600 font-semibold'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                }`}
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 ${viewMode === 'list' ? 'bg-gray-200' : ''}`}
                         >
-                            Đã bán (143)
+                            <List size={20} />
                         </button>
                     </div>
-
-                    {/* Products Grid - Changes based on active tab */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-5 p-4">
-                        {currentProducts.map(product => (
-                            <a href='product-detail' key={product.id} className="border rounded-md p-2 hover:shadow-md transition-shadow cursor-pointer">
-                                {/* Product Image */}
-                                <div className="aspect-square bg-gray-100 mb-2 rounded overflow-hidden">
-                                    <img
-                                        src={product.image}
-                                        alt={product.title}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-
-                                {/* Product Info */}
-                                <div className="text-xs">
-                                    <p className="font-semibold">{product.title}</p>
-                                    <div className="flex items-center text-gray-500 mb-1">
-                                        <span>{product.condition}</span>
-                                        <span className="mx-1">·</span>
-                                        <span>{product.percent}</span>
-                                    </div>
-                                    <p className="text-red-600 font-bold">{product.price}</p>
-                                    <div className="flex items-center mt-1 text-gray-500">
-                                        <Clock size={12} className="mr-1" />
-                                        <span>{product.time} - {product.location}</span>
-                                    </div>
-                                </div>
-                            </a>
-                        ))}
+                    <div className="flex items-center space-x-2">
+                        <span>Sắp xếp theo:</span>
+                        <select
+                            value={sortOption}
+                            onChange={(e) => setSortOption(e.target.value)}
+                            className="border rounded px-2 py-1"
+                        >
+                            <option value="Đặc sắc">Đặc sắc</option>
+                            <option value="Mới nhất">Mới nhất</option>
+                            <option value="Bán chạy">Bán chạy</option>
+                        </select>
                     </div>
+                </div>
+
+                {/* Product Grid */}
+                <div className={`grid ${viewMode === 'grid' ? 'grid-cols-5 gap-4' : 'grid-cols-1 gap-2'}`}>
+                    {products.map((product) => (
+                        <div
+                            key={product.id}
+                            className={`bg-white rounded-lg shadow-md p-3 ${viewMode === 'list' ? 'flex items-center' : ''
+                                }`}
+                        >
+                            <div className={`relative ${viewMode === 'list' ? 'mr-4' : ''}`}>
+                                <img
+                                    src={product.image}
+                                    alt={product.name}
+                                    className={`${viewMode === 'grid' ? 'w-full h-48 object-cover' : 'w-24 h-24 object-cover'
+                                        } rounded-lg`}
+                                />
+                                {product.isNew && (
+                                    <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
+                                        Mới
+                                    </span>
+                                )}
+                                <button className="absolute top-2 right-2 bg-white rounded-full p-1">
+                                    <Heart size={20} className="text-gray-500" />
+                                </button>
+                            </div>
+                            <div className={`${viewMode === 'list' ? 'flex-grow' : ''}`}>
+                                <h3 className={`font-medium ${viewMode === 'grid' ? 'text-center mt-2' : 'mb-1'}`}>
+                                    {product.name}
+                                </h3>
+                                <div className={`flex items-center ${viewMode === 'grid' ? 'justify-center' : 'mb-1'}`}>
+                                    {renderStars(product.rating)}
+                                    <span className="text-gray-500 text-sm ml-2">({product.ratingCount})</span>
+                                    <span className='pl-6 text-sm mt-2'>Đã bán ({product.sold}) </span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>
-
     );
 };
 

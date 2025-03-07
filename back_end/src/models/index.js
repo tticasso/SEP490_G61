@@ -5,6 +5,7 @@ const Categories = require('./categories.model')
 const Brand = require('./brand.model')
 const Product = require('./product.model')
 const ProductReview = require('./product-review.model')
+const Address = require('./user-address.model')
 // Cau hinh mongoose dang global
 mongoose.Promise = global.Promise
 // Dinh nghia doi tuong DB
@@ -20,6 +21,7 @@ db.categories = Categories
 db.brand = Brand
 db.product = Product
 db.productReview = ProductReview
+db.address = Address
 // Thuoc tinh tham chieu toi action ket noi CSDL
 db.connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, {

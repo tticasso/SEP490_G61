@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const httpErrors = require('http-errors');
 const db = require('./src/models');
 require('dotenv').config();
-const { AuthRouter, UserRouter, RoleRouter, CategoriesRouter, BrandRouter, ProductRouter, ProductReviewRouter } = require('./src/routes');
+const { AuthRouter, UserRouter, RoleRouter, CategoriesRouter, BrandRouter, ProductRouter, ProductReviewRouter, AddressRouter } = require('./src/routes');
 const session = require('express-session');
 const passport = require('passport');
 const cors = require('cors');
@@ -25,7 +25,7 @@ app.use(cors({
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token']
-  }));
+}));
 // Bổ sung middleware kiểm soát hoạt động của Web server
 app.use(bodyParser.json());
 app.use(morgan("dev"));
@@ -43,7 +43,7 @@ app.use('/api/categories', CategoriesRouter);
 app.use('/api/brand', BrandRouter);
 app.use('/api/product', ProductRouter);
 app.use('/api/product-review', ProductReviewRouter);
-
+app.use('/api/address', AddressRouter);
 
 // Kiểm soát các lỗi trong Express web server
 app.use(async (req, res, next) => {

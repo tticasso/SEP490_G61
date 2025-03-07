@@ -21,26 +21,26 @@ const ShippingAddresses = () => {
   
   // Dữ liệu mẫu khi API không hoạt động
   const mockAddresses = [
-    {
-      _id: "mock-address-1",
-      user_id: userId,
-      address_line1: "123 Đường Lê Lợi",
-      address_line2: "Phường Bến Nghé",
-      city: "Hồ Chí Minh",
-      country: "Việt Nam",
-      phone: "0901234567",
-      status: true
-    },
-    {
-      _id: "mock-address-2",
-      user_id: userId,
-      address_line1: "45 Đường Nguyễn Huệ",
-      address_line2: "Phường Bến Thành",
-      city: "Hồ Chí Minh",
-      country: "Việt Nam",
-      phone: "0907654321",
-      status: true
-    }
+    // {
+    //   _id: "mock-address-1",
+    //   user_id: userId,
+    //   address_line1: "123 Đường Lê Lợi",
+    //   address_line2: "Phường Bến Nghé",
+    //   city: "Hồ Chí Minh",
+    //   country: "Việt Nam",
+    //   phone: "0901234567",
+    //   status: true
+    // },
+    // {
+    //   _id: "mock-address-2",
+    //   user_id: userId,
+    //   address_line1: "45 Đường Nguyễn Huệ",
+    //   address_line2: "Phường Bến Thành",
+    //   city: "Hồ Chí Minh",
+    //   country: "Việt Nam",
+    //   phone: "0907654321",
+    //   status: true
+    // }
   ];
 
   // Fetch addresses từ API hoặc sử dụng dữ liệu mẫu

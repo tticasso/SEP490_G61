@@ -2,23 +2,44 @@ const db = require("../models")
 const cryto = require('crypto')
 const nodemailer = require('nodemailer')
 const User = db.user
+const Role = db.role
 const bcrypt = require("bcrypt")
 require('dotenv').config()
 async function create(req, res, next) {
     try {
+        // Lấy thông tin từ request body
+        const { firstName, lastName, email, phone, password, roles } = req.body;
+        
+        // Tìm role dựa trên tên
+        let userRoles = [];
+        if (roles && Array.isArray(roles)) {
+            const foundRoles = await Role.find({ name: { $in: roles } });
+            userRoles = foundRoles.map(role => role._id);
+        } else {
+            // Nếu không có roles, gán role mặc định
+            const defaultRole = await Role.findOne({ name: "MEMBER" });
+            if (defaultRole) {
+                userRoles = [defaultRole._id];
+            }
+        }
+        
+        // Tạo user mới
         const newUser = new User({
-            email: req.body.email,
-            password: req.body.password,
-            type: req.body.type,
-            roles: req.body.roles
-        })
-
-        // Save into DB
-        await newUser.save()
-            .then(newDoc => res.status(201).json(newDoc))
-            .catch(error => next(error))
+            firstName,
+            lastName,
+            email,
+            phone,
+            password: bcrypt.hashSync(password, parseInt(process.env.PASSWORD_KEY)),
+            roles: userRoles
+        });
+        
+        // Lưu vào database
+        const savedUser = await newUser.save();
+        
+        // Trả về thông tin user đã tạo
+        res.status(201).json(savedUser);
     } catch (error) {
-        next(error)
+        next(error);
     }
 }
 
@@ -54,7 +75,7 @@ async function update(req, res, next) {
             email: req.body.email,
             password: req.body.password,
             type: req.body.type,
-            classes: []
+            status: req.body.status
         }
         await User.findByIdAndUpdate(
             id,

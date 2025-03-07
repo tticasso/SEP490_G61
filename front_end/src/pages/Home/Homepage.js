@@ -1,15 +1,176 @@
-import React, { useState } from 'react';
-import { SearchIcon, UserIcon, HeartIcon, ShoppingCartIcon, ClockIcon, LocationIcon, X as XIcon, Minus as MinusIcon, Plus as PlusIcon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { SearchIcon, UserIcon, HeartIcon, ShoppingCartIcon, ClockIcon, X as XIcon, Minus as MinusIcon, Plus as PlusIcon } from 'lucide-react';
 import image from '../../assets/image1.png'
 import dongho from '../../assets/dongho.png'
 import clockBanner from '../../assets/clockBanner.jpg'
 import clothesBanner from '../../assets/clothesBanner.jpg'
 import phoneBanner from '../../assets/phoneBanner.jpg'
+import ApiService from '../../services/ApiService';
 
 const TroocEcommerce = () => {
     const [hoveredProduct, setHoveredProduct] = useState(null);
     const [showProductModal, setShowProductModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
+    
+    // States cho dữ liệu từ API
+    const [products, setProducts] = useState([]);
+    const [newProducts, setNewProducts] = useState([]);
+    const [recommendedProducts, setRecommendedProducts] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // Gọi API lấy danh sách sản phẩm khi component được mount
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                
+                // Lấy danh sách sản phẩm
+                const productsData = await ApiService.get('/product', false);
+                setProducts(productsData);
+                
+                // Lấy danh sách danh mục
+                const categoriesData = await ApiService.get('/categories', false);
+                setCategories(categoriesData);
+                
+                // Lọc sản phẩm mới (5 sản phẩm mới nhất)
+                const sortedByDate = [...productsData].sort((a, b) => 
+                    new Date(b.created_at) - new Date(a.created_at)
+                );
+                setNewProducts(sortedByDate.slice(0, 5));
+                
+                // Lọc sản phẩm đề xuất (sản phẩm có is_feature = true hoặc là các sản phẩm bán chạy nhất)
+                const featuredProducts = productsData.filter(product => product.is_feature);
+                const hotProducts = productsData.filter(product => product.is_hot);
+                const sortedBySold = [...productsData].sort((a, b) => b.sold - a.sold);
+                
+                // Kết hợp các sản phẩm đặc biệt, loại bỏ trùng lặp và lấy tối đa 10 sản phẩm
+                const combined = [...featuredProducts, ...hotProducts, ...sortedBySold];
+                const uniqueIds = new Set();
+                const uniqueProducts = [];
+                
+                for (const product of combined) {
+                    if (!uniqueIds.has(product._id)) {
+                        uniqueIds.add(product._id);
+                        uniqueProducts.push(product);
+                        if (uniqueProducts.length >= 10) break;
+                    }
+                }
+                
+                setRecommendedProducts(uniqueProducts);
+                
+                setLoading(false);
+            } catch (err) {
+                console.error("Error fetching data:", err);
+                setError(err.message || "Có lỗi xảy ra khi tải dữ liệu");
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    // Hàm format giá tiền
+    const formatPrice = (price) => {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+            .format(price)
+            .replace('₫', 'đ');
+    };
+    
+    // Hàm format thời gian
+    const formatTime = (dateString) => {
+        const now = new Date();
+        const date = new Date(dateString);
+        const diffMs = now - date;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        
+        if (diffHours < 24) {
+            return `${diffHours} giờ trước`;
+        } else {
+            const diffDays = Math.floor(diffHours / 24);
+            return `${diffDays} ngày trước`;
+        }
+    };
+
+    // Component hiển thị sản phẩm
+    const ProductCard = ({ product, index, isHoveredProduct }) => {
+        return (
+            <div 
+                key={product._id} 
+                className="border rounded bg-white overflow-hidden relative cursor-pointer"
+                onMouseEnter={() => setHoveredProduct(index)}
+                onMouseLeave={() => setHoveredProduct(null)}
+                onClick={() => {
+                    setSelectedProduct({
+                        id: product._id,
+                        name: product.name,
+                        price: formatPrice(product.price),
+                        condition: product.condition || "Mới 100%",
+                        image: product.thumbnail || dongho
+                    });
+                    setShowProductModal(true);
+                }}
+            >
+                <img 
+                    src={product.thumbnail || dongho} 
+                    alt={product.name} 
+                    className="w-full h-40 object-cover" 
+                />
+                
+                {/* Add to Cart Button - Appears on hover at the bottom of the product */}
+                {isHoveredProduct && (
+                    <div className="absolute bottom-0 left-0 right-0 py-2 bg-white bg-opacity-95 flex items-center justify-center transition-opacity duration-300 shadow-md">
+                        <button className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-4 rounded-md font-medium text-sm">
+                            Thêm Giỏ Hàng
+                        </button>
+                    </div>
+                )}
+                
+                <div className="p-2">
+                    <h3 className="text-sm font-medium">{product.name}</h3>
+                    <div className="text-xs text-gray-500">{product.condition || "Mới 100%"}</div>
+                    <div className="text-red-500 font-bold mt-1">{formatPrice(product.price)}</div>
+                    <div className="flex items-center text-xs text-gray-500 mt-1">
+                        <ClockIcon size={12} className="mr-1" />
+                        <span>{formatTime(product.created_at)}</span>
+                        <span className="mx-1">•</span>
+                        <span>Hà Nội</span>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // Hiển thị loading
+    if (loading) {
+        return (
+            <div className="bg-[#F1F5F9] min-h-screen flex items-center justify-center">
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h2 className="text-xl font-semibold mb-2">Đang tải dữ liệu...</h2>
+                    <p className="text-gray-600">Vui lòng đợi trong giây lát</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Hiển thị lỗi
+    if (error) {
+        return (
+            <div className="bg-[#F1F5F9] min-h-screen flex items-center justify-center">
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h2 className="text-xl font-semibold mb-2 text-red-600">Đã xảy ra lỗi</h2>
+                    <p className="text-gray-600">{error}</p>
+                    <button 
+                        className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                        onClick={() => window.location.reload()}
+                    >
+                        Thử lại
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className='bg-[#F1F5F9] pb-20'>
@@ -28,27 +189,16 @@ const TroocEcommerce = () => {
                                     {/* Sidebar */}
                                     <div className="w-1/5 bg-white">
                                         <div className=" space-y-2 pt-3 pb-3 pl-3 pr-5">
-                                            <div className="p-3 border-b border-black ">
-                                                <h3 className="font-medium text-gray-800 mb-2">Thời trang nam</h3>
-                                            </div>
-                                            <div className="p-3 border-b border-black">
-                                                <h3 className="font-medium text-gray-800 mb-2">Thời trang nữ</h3>
-                                            </div>
-                                            <div className="p-3 border-b border-black">
-                                                <h3 className="font-medium text-gray-800 mb-2">Phụ kiện thời trang</h3>
-                                            </div>
-                                            <div className="p-3 border-b border-black">
-                                                <h3 className="font-medium text-gray-800 mb-2">Đồ công nghệ</h3>
-                                            </div>
-                                            <div className="p-3">
-                                                <h3 className="font-medium text-gray-800 mb-2">Đồng hồ</h3>
-                                            </div>
+                                            {categories.map((category) => (
+                                                <div key={category._id} className="p-3 border-b border-black">
+                                                    <h3 className="font-medium text-gray-800 mb-2">{category.name}</h3>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                     <div className='w-4/5'>
-                                        <img src={image} alt="Apple logo" className="w-full"/>
+                                        <img src={image} alt="Banner" className="w-full"/>
                                     </div>
-
                                 </div>
                             </div>
                         </div>
@@ -62,44 +212,13 @@ const TroocEcommerce = () => {
 
                             {/* Product Grid */}
                             <div className="grid grid-cols-5 gap-4 bg-[#F1F5F9]">
-                                {[1, 2, 3, 4, 5].map((item) => (
-                                    <div 
-                                        key={item} 
-                                        className="border rounded bg-white overflow-hidden relative cursor-pointer"
-                                        onMouseEnter={() => setHoveredProduct(item)}
-                                        onMouseLeave={() => setHoveredProduct(null)}
-                                        onClick={() => {
-                                            setSelectedProduct({
-                                                id: item,
-                                                name: "Iphone 13 - VNA - 128GB",
-                                                price: "10.000.000 đ",
-                                                condition: "Đã qua sử dụng - 99%",
-                                                image: dongho
-                                            });
-                                            setShowProductModal(true);
-                                        }}
-                                    >
-                                        <img src={dongho} alt="Product" className="w-full h-40 object-cover" />
-                                        {/* Add to Cart Button - Appears on hover at the bottom of the product */}
-                                        {hoveredProduct === item && (
-                                            <div className="absolute bottom-0 left-0 right-0 py-2 bg-white bg-opacity-95 flex items-center justify-center transition-opacity duration-300 shadow-md">
-                                                <button className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-4 rounded-md font-medium text-sm">
-                                                    Thêm Giỏ Hàng
-                                                </button>
-                                            </div>
-                                        )}
-                                        <div className="p-2">
-                                            <h3 className="text-sm font-medium">Iphone 13 - VNA - 128GB</h3>
-                                            <div className="text-xs text-gray-500">Đã qua sử dụng - 99%</div>
-                                            <div className="text-red-500 font-bold mt-1">10.000.000 đ</div>
-                                            <div className="flex items-center text-xs text-gray-500 mt-1">
-                                                <ClockIcon size={12} className="mr-1" />
-                                                <span>22 giờ trước</span>
-                                                <span className="mx-1">•</span>
-                                                <span>Hà Nội</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                {newProducts.map((product, index) => (
+                                    <ProductCard 
+                                        key={product._id}
+                                        product={product}
+                                        index={`new-${index}`} 
+                                        isHoveredProduct={hoveredProduct === `new-${index}`}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -159,89 +278,29 @@ const TroocEcommerce = () => {
 
                             {/* Product Grid */}
                             <div className="grid grid-cols-5 gap-4 pt-8">
-                                {[1, 2, 3, 4, 5].map((item) => (
-                                    <div 
-                                        key={item} 
-                                        className="border rounded bg-white overflow-hidden relative cursor-pointer"
-                                        onMouseEnter={() => setHoveredProduct(item+100)}
-                                        onMouseLeave={() => setHoveredProduct(null)}
-                                        onClick={() => {
-                                            setSelectedProduct({
-                                                id: item+100,
-                                                name: "Iphone 13 - VNA - 128GB",
-                                                price: "10.000.000 đ",
-                                                condition: "Đã qua sử dụng - 99%",
-                                                image: dongho
-                                            });
-                                            setShowProductModal(true);
-                                        }}
-                                    >
-                                        <img src={dongho} alt="Product" className="w-full h-40 object-cover" />
-                                        {/* Add to Cart Button - Appears on hover at the bottom of the product */}
-                                        {hoveredProduct === item+100 && (
-                                            <div className="absolute bottom-0 left-0 right-0 py-2 bg-white bg-opacity-95 flex items-center justify-center transition-opacity duration-300 shadow-md">
-                                                <button className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-4 rounded-md font-medium text-sm">
-                                                    Thêm Giỏ Hàng
-                                                </button>
-                                            </div>
-                                        )}
-                                        <div className="p-2">
-                                            <h3 className="text-sm font-medium">Iphone 13 - VNA - 128GB</h3>
-                                            <div className="text-xs text-gray-500">Đã qua sử dụng - 99%</div>
-                                            <div className="text-red-500 font-bold mt-1">10.000.000 đ</div>
-                                            <div className="flex items-center text-xs text-gray-500 mt-1">
-                                                <ClockIcon size={12} className="mr-1" />
-                                                <span>22 giờ trước</span>
-                                                <span className="mx-1">•</span>
-                                                <span>Hà Nội</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                {recommendedProducts.slice(0, 5).map((product, index) => (
+                                    <ProductCard 
+                                        key={product._id}
+                                        product={product}
+                                        index={`rec1-${index}`} 
+                                        isHoveredProduct={hoveredProduct === `rec1-${index}`}
+                                    />
                                 ))}
                             </div>
 
-                            {/* Product Grid */}
-                            <div className="grid grid-cols-5 gap-4 pt-8">
-                                {[1, 2, 3, 4, 5].map((item) => (
-                                    <div 
-                                        key={item} 
-                                        className="border rounded bg-white overflow-hidden relative cursor-pointer"
-                                        onMouseEnter={() => setHoveredProduct(item+200)}
-                                        onMouseLeave={() => setHoveredProduct(null)}
-                                        onClick={() => {
-                                            setSelectedProduct({
-                                                id: item+200,
-                                                name: "Iphone 13 - VNA - 128GB",
-                                                price: "10.000.000 đ",
-                                                condition: "Đã qua sử dụng - 99%",
-                                                image: dongho
-                                            });
-                                            setShowProductModal(true);
-                                        }}
-                                    >
-                                        <img src={dongho} alt="Product" className="w-full h-40 object-cover" />
-                                        {/* Add to Cart Button - Appears on hover at the bottom of the product */}
-                                        {hoveredProduct === item+200 && (
-                                            <div className="absolute bottom-0 left-0 right-0 py-2 bg-white bg-opacity-95 flex items-center justify-center transition-opacity duration-300 shadow-md">
-                                                <button className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-4 rounded-md font-medium text-sm">
-                                                    Thêm Giỏ Hàng
-                                                </button>
-                                            </div>
-                                        )}
-                                        <div className="p-2">
-                                            <h3 className="text-sm font-medium">Iphone 13 - VNA - 128GB</h3>
-                                            <div className="text-xs text-gray-500">Đã qua sử dụng - 99%</div>
-                                            <div className="text-red-500 font-bold mt-1">10.000.000 đ</div>
-                                            <div className="flex items-center text-xs text-gray-500 mt-1">
-                                                <ClockIcon size={12} className="mr-1" />
-                                                <span>22 giờ trước</span>
-                                                <span className="mx-1">•</span>
-                                                <span>Hà Nội</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            {/* Product Grid - Second Row */}
+                            {recommendedProducts.length > 5 && (
+                                <div className="grid grid-cols-5 gap-4 pt-8">
+                                    {recommendedProducts.slice(5, 10).map((product, index) => (
+                                        <ProductCard 
+                                            key={product._id}
+                                            product={product}
+                                            index={`rec2-${index}`} 
+                                            isHoveredProduct={hoveredProduct === `rec2-${index}`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                     
@@ -353,7 +412,12 @@ const TroocEcommerce = () => {
                             <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium mt-4">
                                 THÊM VÀO GIỎ HÀNG
                             </button>
-                            <button onClick={() => window.location.href = '/product-detail'} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium mt-4">
+                            <button 
+                                onClick={() => {
+                                    window.location.href = `/product-detail?id=${selectedProduct.id}`;
+                                }} 
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium mt-4"
+                            >
                                 Xem thông tin chi tiết
                             </button>
                             </div>

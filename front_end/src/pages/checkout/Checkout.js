@@ -25,7 +25,7 @@ const CheckoutPage = () => {
     const paymentMethods = [
         { id: 1, name: 'Thanh toán khi nhận hàng', icon: <Truck /> },
         { id: 2, name: 'Thanh toán Momo', icon: <Truck /> },
-        { id: 3, name: 'Thanh toán ZaloPay', icon: <Truck /> }
+        { id: 3, name: 'Thanh toán VNPay', icon: <Truck /> }
     ];
 
     const deliveryMethods = [

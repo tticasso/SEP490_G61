@@ -1,37 +1,55 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import AuthService from '../../services/AuthService';
 
 const RegisterPage = () => {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    password: ""
+  });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Kiểm tra nếu người dùng đã đăng nhập thì chuyển hướng
+  useEffect(() => {
+    if (AuthService.isLoggedIn()) {
+      navigate('/');
+    }
+  }, [navigate]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
 
     try {
-      const response = await fetch("http://localhost:9999/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, phone, email, password }),
-      });
+      await AuthService.register(
+        formData.firstName,
+        formData.lastName,
+        formData.phone,
+        formData.email,
+        formData.password
+      );
 
-      if (response.ok) {
-        // Xử lý đăng ký thành công (ví dụ: hiển thị thông báo, chuyển hướng)
-        console.log("Đăng ký thành công");
-        navigate("/login"); // Chuyển hướng đến trang đăng nhập
-      } else {
-        const errorData = await response.json();
-        console.error("Lỗi đăng ký:", errorData.message);
-        // Xử lý lỗi (ví dụ: hiển thị thông báo lỗi)
-      }
+      // Đăng ký thành công
+      alert("Đăng ký thành công! Vui lòng đăng nhập.");
+      navigate("/login");
     } catch (error) {
-      console.error("Lỗi:", error);
-      // Xử lý lỗi (ví dụ: hiển thị thông báo lỗi)
+      setError(error || "Đăng ký thất bại");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -55,19 +73,43 @@ const RegisterPage = () => {
             Đăng ký tài khoản
           </h2>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label className="block mb-1">
                 <span className="font-medium">
-                  Họ và tên <span className="text-red-500">*</span>
+                  Họ <span className="text-red-500">*</span>
                 </span>
               </label>
               <input
                 type="text"
-                placeholder="Nhập họ và tên"
+                name="lastName"
+                placeholder="Nhập họ"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={formData.lastName}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1">
+                <span className="font-medium">
+                  Tên <span className="text-red-500">*</span>
+                </span>
+              </label>
+              <input
+                type="text"
+                name="firstName"
+                placeholder="Nhập tên"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={formData.firstName}
+                onChange={handleChange}
                 required
               />
             </div>
@@ -80,12 +122,14 @@ const RegisterPage = () => {
               </label>
               <input
                 type="tel"
+                name="phone"
                 placeholder="Nhập số điện thoại"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={formData.phone}
+                onChange={handleChange}
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">Định dạng: 0912345678 hoặc 84912345678</p>
             </div>
 
             <div>
@@ -96,10 +140,11 @@ const RegisterPage = () => {
               </label>
               <input
                 type="email"
+                name="email"
                 placeholder="Nhập email"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={handleChange}
                 required
               />
             </div>
@@ -112,19 +157,24 @@ const RegisterPage = () => {
               </label>
               <input
                 type="password"
+                name="password"
                 placeholder="Nhập mật khẩu"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={formData.password}
+                onChange={handleChange}
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ và số
+              </p>
             </div>
 
             <button
               type="submit"
               className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition"
+              disabled={loading}
             >
-              Đăng ký
+              {loading ? "Đang xử lý..." : "Đăng ký"}
             </button>
           </form>
 

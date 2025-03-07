@@ -22,10 +22,11 @@ import ImportHistory from "./Seller/ImportHistory";
 import AddStock from "./Seller/AddStock";
 import RegisteredUsers from "./Seller/RegistedUser";
 import AllOrders from "./Seller/AllOrder";
-import TroocAdminDashboard from "./admin/Sidebar";
 import ShopRegistration from "./sellerRegistration/ShopRegistration";
 import ForgotPassword from './forgotPassword/ForgotPassword';
 import ResetPassword from './forgotPassword/ResetPassword';
+import AdminLayout from './admin/AdminLayout';
+import ChatBot from './chatbot/ChatBot'
 
 function useGoogleAuth() {
   const location = useLocation();
@@ -116,11 +117,12 @@ function App() {
         {/* Routes cho quản lí order của seller */}
         <Route path="/seller-dashboard/orders" element={<AllOrders />} />
         {/* Admin routers */}
-        <Route path="/admin" element={<TroocAdminDashboard />} />
+        <Route path="/admin/*" element={<AdminLayout />} />
         <Route path="/shop-registration" element={<ShopRegistration />} />
 
       </Routes>
       {!noHeaderPage && <Footer />}
+      <ChatBot/>
     </div>
   );
 }

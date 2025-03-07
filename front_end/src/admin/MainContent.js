@@ -1,70 +1,27 @@
 import React from 'react';
 import { Search, ChevronDown } from 'lucide-react';
-import ProductManagement from './components/ProductManagement';
-import CategoryManagement from './components/CategoryManagement';
-import AddCategory from './components/AddCategory';
-import Dashboard from './components/Dashboard';
-import BrandList from './components/BrandList';
-import AddBrand from './components/AddBrand';
-import StoreList from './components/StoreList';
-import StoreDetail from './components/StoreDetail';
-import CustomerManagement from './components/CustomerManagement';
-import OrderManagement from './components/OrderManagement';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import ProductManagement from './product/ProductManagement';
+import CategoryManagement from './category/CategoryManagement';
+import AddCategory from './category/AddCategory';
+import Dashboard from './dashboard/Dashboard';
+import BrandList from './brand/BrandList';
+import AddBrand from './brand/AddBrand';
+import StoreList from './store/StoreList';
+import StoreDetail from './store/StoreDetail';
+import CustomerManagement from './customer/CustomerManagement';
+import OrderManagement from './order/OrderManagement';
 import logo from '../assets/logo.png'
 
 // Main Content Component
-const MainContent = ({ activeMenu, setActiveMenu }) => {
-
-  // Render content based on active menu
-  const renderContent = () => {
-    switch (activeMenu) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'products':
-        return <div className="p-6">Nội dung Sản phẩm</div>;
-      case 'productManagement':
-        return <ProductManagement />;
-      case 'categories':
-        return <div className="p-6">Nội dung Danh mục</div>;
-      case 'allCategories':
-        return <CategoryManagement />;
-      case 'addCategory':
-        return <AddCategory />;
-      case 'brands':
-        return <div className="p-6">Nội dung Thương hiệu</div>;
-      case 'brandList':
-        return <BrandList />;
-      case 'addBrand':
-        return <AddBrand />;
-      case 'storeDetail':
-        return <StoreDetail onBack={() => setActiveMenu('storeList')} />;
-      case 'stores':
-        return <div className="p-6">Nội dung Cửa hàng</div>;
-      case 'storeList':
-        return <StoreList />;
-      case 'customers':
-        return <div className="p-6">Nội dung Khách hàng</div>;
-      case 'customerManagement':
-        return <CustomerManagement />;
-      case 'orders':
-        return <div className="p-6">Nội dung Đơn hàng</div>;
-      case 'orderManagement':
-        return <OrderManagement />;
-      case 'support':
-        return <div className="p-6">Nội dung Hỗ trợ</div>;
-      case 'settings':
-        return <div className="p-6">Nội dung Cài đặt</div>;
-      default:
-        return <Dashboard />;
-    }
-  };
+const MainContent = () => {
+  const navigate = useNavigate();
 
   return (
     <div className="flex flex-col flex-1">
       {/* Header */}
-
       <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4">
-        <div className="p-4 flex gap-2 items-center">
+        <div onClick={() => window.location.href ='/'} className="p-4 flex gap-2 items-center">
           <img src={logo} alt="VVDShop Logo" className="h-10" />
           <p>TROOC2HAND</p>
         </div>
@@ -89,7 +46,24 @@ const MainContent = ({ activeMenu, setActiveMenu }) => {
       </div>
 
       {/* Content Area */}
-      {renderContent()}
+      <div className="flex-1">
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/products" element={<ProductManagement />} />
+          <Route path="/categories" element={<CategoryManagement />} />
+          <Route path="/add-category" element={<AddCategory />} />
+          <Route path="/brands" element={<BrandList />} />
+          <Route path="/add-brand" element={<AddBrand />} />
+          <Route path="/stores" element={<StoreList />} />
+          <Route path="/store/:id" element={<StoreDetail onBack={() => navigate('/admin/stores')} />} />
+          <Route path="/customers" element={<CustomerManagement />} />
+          <Route path="/orders" element={<OrderManagement />} />
+          <Route path="/support" element={<div className="p-6">Nội dung Hỗ trợ</div>} />
+          <Route path="/settings" element={<div className="p-6">Nội dung Cài đặt</div>} />
+          <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+        </Routes>
+      </div>
     </div>
   );
 };

@@ -207,7 +207,7 @@ const ProductDetail = () => {
                                 <button className="border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-lg transition-colors border-blue-600">
                                     <ShoppingCart size={18} className="text-gray-600" />
                                 </button>
-                                <button className="border border-gray-300 hover:bg-gray-50 flex-1 py-2 rounded-lg text-gray-600 border-blue-600 font-medium transition-colors">
+                                <button onClick={() => window.location.href = '/user-profile/messages'} className="border border-gray-300 hover:bg-gray-50 flex-1 py-2 rounded-lg text-gray-600 border-blue-600 font-medium transition-colors">
                                    <p className='flex items-center justify-center gap-2 text-blue-600'><MessageSquareText size={18}/>Chat</p>
                                 </button>
                             </div>

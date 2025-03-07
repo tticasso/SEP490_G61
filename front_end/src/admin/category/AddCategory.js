@@ -1,22 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, RefreshCw, Upload } from 'lucide-react';
+import ApiService from '../../services/ApiService';
+import { useNavigate } from 'react-router-dom';
 
-const AddBrand = () => {
-    const [brandName, setBrandName] = useState('');
-    const [description, setDescription] = useState('');
-    const [category, setCategory] = useState('Máy tính & laptop');
+const AddCategory = () => {
+    const [formData, setFormData] = useState({
+        name: '',
+        description: ''
+    });
+    const [formErrors, setFormErrors] = useState({});
+    const [loading, setLoading] = useState(false);
+    const [categories, setCategories] = useState([]);
+    const [parentCategory, setParentCategory] = useState('');
     const [image, setImage] = useState(null);
 
-    // Handle form submission
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        // Logic to save the brand
-        console.log({
-            brandName,
-            description,
-            category,
-            image
+    const navigate = useNavigate();
+
+    // Fetch categories for parent selection
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const response = await ApiService.get('/categories');
+                setCategories(response);
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+            }
+        };
+
+        fetchCategories();
+    }, []);
+
+    // Handle form input change
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({
+            ...formData,
+            [name]: value
         });
+        
+        // Clear error for this field
+        if (formErrors[name]) {
+            setFormErrors({
+                ...formErrors,
+                [name]: ''
+            });
+        }
     };
 
     // Handle image upload
@@ -26,67 +54,99 @@ const AddBrand = () => {
         }
     };
 
+    // Handle form submission
+    const handleSubmit = async (e) => {
+        if (e && e.preventDefault) {
+            e.preventDefault();
+        }
+        
+        // Validation
+        const errors = {};
+        if (!formData.name.trim()) {
+            errors.name = 'Tên danh mục là bắt buộc';
+        }
+        
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            return;
+        }
+        
+        try {
+            setLoading(true);
+            await ApiService.post('/categories/create', formData);
+            
+            // Redirect to category list page
+            navigate('/admin/categories');
+        } catch (error) {
+            setFormErrors({
+                submit: 'Lỗi khi tạo danh mục: ' + error
+            });
+            setLoading(false);
+        }
+    };
+
     // Handle save and display
     const handleSaveAndDisplay = () => {
-        // Logic to save and display
-        console.log("Save and display");
+        handleSubmit();
     };
 
     // Handle save
     const handleSave = () => {
-        // Logic to save
-        console.log("Save only");
+        handleSubmit();
     };
-
-    // Category options
-    const categoryOptions = [
-        "Máy tính & laptop",
-        "Đồng hồ",
-        "Thời trang nam",
-        "Thời trang nữ",
-        "Mẹ & bé",
-        "Nhà cửa & đời sống",
-        "Sắc đẹp",
-        "Sức khỏe",
-        "Giày dép nữ",
-        "Thiết bị điện tử",
-        "Máy ảnh & máy quay phim"
-    ];
 
     return (
         <div className="flex-1 bg-white">
             {/* Header */}
             <div className="border-b border-gray-200 p-6 flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-gray-800">THÊM THƯƠNG HIỆU</h1>
+                <h1 className="text-2xl font-bold text-gray-800">THÊM DANH MỤC</h1>
                 <div className="flex items-center">
                     <button className="flex items-center text-gray-600 mr-4">
                         <RefreshCw size={18} className="mr-2" />
                         <span>Dữ liệu mới nhất</span>
                     </button>
-                    <div className="text-gray-500">July 12, 2024 16:10 PM</div>
+                    <div className="text-gray-500">
+                        {new Date().toLocaleDateString('vi-VN')} {new Date().toLocaleTimeString('vi-VN')}
+                    </div>
                 </div>
             </div>
 
             {/* Back button */}
             <div className="p-6">
+                <button 
+                    className="flex items-center text-gray-600 hover:text-gray-800 mb-6"
+                    onClick={() => navigate('/admin/categories')}
+                >
+                    <ChevronLeft size={18} className="mr-1" />
+                    <span>Quay lại</span>
+                </button>
+
+                {formErrors.submit && (
+                    <div className="mb-6 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                        {formErrors.submit}
+                    </div>
+                )}
 
                 <div className="grid grid-cols-3 gap-6">
                     {/* Left column - Form */}
                     <div className="col-span-2">
                         <form onSubmit={handleSubmit}>
-                            {/* Brand name */}
+                            {/* Category name */}
                             <div className="mb-6">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Tên thương hiệu <span className="text-red-500">*</span>
+                                    Tên danh mục <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
-                                    placeholder="Tên thương hiệu"
-                                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                    value={brandName}
-                                    onChange={(e) => setBrandName(e.target.value)}
-                                    required
+                                    name="name"
+                                    placeholder="Tên danh mục"
+                                    className={`w-full p-3 border ${formErrors.name ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400`}
+                                    value={formData.name}
+                                    onChange={handleInputChange}
                                 />
+                                {formErrors.name && (
+                                    <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
+                                )}
                             </div>
 
                             {/* Description */}
@@ -150,29 +210,13 @@ const AddBrand = () => {
 
                                     {/* Text editor content area */}
                                     <textarea
+                                        name="description"
                                         className="w-full p-3 min-h-[150px] focus:outline-none"
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        placeholder="Nhập mô tả cho thương hiệu..."
+                                        value={formData.description}
+                                        onChange={handleInputChange}
+                                        placeholder="Nhập mô tả cho danh mục..."
                                     ></textarea>
                                 </div>
-                            </div>
-                            {/* Action buttons */}
-                            <div className="mt-8 flex justify-center space-x-4">
-                                <button
-                                    type="button"
-                                    className="px-6 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center"
-                                    onClick={handleSave}
-                                >
-                                    Lưu nhập
-                                </button>
-                                <button
-                                    type="button"
-                                    className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center"
-                                    onClick={handleSaveAndDisplay}
-                                >
-                                    Lưu và hiển thị
-                                </button>
                             </div>
                         </form>
                     </div>
@@ -180,45 +224,23 @@ const AddBrand = () => {
                     {/* Right column - Options */}
                     <div className="col-span-1">
                         <div>
-                            {/* Category selection */}
+                            {/* Parent category */}
                             <div className="mb-6">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Danh mục
+                                    Cấp cha
                                 </label>
-                                <div className="max-h-[300px] overflow-y-auto border border-gray-300 rounded-md p-3">
-                                    {categoryOptions.map((cat, index) => (
-                                        <div key={index} className="mb-2 flex items-center">
-                                            <input
-                                                type="radio"
-                                                id={`category-${index}`}
-                                                name="category"
-                                                value={cat}
-                                                checked={category === cat}
-                                                onChange={() => setCategory(cat)}
-                                                className="mr-2"
-                                            />
-                                            <label htmlFor={`category-${index}`} className="text-sm text-gray-700">
-                                                {cat}
-                                            </label>
-                                            {index < 5 && (
-                                                <svg
-                                                    className={`ml-2 w-4 h-4 cursor-pointer ${cat === category ? 'text-gray-800' : 'text-gray-400'}`}
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d={cat === category && index < 2 ? "M19 9l-7 7-7-7" : "M9 5l7 7-7 7"}
-                                                    />
-                                                </svg>
-                                            )}
-                                        </div>
+                                <select
+                                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    value={parentCategory}
+                                    onChange={(e) => setParentCategory(e.target.value)}
+                                >
+                                    <option value="">Không</option>
+                                    {categories.map(category => (
+                                        <option key={category._id} value={category._id}>
+                                            {category.name}
+                                        </option>
                                     ))}
-                                </div>
+                                </select>
                             </div>
 
                             {/* Image upload */}
@@ -251,10 +273,28 @@ const AddBrand = () => {
                     </div>
                 </div>
 
-
+                {/* Action buttons */}
+                <div className="mt-8 flex justify-center space-x-4">
+                    <button
+                        type="button"
+                        className="px-6 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center"
+                        onClick={handleSave}
+                        disabled={loading}
+                    >
+                        {loading ? 'Đang lưu...' : 'Lưu bản nháp'}
+                    </button>
+                    <button
+                        type="button"
+                        className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center"
+                        onClick={handleSaveAndDisplay}
+                        disabled={loading}
+                    >
+                        {loading ? 'Đang lưu...' : 'Lưu và hiển thị'}
+                    </button>
+                </div>
             </div>
         </div>
     );
 };
 
-export default AddBrand;
+export default AddCategory;

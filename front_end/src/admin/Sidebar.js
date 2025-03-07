@@ -1,37 +1,38 @@
 import React, { useState } from 'react';
 import { BarChart2, Package, Grid, ShoppingBag, Users, Truck, HelpCircle, Settings, ChevronDown, ArrowRight } from 'lucide-react';
-import MainContent from './MainContent';
-
+import { Link, useLocation } from 'react-router-dom';
 
 // Sidebar Component
-const Sidebar = ({ activeMenu, setActiveMenu }) => {
+const Sidebar = () => {
   const [expandedMenus, setExpandedMenus] = useState(['products']);
+  const location = useLocation();
+  const currentPath = location.pathname;
   
   const menuItems = [
-    { id: 'dashboard', icon: <BarChart2 size={20} />, label: 'Bảng điều khiển', hasSubmenu: false },
+    { id: 'dashboard', icon: <BarChart2 size={20} />, label: 'Bảng điều khiển', hasSubmenu: false, path: '/admin/dashboard' },
     { id: 'products', icon: <Package size={20} />, label: 'Sản phẩm', hasSubmenu: true, submenus: [
-      { id: 'productManagement', label: 'Quản lý sản phẩm' }
+      { id: 'productManagement', label: 'Quản lý sản phẩm', path: '/admin/products' }
     ]},
     { id: 'categories', icon: <Grid size={20} />, label: 'Danh mục', hasSubmenu: true, submenus: [
-      { id: 'allCategories', label: 'Tất cả danh mục' },
-      { id: 'addCategory', label: 'Thêm mới danh mục' }
+      { id: 'allCategories', label: 'Tất cả danh mục', path: '/admin/categories' },
+      { id: 'addCategory', label: 'Thêm mới danh mục', path: '/admin/add-category' }
     ]},
     { id: 'brands', icon: <ShoppingBag size={20} />, label: 'Thương hiệu', hasSubmenu: true, submenus: [
-      { id: 'brandList', label: 'Danh sách thương hiệu' },
-      { id: 'addBrand', label: 'Thêm mới thương hiệu' }
+      { id: 'brandList', label: 'Danh sách thương hiệu', path: '/admin/brands' },
+      { id: 'addBrand', label: 'Thêm mới thương hiệu', path: '/admin/add-brand' }
     ]},
     { id: 'stores', icon: <ShoppingBag size={20} />, label: 'Cửa hàng', hasSubmenu: true, submenus: [
-      { id: 'storeList', label: 'Danh sách cửa hàng' },
-      { id: 'addStore', label: 'Thêm mới cửa hàng' }
+      { id: 'storeList', label: 'Danh sách cửa hàng', path: '/admin/stores' },
+      { id: 'addStore', label: 'Thêm mới cửa hàng', path: '/admin/add-store' }
     ]},
     { id: 'customers', icon: <Users size={20} />, label: 'Khách hàng', hasSubmenu: true, submenus: [
-      { id: 'customerManagement', label: 'Quản lý khách hàng' }
+      { id: 'customerManagement', label: 'Quản lý khách hàng', path: '/admin/customers' }
     ]},
     { id: 'orders', icon: <Truck size={20} />, label: 'Đơn hàng', hasSubmenu: true, submenus: [
-      { id: 'orderManagement', label: 'Tất cả đơn hàng' }
+      { id: 'orderManagement', label: 'Tất cả đơn hàng', path: '/admin/orders' }
     ]},
-    { id: 'support', icon: <HelpCircle size={20} />, label: 'Hỗ trợ', hasSubmenu: false },
-    { id: 'settings', icon: <Settings size={20} />, label: 'Cài đặt', hasSubmenu: false },
+    { id: 'support', icon: <HelpCircle size={20} />, label: 'Hỗ trợ', hasSubmenu: false, path: '/admin/support' },
+    { id: 'settings', icon: <Settings size={20} />, label: 'Cài đặt', hasSubmenu: false, path: '/admin/settings' },
   ];
   
   const toggleMenu = (menuId) => {
@@ -42,45 +43,56 @@ const Sidebar = ({ activeMenu, setActiveMenu }) => {
     }
   };
 
+  const isActiveMenu = (path) => {
+    return currentPath === path;
+  };
+
   return (
     <div className="h-screen bg-white border-r border-gray-200 overflow-y-auto px-6">
       
       <div className="px-4 py-2">
         {menuItems.map((item) => (
           <div key={item.id}>
-            <div 
-              className={`flex items-center p-3 my-1 rounded-lg cursor-pointer ${activeMenu === item.id ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-              onClick={() => {
-                if (item.hasSubmenu) {
-                  toggleMenu(item.id);
-                } else {
-                  setActiveMenu(item.id);
-                }
-              }}
-            >
-              <div className="mr-3 text-gray-500">
-                {item.icon}
-              </div>
-              <span className="flex-grow font-medium text-gray-700">{item.label}</span>
-              {item.hasSubmenu && (
+            {item.hasSubmenu ? (
+              <div 
+                className={`flex items-center p-3 my-1 rounded-lg cursor-pointer hover:bg-gray-50`}
+                onClick={() => toggleMenu(item.id)}
+              >
+                <div className="mr-3 text-gray-500">
+                  {item.icon}
+                </div>
+                <span className="flex-grow font-medium text-gray-700">{item.label}</span>
                 <ChevronDown size={18} className={`text-gray-400 transform transition-transform ${expandedMenus.includes(item.id) ? 'rotate-180' : ''}`} />
-              )}
-            </div>
+              </div>
+            ) : (
+              <Link to={item.path}>
+                <div 
+                  className={`flex items-center p-3 my-1 rounded-lg cursor-pointer ${isActiveMenu(item.path) ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                >
+                  <div className="mr-3 text-gray-500">
+                    {item.icon}
+                  </div>
+                  <span className={`flex-grow font-medium ${isActiveMenu(item.path) ? 'text-blue-600' : 'text-gray-700'}`}>
+                    {item.label}
+                  </span>
+                </div>
+              </Link>
+            )}
             
             {/* Submenu items */}
             {item.hasSubmenu && item.submenus && expandedMenus.includes(item.id) && (
               <div className="ml-7 my-1">
                 {item.submenus.map(submenu => (
-                  <div
-                    key={submenu.id}
-                    className={`flex items-center p-2 pl-4 my-1 rounded-lg cursor-pointer ${activeMenu === submenu.id ? 'bg-gray-100 text-blue-600' : 'hover:bg-gray-50'}`}
-                    onClick={() => setActiveMenu(submenu.id)}
-                  >
-                    <ArrowRight size={16} className="mr-2 text-gray-400" />
-                    <span className={`text-sm ${activeMenu === submenu.id ? 'font-medium text-blue-600' : 'text-gray-600'}`}>
-                      {submenu.label}
-                    </span>
-                  </div>
+                  <Link key={submenu.id} to={submenu.path}>
+                    <div
+                      className={`flex items-center p-2 pl-4 my-1 rounded-lg cursor-pointer ${isActiveMenu(submenu.path) ? 'bg-gray-100 text-blue-600' : 'hover:bg-gray-50'}`}
+                    >
+                      <ArrowRight size={16} className="mr-2 text-gray-400" />
+                      <span className={`text-sm ${isActiveMenu(submenu.path) ? 'font-medium text-blue-600' : 'text-gray-600'}`}>
+                        {submenu.label}
+                      </span>
+                    </div>
+                  </Link>
                 ))}
               </div>
             )}
@@ -91,16 +103,4 @@ const Sidebar = ({ activeMenu, setActiveMenu }) => {
   );
 };
 
-// Main App Component
-const TroocAdminDashboard = () => {
-  const [activeMenu, setActiveMenu] = useState('dashboard');
-
-  return (
-    <div className="flex h-screen">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-      <MainContent activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-    </div>
-  );
-};
-
-export default TroocAdminDashboard;
+export default Sidebar;

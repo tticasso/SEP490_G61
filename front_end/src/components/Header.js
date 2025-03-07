@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Menu,
     Search,
@@ -7,10 +8,17 @@ import {
     ShoppingCart,
     Globe,
     PiggyBank,
-    ChevronRight
+    ChevronRight,
+    LogOut,
+    MessageSquare,
+    Package,
+    MapPin,
+    Lock,
+    UserCircle
 } from 'lucide-react';
 import CartModal from '../pages/cart/CartModal';
-import logo from '../assets/logo.png'
+import logo from '../assets/logo.png';
+import AuthService from '../services/AuthService';
 
 const ProductCategoriesSidebar = ({ isOpen, onClose, buttonRef }) => {
     const sidebarRef = useRef(null);
@@ -61,7 +69,7 @@ const ProductCategoriesSidebar = ({ isOpen, onClose, buttonRef }) => {
             <ul className="py-2">
                 {categories.map((category, index) => (
                     <li
-                    onClick={() => window.location.href = "categories"}
+                        onClick={() => window.location.href = "categories"}
                         key={index}
                         className="px-4 py-2 hover:bg-gray-100 flex justify-between items-center cursor-pointer"
                     >
@@ -75,31 +83,71 @@ const ProductCategoriesSidebar = ({ isOpen, onClose, buttonRef }) => {
         </div>
     );
 };
-
 const Header = () => {
+    const navigate = useNavigate();
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [language, setLanguage] = useState('Vietnamese');
     const [searchQuery, setSearchQuery] = useState('');
     const [isCategoriesSidebarOpen, setIsCategoriesSidebarOpen] = useState(false);
+    const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
     const categoriesButtonRef = useRef(null);
+    const userDropdownRef = useRef(null);
+    const userButtonRef = useRef(null);
+
+    // Kiểm tra trạng thái đăng nhập
+    const currentUser = AuthService.getCurrentUser();
+    const isLoggedIn = AuthService.isLoggedIn();
 
     const toggleCategoriesSidebar = () => {
         setIsCategoriesSidebarOpen(!isCategoriesSidebarOpen);
     };
 
+    const toggleUserDropdown = () => {
+        setIsUserDropdownOpen(!isUserDropdownOpen);
+    };
+
+    // Xử lý đăng xuất
+    const handleLogout = () => {
+        AuthService.logout();
+        setIsUserDropdownOpen(false);
+        localStorage.clear();
+        navigate('/');
+        // Reload để cập nhật trạng thái
+        window.location.reload();
+    };
+
+    // Xử lý click bên ngoài để đóng dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (
+                userDropdownRef.current &&
+                !userDropdownRef.current.contains(event.target) &&
+                userButtonRef.current &&
+                !userButtonRef.current.contains(event.target)
+            ) {
+                setIsUserDropdownOpen(false);
+            }
+        };
+
+        if (isUserDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isUserDropdownOpen]);
+
     return (
         <div className="bg-white shadow-sm relative">
-            {/* Existing header code remains the same */}
-            {/* Main Header */}
+            {/* Top Notification Bar */}
             <div className='border-b'>
                 <div className="mx-auto max-w-7xl py-2 flex items-center justify-between flex ">
-                    {/* Top Notification Bar */}
                     <div className="text-center py-4 text-sm px-4">
                         Đăng ký bán hàng cùng TROOC để có những ưu đãi hấp dẫn
                     </div>
                     {/* Language and Tracking */}
                     <div className="flex gap-3 items-center space-x-4 text-sm text-gray-600">
-
                         <a href="#" className="hover:text-purple-600">Vị trí cửa hàng</a>
                         <a href="#" className="hover:text-purple-600">Theo dõi đơn hàng</a>
                         <a href="#" className="hover:text-purple-600">FAQs</a>
@@ -119,11 +167,8 @@ const Header = () => {
                             Việt Nam (VNĐ)
                         </div>
                     </div>
-
-
                 </div>
             </div>
-
 
             {/* Logo and Search Section */}
             <div className='border-b py-6'>
@@ -171,13 +216,98 @@ const Header = () => {
 
                     {/* User Actions */}
                     <div className="flex items-center space-x-12">
-                        <a href='login' className="flex flex-col items-center text-gray-600 hover:text-purple-600 text-xs">
-                            <User size={24} />
-                            <span>Login</span>
-                        </a>
+                        {/* User Account Section - Conditional Rendering */}
+                        <div className="relative">
+                            {isLoggedIn ? (
+                                // Nếu đã đăng nhập, hiển thị nút dropdown tài khoản
+                                <button
+                                    ref={userButtonRef}
+                                    className="flex flex-col items-center text-gray-600 hover:text-purple-600 text-xs"
+                                    onClick={toggleUserDropdown}
+                                >
+                                    <User size={24} />
+                                    <span>Tài khoản</span>
+                                </button>
+                            ) : (
+                                // Nếu chưa đăng nhập, hiển thị nút chuyển đến trang login
+                                <button
+                                    className="flex flex-col items-center text-gray-600 hover:text-purple-600 text-xs"
+                                    onClick={() => navigate('/login')}
+                                >
+                                    <User size={24} />
+                                    <span>Login</span>
+                                </button>
+                            )}
+
+                            {/* User Dropdown Menu for Logged In Users */}
+                            {isLoggedIn && isUserDropdownOpen && (
+                                <div
+                                    ref={userDropdownRef}
+                                    className="absolute z-50 right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 border"
+                                >
+                                    <div className="px-4 py-2 border-b">
+                                        <div className="font-medium text-gray-900">
+                                            {currentUser?.email}
+                                        </div>
+                                    </div>
+
+                                    <a
+                                        href="/user-profile"
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                    >
+                                        <UserCircle size={16} className="mr-2" />
+                                        Tài khoản của tôi
+                                    </a>
+
+                                    <a
+                                        href="/user-profile/orders"
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                    >
+                                        <Package size={16} className="mr-2" />
+                                        Đơn mua
+                                    </a>
+
+                                    <a
+                                        href="/user-profile/messages"
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                    >
+                                        <MessageSquare size={16} className="mr-2" />
+                                        Tin nhắn
+                                    </a>
+
+                                    <a
+                                        href="/user-profile/addresses"
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                    >
+                                        <MapPin size={16} className="mr-2" />
+                                        Địa chỉ nhận hàng
+                                    </a>
+
+                                    <a
+                                        href="/user-profile/password"
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                    >
+                                        <Lock size={16} className="mr-2" />
+                                        Đổi mật khẩu
+                                    </a>
+
+                                    <div className="border-t mt-1">
+                                        <button
+                                            onClick={handleLogout}
+                                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
+                                        >
+                                            <LogOut size={16} className="mr-2" />
+                                            Đăng xuất
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <button className="flex flex-col items-center text-gray-600 hover:text-purple-600 text-xs">
                             <Heart size={24} />
                         </button>
+
                         <div className='flex gap-2'>
                             <button id='cartbutton' className='cartbutton' onClick={() => setIsCartOpen(true)}>
                                 <ShoppingCart size={24} />
@@ -192,8 +322,6 @@ const Header = () => {
                             isOpen={isCartOpen}
                             onClose={() => setIsCartOpen(false)}
                         />
-
-
                     </div>
                 </div>
             </div>

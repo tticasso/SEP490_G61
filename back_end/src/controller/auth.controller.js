@@ -83,26 +83,26 @@ async function signIn(req, res, next) {
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "/api/auth/google/callback"
+    callbackURL: "http://localhost:9999/api/auth/google/callback"
 }, async (accessToken, refreshToken, profile, done) => {
     try {
         let user = await User.findOne({ email: profile.emails[0].value });
 
         if (!user) {
-            // Tạo user mới nếu chưa tồn tại
-            user = new User({
+            const newUser = new User({
                 email: profile.emails[0].value,
-                firstName: profile.name.givenName,
-                lastName: profile.name.familyName,
-                password: bcrypt.hashSync(Math.random().toString(36).slice(-8), 10), // Mật khẩu ngẫu nhiên
+                firstName: profile.name.givenName || 'Google',
+                lastName: profile.name.familyName || 'User',
+                password: bcrypt.hashSync(Math.random().toString(36).slice(-8), 10),
+                phone: '0912345678' // Thêm số điện thoại mặc định nếu model yêu cầu
             });
 
             // Gán quyền mặc định
             const role = await Role.findOne({ name: "MEMBER" });
             user.roles = [role._id];
 
-            await user.save();
-        }
+                            await user.save();
+                        }
 
         return done(null, user);
     } catch (error) {
@@ -127,7 +127,7 @@ function googleAuth(req, res, next) {
 function googleAuthCallback(req, res, next) {
     passport.authenticate('google', { session: false }, (err, user) => {
         if (err || !user) {
-            return res.redirect('/login?error=true');
+            return res.redirect('http://localhost:3000/login?error=true'); // Thay đổi thành URL frontend
         }
 
         // Tạo token JWT
@@ -136,8 +136,26 @@ function googleAuthCallback(req, res, next) {
             expiresIn: config.jwtExpiration
         });
 
-        res.redirect(`/dashboard?token=${token}`);
-    })(req, res, next); 
+        // Lấy thông tin user cần thiết
+        const authorities = []
+        for (let i = 0; i < user.roles.length; i++) {
+            authorities.push("ROLE_" + user.roles[i].name)
+        }
+
+        // Tạo một object chứa thông tin người dùng
+        const userData = {
+            id: user._id.toString(),
+            email: user.email,
+            accessToken: token,
+            roles: authorities
+        };
+
+        // Mã hóa thông tin người dùng để truyền qua URL
+        const userDataEncoded = encodeURIComponent(JSON.stringify(userData));
+
+        // Chuyển hướng tới URL frontend với dữ liệu người dùng
+        res.redirect(`http://localhost:3000/?googleAuth=${userDataEncoded}`); // Thay đổi thành URL frontend
+    })(req, res, next);
 }
 
 

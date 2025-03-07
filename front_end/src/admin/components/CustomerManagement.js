@@ -1,54 +1,19 @@
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react';
+import AuthService from '../../services/AuthService';
+import ApiService from '../../services/ApiService';
 
 const CustomerManagement = () => {
-  // Sample customer data
-  const customerData = [
-    {
-      id: 1,
-      name: 'vu dinh',
-      avatar: null,
-      email: 'vuvandinh2031@gmail.com',
-      orders: 0,
-      lastActivity: '22:43 29/6/2024'
-    },
-    {
-      id: 2,
-      name: 'Vũ Đình',
-      avatar: '/api/placeholder/50/50',
-      email: 'vuvandinh203@gmail.com',
-      orders: 11,
-      lastActivity: '22:43 29/6/2024'
-    },
-    {
-      id: 3,
-      name: 'Bùi Thị Hồng Thơm',
-      avatar: null,
-      email: 'thomhong102003@gmail.com',
-      orders: 0,
-      lastActivity: '22:43 29/6/2024'
-    },
-    {
-      id: 4,
-      name: 'Hồng Oanh',
-      avatar: null,
-      email: 'oanhoanh@gmail.com',
-      orders: 0,
-      lastActivity: '22:43 29/6/2024'
-    },
-    {
-      id: 5,
-      name: 'đinh vũ',
-      avatar: null,
-      email: 'thomcute2810@gmail.com',
-      orders: 8,
-      lastActivity: '9:2 30/6/2024'
-    }
-  ];
+  // State cho dữ liệu người dùng
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = 2;
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [usersPerPage, setUsersPerPage] = useState(5);
+  const totalPages = Math.ceil(totalUsers / usersPerPage);
 
   // Filter states
   const [filter, setFilter] = useState({
@@ -61,27 +26,215 @@ const CustomerManagement = () => {
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [newUser, setNewUser] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    password: '',
+    roles: ['MEMBER']
+  });
+  const [formErrors, setFormErrors] = useState({});
+
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await ApiService.get('/user/list');
+        setUsers(response);
+        setTotalUsers(response.length);
+        setLoading(false);
+      } catch (error) {
+        setError('Lỗi khi tải dữ liệu người dùng: ' + error);
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
   // Handle search
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
   };
 
-  // Filter customers based on search term
-  const filteredCustomers = customerData.filter(customer => {
-    return customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           customer.email.toLowerCase().includes(searchTerm.toLowerCase());
+  // Filter users based on search term
+  const filteredUsers = users.filter(user => {
+    const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
+    return fullName.includes(searchTerm.toLowerCase()) ||
+           (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()));
   });
+
+  // Paginate users
+  const indexOfLastUser = currentPage * usersPerPage;
+  const indexOfFirstUser = indexOfLastUser - usersPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
 
   // Handle pagination
   const goToPage = (page) => {
     setCurrentPage(page);
   };
 
-  // Handle view customer detail
-  const handleViewCustomerDetail = (customer) => {
-    console.log("View customer details:", customer);
-    // We would navigate to a customer detail page or open a modal here
+  // Format roles
+  const formatRoles = (roles) => {
+    if (!roles || !Array.isArray(roles)) return 'Thành viên';
+    return roles.map(role => {
+      const roleName = typeof role === 'string' ? role : (role.name || '');
+      if (roleName.includes('ADMIN')) return 'Quản trị viên';
+      if (roleName.includes('SELLER')) return 'Người bán';
+      return 'Thành viên';
+    }).join(', ');
   };
+
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return `${date.getHours()}:${date.getMinutes()} ${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+  };
+
+  // Handle view user detail
+  const handleViewUserDetail = (user) => {
+    console.log("View user details:", user);
+    // We would navigate to a user detail page or open a modal here
+  };
+
+  // Handle change user status
+  const handleToggleStatus = async (userId, currentStatus) => {
+    try {
+      // Call API to update user status
+      await ApiService.put(`/user/edit/${userId}`, {
+        status: !currentStatus
+      });
+      
+      // Update local state
+      setUsers(users.map(user => 
+        user._id === userId ? { ...user, status: !currentStatus } : user
+      ));
+    } catch (error) {
+      setError('Lỗi khi cập nhật trạng thái người dùng: ' + error);
+    }
+  };
+
+  // Handle delete user
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
+      try {
+        await ApiService.delete(`/user/delete/${userId}`);
+        setUsers(users.filter(user => user._id !== userId));
+      } catch (error) {
+        setError('Lỗi khi xóa người dùng: ' + error);
+      }
+    }
+  };
+
+  // Handle form input change
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewUser({
+      ...newUser,
+      [name]: value
+    });
+    
+    // Clear error for this field
+    if (formErrors[name]) {
+      setFormErrors({
+        ...formErrors,
+        [name]: ''
+      });
+    }
+  };
+
+  // Handle role selection
+  const handleRoleChange = (e) => {
+    const { value } = e.target;
+    setNewUser({
+      ...newUser,
+      roles: [value]
+    });
+  };
+
+  // Validate form
+  const validateForm = () => {
+    const errors = {};
+    
+    if (!newUser.firstName.trim()) {
+      errors.firstName = 'Vui lòng nhập họ';
+    }
+    
+    if (!newUser.lastName.trim()) {
+      errors.lastName = 'Vui lòng nhập tên';
+    }
+    
+    if (!newUser.email.trim()) {
+      errors.email = 'Vui lòng nhập email';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUser.email)) {
+      errors.email = 'Email không hợp lệ';
+    }
+    
+    if (!newUser.phone.trim()) {
+      errors.phone = 'Vui lòng nhập số điện thoại';
+    } else if (!/^(84|0[3-9])[0-9]{8,9}$/.test(newUser.phone)) {
+      errors.phone = 'Số điện thoại không hợp lệ';
+    }
+    
+    if (!newUser.password) {
+      errors.password = 'Vui lòng nhập mật khẩu';
+    } else if (!/^(?=.*[a-zA-Z])(?=.*\d).{8,}$/.test(newUser.password)) {
+      errors.password = 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ và số';
+    }
+    
+    return errors;
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate form
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    
+    try {
+      // Call API to create new user
+      const response = await ApiService.post('/user/create', newUser);
+      
+      // Add new user to list
+      setUsers([...users, response]);
+      
+      // Reset form and close modal
+      setNewUser({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        password: '',
+        roles: ['MEMBER']
+      });
+      setShowModal(false);
+      
+      // Show success message
+      alert('Thêm người dùng mới thành công!');
+    } catch (error) {
+      setFormErrors({
+        submit: 'Lỗi khi thêm người dùng: ' + error
+      });
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-64">Đang tải dữ liệu...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500 p-4">{error}</div>;
+  }
 
   return (
     <div className="flex-1 bg-gray-50">
@@ -92,41 +245,48 @@ const CustomerManagement = () => {
             className={`${filter.all ? 'text-blue-600' : ''}`}
             onClick={() => setFilter({all: true, visible: false, imported: false, trash: false})}
           >
-            Tất cả ( 0 )
+            Tất cả ( {users.length} )
           </button>
           <button 
             className={`${filter.visible ? 'text-blue-600' : ''}`}
             onClick={() => setFilter({all: false, visible: true, imported: false, trash: false})}
           >
-            Hiển thị ( 0 )
-          </button>
-          <button 
-            className={`${filter.imported ? 'text-blue-600' : ''}`}
-            onClick={() => setFilter({all: false, visible: false, imported: true, trash: false})}
-          >
-            Nhập ( 0 )
+            Đang hoạt động ( {users.filter(user => user.status).length} )
           </button>
           <button 
             className={`${filter.trash ? 'text-blue-600' : ''}`}
             onClick={() => setFilter({all: false, visible: false, imported: false, trash: true})}
           >
-            Thùng rác ( 0 )
+            Bị khóa ( {users.filter(user => !user.status).length} )
           </button>
         </div>
       </div>
 
       {/* Function bar */}
-      <div className="flex justify-end items-center px-6 py-4">
+      <div className="flex justify-between items-center px-6 py-4">
+        <div>
+          <h2 className="text-xl font-semibold">Quản lý người dùng</h2>
+        </div>
         <div className="flex items-center">
+          <button
+            className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center mr-4"
+            onClick={() => setShowModal(true)}
+          >
+            <Plus size={18} className="mr-1" />
+            Thêm người dùng mới
+          </button>
           <div className="mr-4">
             <select className="border border-gray-300 rounded-md px-3 py-2 bg-white">
-              <option>Sắp xếp theo</option>
+              <option value="">Sắp xếp theo</option>
+              <option value="newest">Mới nhất</option>
+              <option value="oldest">Cũ nhất</option>
+              <option value="name">Tên</option>
             </select>
           </div>
           <div>
             <input
               type="text"
-              placeholder="Tìm kiếm..."
+              placeholder="Tìm kiếm người dùng..."
               className="border border-gray-300 rounded-md px-3 py-2"
               value={searchTerm}
               onChange={handleSearch}
@@ -135,7 +295,7 @@ const CustomerManagement = () => {
         </div>
       </div>
 
-      {/* Customers table */}
+      {/* Users table */}
       <div className="px-6 pb-6">
         <div className="bg-white rounded-md shadow-sm">
           <table className="min-w-full divide-y divide-gray-200">
@@ -148,92 +308,266 @@ const CustomerManagement = () => {
                   Email
                 </th>
                 <th className="py-3 px-6 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
-                  Đơn hàng
+                  Số điện thoại
                 </th>
                 <th className="py-3 px-6 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
-                  Tham gia
+                  Vai trò
+                </th>
+                <th className="py-3 px-6 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                  Ngày tham gia
+                </th>
+                <th className="py-3 px-6 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                  Thao tác
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredCustomers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-gray-50">
-                  <td className="py-4 px-6">
-                    <div className="flex items-center">
-                      {customer.avatar ? (
-                        <img
-                          src={customer.avatar}
-                          alt={customer.name}
-                          className="h-10 w-10 rounded-full mr-3 object-cover"
-                        />
-                      ) : (
+              {currentUsers.length > 0 ? (
+                currentUsers.map((user) => (
+                  <tr key={user._id} className="hover:bg-gray-50">
+                    <td className="py-4 px-6">
+                      <div className="flex items-center">
                         <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center mr-3">
                           <span className="text-gray-500 font-medium">
-                            {customer.name.charAt(0).toUpperCase()}
+                            {user.firstName ? user.firstName.charAt(0).toUpperCase() : ''}
+                            {user.lastName ? user.lastName.charAt(0).toUpperCase() : ''}
                           </span>
                         </div>
-                      )}
-                      <span 
-                        className="text-sm text-gray-900 hover:text-blue-600 cursor-pointer"
-                        onClick={() => handleViewCustomerDetail(customer)}
-                      >
-                        {customer.name}
-                      </span>
-                    </div>
+                        <span 
+                          className="text-sm text-gray-900 hover:text-blue-600 cursor-pointer"
+                          onClick={() => handleViewUserDetail(user)}
+                        >
+                          {user.firstName} {user.lastName}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{user.email}</td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{user.phone}</td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{formatRoles(user.roles)}</td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{formatDate(user.createdAt)}</td>
+                    <td className="py-4 px-6 text-sm text-gray-700">
+                      <div className="flex space-x-2">
+                        <button 
+                          className={`px-2 py-1 rounded text-white ${user.status ? 'bg-orange-500' : 'bg-green-500'}`}
+                          onClick={() => handleToggleStatus(user._id, user.status)}
+                        >
+                          {user.status ? 'Khóa' : 'Mở khóa'}
+                        </button>
+                        <button 
+                          className="px-2 py-1 rounded bg-red-500 text-white"
+                          onClick={() => handleDeleteUser(user._id)}
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="py-4 px-6 text-center text-gray-500">
+                    Không có người dùng nào phù hợp với tìm kiếm
                   </td>
-                  <td className="py-4 px-6 text-sm text-gray-700">{customer.email}</td>
-                  <td className="py-4 px-6 text-sm text-gray-700">{customer.orders}</td>
-                  <td className="py-4 px-6 text-sm text-gray-700">{customer.lastActivity}</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
 
           {/* Pagination */}
-          <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center justify-between">
-            <div className="flex items-center">
-              <button 
-                className="p-2 border border-gray-300 rounded-md mr-2"
-                onClick={() => goToPage(Math.max(1, currentPage - 1))}
-              >
-                <ChevronLeft size={16} />
-              </button>
+          {totalPages > 0 && (
+            <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center justify-between">
+              <div className="flex items-center">
+                <button 
+                  className={`p-2 border border-gray-300 rounded-md mr-2 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => goToPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                
+                {[...Array(totalPages)].map((_, index) => (
+                  <button 
+                    key={index + 1}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${
+                      currentPage === index + 1
+                        ? 'bg-pink-500 text-white'
+                        : 'text-gray-700'
+                    }`}
+                    onClick={() => goToPage(index + 1)}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+                
+                <button 
+                  className={`p-2 border border-gray-300 rounded-md ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
               
-              <button className="w-8 h-8 rounded-full bg-pink-500 text-white flex items-center justify-center mr-2">
-                1
-              </button>
-              
-              <button 
-                className="w-8 h-8 rounded-full text-gray-700 flex items-center justify-center mr-2"
-                onClick={() => goToPage(2)}
+              <div className="flex items-center text-sm text-gray-700">
+                <span>Trang {currentPage} của {totalPages}</span>
+                <span className="mx-4">-</span>
+                <span>Hiển thị</span>
+                <select 
+                  className="mx-2 border border-gray-300 rounded p-1"
+                  value={usersPerPage}
+                  onChange={(e) => setUsersPerPage(Number(e.target.value))}
+                >
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                </select>
+                <span>/</span>
+                <span className="ml-2">{totalUsers}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add User Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Thêm người dùng mới</h3>
+              <button
+                className="text-gray-400 hover:text-gray-600"
+                onClick={() => setShowModal(false)}
               >
-                2
-              </button>
-              
-              <button 
-                className="p-2 border border-gray-300 rounded-md"
-                onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
-              >
-                <ChevronRight size={16} />
+                <X size={20} />
               </button>
             </div>
             
-            <div className="flex items-center text-sm text-gray-700">
-              <span>Trang 1 của 2</span>
-              <span className="mx-4">-</span>
-              <span>Hiển thị</span>
-              <select className="mx-2 border border-gray-300 rounded p-1">
-                <option>5</option>
-                <option>10</option>
-                <option>20</option>
-                <option>50</option>
-              </select>
-              <span>/</span>
-              <span className="ml-2">8</span>
-            </div>
+            <form onSubmit={handleSubmit}>
+              {formErrors.submit && (
+                <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {formErrors.submit}
+                </div>
+              )}
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Họ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="lastName"
+                  className={`w-full px-3 py-2 border ${formErrors.lastName ? 'border-red-500' : 'border-gray-300'} rounded-md`}
+                  value={newUser.lastName}
+                  onChange={handleInputChange}
+                />
+                {formErrors.lastName && (
+                  <p className="mt-1 text-sm text-red-500">{formErrors.lastName}</p>
+                )}
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tên <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="firstName"
+                  className={`w-full px-3 py-2 border ${formErrors.firstName ? 'border-red-500' : 'border-gray-300'} rounded-md`}
+                  value={newUser.firstName}
+                  onChange={handleInputChange}
+                />
+                {formErrors.firstName && (
+                  <p className="mt-1 text-sm text-red-500">{formErrors.firstName}</p>
+                )}
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  className={`w-full px-3 py-2 border ${formErrors.email ? 'border-red-500' : 'border-gray-300'} rounded-md`}
+                  value={newUser.email}
+                  onChange={handleInputChange}
+                />
+                {formErrors.email && (
+                  <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
+                )}
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Số điện thoại <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  className={`w-full px-3 py-2 border ${formErrors.phone ? 'border-red-500' : 'border-gray-300'} rounded-md`}
+                  value={newUser.phone}
+                  onChange={handleInputChange}
+                />
+                {formErrors.phone && (
+                  <p className="mt-1 text-sm text-red-500">{formErrors.phone}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">Định dạng: 0912345678 hoặc 84912345678</p>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mật khẩu <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  className={`w-full px-3 py-2 border ${formErrors.password ? 'border-red-500' : 'border-gray-300'} rounded-md`}
+                  value={newUser.password}
+                  onChange={handleInputChange}
+                />
+                {formErrors.password && (
+                  <p className="mt-1 text-sm text-red-500">{formErrors.password}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ và số</p>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Vai trò
+                </label>
+                <select
+                  name="role"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={newUser.roles[0]}
+                  onChange={handleRoleChange}
+                >
+                  <option value="MEMBER">Thành viên</option>
+                  <option value="SELLER">Người bán</option>
+                  <option value="ADMIN">Quản trị viên</option>
+                </select>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700"
+                  onClick={() => setShowModal(false)}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Thêm người dùng
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

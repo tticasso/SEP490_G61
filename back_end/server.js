@@ -7,6 +7,7 @@ require('dotenv').config();
 const { AuthRouter, UserRouter, RoleRouter, CategoriesRouter, BrandRouter, ProductRouter } = require('./src/routes');
 const session = require('express-session');
 const passport = require('passport');
+const cors = require('cors');
 
 // Khởi tạo Express trước khi dùng app.use()
 const app = express();
@@ -19,7 +20,12 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
-
+app.use(cors({
+    origin: 'http://localhost:3000', // Thay đổi thành domain frontend của bạn
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token']
+  }));
 // Bổ sung middleware kiểm soát hoạt động của Web server
 app.use(bodyParser.json());
 app.use(morgan("dev"));

@@ -97,7 +97,7 @@ const Orders = () => {
                 <button onClick={() => window.location.href = '/user-profile/messages'} className="text-sm hover:text-purple-500 text-gray-600 flex items-center">
                   <MessageCircle size={16} className="mr-1" /> Nhắn tin
                 </button>
-                <button onClick={() => window.location.href = 'shop-detail'} className="text-sm hover:text-purple-500 text-gray-600 flex items-center">
+                <button onClick={() => window.location.href = '/shop-detail'} className="text-sm hover:text-purple-500 text-gray-600 flex items-center">
                   <ShoppingBag size={16} className="mr-1" /> Xem Shop
                 </button>
               </div>

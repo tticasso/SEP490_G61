@@ -1,9 +1,49 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import AuthService from '../../services/AuthService';
 
 const LoginPage = () => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  // Kiểm tra nếu người dùng đã đăng nhập thì chuyển hướng
+  useEffect(() => {
+    if (AuthService.isLoggedIn()) {
+      navigate('/');
+    }
+  }, [navigate]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      await AuthService.login(formData.email, formData.password);
+      navigate('/'); // Chuyển hướng đến trang chủ sau khi đăng nhập thành công
+    } catch (error) {
+      setError(error || 'Đăng nhập thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Function to handle Google authentication redirect
   const handleGoogleRedirect = () => {
-    window.location.href = 'http://localhost:9999/auth/google';
+    window.location.href = 'http://localhost:9999/api/auth/google';
   };
 
   return (
@@ -22,15 +62,25 @@ const LoginPage = () => {
         <div className="w-full max-w-md px-8">
           <h2 className="text-3xl font-bold text-blue-600 mb-8">Đăng nhập tài khoản</h2>
           
-          <form className="space-y-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+          
+          <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label className="block mb-1">
                 <span className="font-medium">Email <span className="text-red-500">*</span></span>
               </label>
               <input 
                 type="email" 
+                name="email"
                 placeholder="abcxyz@gmail.com"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={formData.email}
+                onChange={handleChange}
+                required
               />
             </div>
             
@@ -40,16 +90,21 @@ const LoginPage = () => {
               </label>
               <input 
                 type="password" 
+                name="password"
                 placeholder="********"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={formData.password}
+                onChange={handleChange}
+                required
               />
             </div>
             
             <button
-              type="button"
+              type="submit"
               className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition"
+              disabled={loading}
             >
-              Đăng nhập
+              {loading ? "Đang xử lý..." : "Đăng nhập"}
             </button>
           </form>
           
@@ -65,6 +120,7 @@ const LoginPage = () => {
             
             <div className="mt-6 flex justify-center">
               <button 
+                type="button"
                 onClick={handleGoogleRedirect}
                 className="flex items-center justify-center px-6 py-2 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"
               >
@@ -81,7 +137,7 @@ const LoginPage = () => {
           </div>
           
           <div className="mt-6 text-center">
-            <a href="#" className="text-blue-600 hover:underline text-sm">
+            <a href="/forgot-password" className="text-blue-600 hover:underline text-sm">
               Bạn quên mật khẩu? Click vào đây
             </a>
             <div className="mt-1">

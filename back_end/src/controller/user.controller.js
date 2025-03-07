@@ -4,12 +4,22 @@ const nodemailer = require('nodemailer')
 const User = db.user
 const bcrypt = require("bcrypt")
 require('dotenv').config()
+
+function formatPhoneNumber(phone) {
+    if (!phone.startsWith('84') && phone.startsWith('0')) {
+        return '84' + phone.substring(1); // Thay 0 bằng 84
+    }
+    return phone;
+}
+
 async function create(req, res, next) {
     try {
         const newUser = new User({
             email: req.body.email,
-            password: req.body.password,
-            type: req.body.type,
+            password: bcrypt.hashSync(req.body.password, parseInt(process.env.PASSWORD_KEY)),
+            firstName: req.body.firstName,
+            lastName: req.body.lastName,
+            phone: formatPhoneNumber(req.body.phone),
             roles: req.body.roles
         })
 
@@ -54,7 +64,7 @@ async function update(req, res, next) {
             email: req.body.email,
             password: req.body.password,
             type: req.body.type,
-            classes: []
+            status: req.body.status
         }
         await User.findByIdAndUpdate(
             id,

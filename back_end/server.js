@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const httpErrors = require('http-errors');
 const db = require('./src/models');
 require('dotenv').config();
-const { AuthRouter, UserRouter, RoleRouter, CategoriesRouter, BrandRouter, ProductRouter } = require('./src/routes');
+const { AuthRouter, UserRouter, RoleRouter, CategoriesRouter, BrandRouter, ProductRouter, ProductReviewRouter } = require('./src/routes');
 const session = require('express-session');
 const passport = require('passport');
 
@@ -36,6 +36,7 @@ app.use('/api/role', RoleRouter);
 app.use('/api/categories', CategoriesRouter);
 app.use('/api/brand', BrandRouter);
 app.use('/api/product', ProductRouter);
+app.use('/api/product-review', ProductReviewRouter);
 
 
 // Kiểm soát các lỗi trong Express web server

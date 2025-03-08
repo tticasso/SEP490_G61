@@ -50,6 +50,21 @@ async function create(req, res, next) {
     }
 }
 
+async function getUserById(req, res, next) {
+    try {
+        const { id } = req.params; // Lấy ID từ tham số URL
+        const user = await User.findById(id); // Tìm người dùng theo ID
+
+        if (!user) {
+            return res.status(404).json({ message: 'Người dùng không tồn tại' });
+        }
+
+        res.status(200).json(user); // Trả về thông tin người dùng
+    } catch (error) {
+        next(error); // Xử lý lỗi
+    }
+}
+
 async function accessAll(req, res, next) {
     res.send("All users access")
 }

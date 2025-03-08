@@ -27,8 +27,8 @@ const getCategoryById = async (req, res) => {
 // Thêm danh mục mới
 const createCategory = async (req, res) => {
     try {
-        const { name, description } = req.body;
-        const newCategory = new Categories({ name, description });
+        const { name, description , image } = req.body;
+        const newCategory = new Categories({ name, description ,image });
         await newCategory.save();
         res.status(201).json(newCategory);
     } catch (error) {

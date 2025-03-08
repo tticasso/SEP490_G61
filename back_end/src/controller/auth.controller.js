@@ -88,21 +88,22 @@ passport.use(new GoogleStrategy({
     try {
         let user = await User.findOne({ email: profile.emails[0].value });
 
-        if (!user) {
-            const newUser = new User({
-                email: profile.emails[0].value,
-                firstName: profile.name.givenName || 'Google',
-                lastName: profile.name.familyName || 'User',
-                password: bcrypt.hashSync(Math.random().toString(36).slice(-8), 10),
-                phone: '0912345678' // Thêm số điện thoại mặc định nếu model yêu cầu
-            });
+if (!user) {
+    const newUser = new User({
+        email: profile.emails[0].value,
+        firstName: profile.name.givenName || 'Google',
+        lastName: profile.name.familyName || 'User',
+        password: bcrypt.hashSync(Math.random().toString(36).slice(-8), 10),
+        phone: '0912345678' // Số điện thoại mặc định
+    });
 
-            // Gán quyền mặc định
-            const role = await Role.findOne({ name: "MEMBER" });
-            user.roles = [role._id];
+    // Gán quyền mặc định
+    const role = await Role.findOne({ name: "MEMBER" });
+    newUser.roles = [role._id]; // Cập nhật thuộc tính roles cho newUser
 
-                            await user.save();
-                        }
+    await newUser.save(); // Lưu người dùng mới
+    user = newUser; // Gán user mới vào biến user
+}
 
         return done(null, user);
     } catch (error) {
@@ -125,7 +126,7 @@ function googleAuth(req, res, next) {
 }
 
 function googleAuthCallback(req, res, next) {
-    passport.authenticate('google', { session: false }, (err, user) => {
+    passport.authenticate('google', { session: false }, async (err, user) => {
         if (err || !user) {
             return res.redirect('http://localhost:3000/login?error=true'); // Thay đổi thành URL frontend
         }
@@ -137,9 +138,9 @@ function googleAuthCallback(req, res, next) {
         });
 
         // Lấy thông tin user cần thiết
-        const authorities = []
+        const authorities = [];
         for (let i = 0; i < user.roles.length; i++) {
-            authorities.push("ROLE_" + user.roles[i].name)
+            authorities.push("ROLE_" + user.roles[i].name);
         }
 
         // Tạo một object chứa thông tin người dùng
@@ -147,7 +148,7 @@ function googleAuthCallback(req, res, next) {
             id: user._id.toString(),
             email: user.email,
             accessToken: token,
-            roles: authorities
+            roles: authorities // Đảm bảo rằng roles được thêm vào userData
         };
 
         // Mã hóa thông tin người dùng để truyền qua URL
@@ -157,6 +158,7 @@ function googleAuthCallback(req, res, next) {
         res.redirect(`http://localhost:3000/?googleAuth=${userDataEncoded}`); // Thay đổi thành URL frontend
     })(req, res, next);
 }
+
 
 
 const authController = {

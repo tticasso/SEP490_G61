@@ -138,7 +138,7 @@ async function existedUser(req, res, next) {
 
 async function forgotPassword(req, res, next) {
     try {
-        const { email } = req.body; // Nhận email từ request body
+        const { email } = req.body; 
         const user = await User.findOne({ email });
 
         if (!user) {
@@ -193,7 +193,7 @@ async function resetPassword(req, res, next) {
         }
 
         // Cập nhật mật khẩu mới
-        user.password = bcrypt.hashSync(req.body.newPassword, parseInt(process.env.PASSWORD_KEY));
+        user.password = bcrypt.hashSync(newPassword, parseInt(process.env.PASSWORD_KEY));
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
         await user.save();

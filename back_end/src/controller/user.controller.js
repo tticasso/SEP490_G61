@@ -17,7 +17,7 @@ async function create(req, res, next) {
     try {
         // Lấy thông tin từ request body
         const { firstName, lastName, email, phone, password, roles } = req.body;
-        
+
         // Tìm role dựa trên tên
         let userRoles = [];
         if (roles && Array.isArray(roles)) {
@@ -30,7 +30,7 @@ async function create(req, res, next) {
                 userRoles = [defaultRole._id];
             }
         }
-        
+
         // Tạo user mới
         const newUser = new User({
             email: req.body.email,
@@ -138,7 +138,7 @@ async function existedUser(req, res, next) {
 
 async function forgotPassword(req, res, next) {
     try {
-        const { email } = req.body; 
+        const { email } = req.body;
         const user = await User.findOne({ email });
 
         if (!user) {
@@ -216,7 +216,8 @@ const userController = {
     accessByAdmin,
     accessBySeller,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    getUserById
 }
 
 module.exports = userController

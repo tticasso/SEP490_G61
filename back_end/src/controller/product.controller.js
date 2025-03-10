@@ -30,6 +30,23 @@ const getProductById = async (req, res) => {
     }
 };
 
+async function getProductsByUserId(req, res, next) {
+    try {
+      const { userId } = req.params;
+      const products = await Product.find({
+        created_by: userId,
+        is_active: true,
+        is_delete: false,
+        is_hot: true, 
+        is_feature: true 
+      });
+      res.status(200).json(products);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+
 // Thêm sản phẩm mới
 const createProduct = async (req, res) => {
     try {
@@ -159,7 +176,8 @@ const productController = {
     getProductById,
     createProduct,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    getProductsByUserId
 };
 
 module.exports = productController;

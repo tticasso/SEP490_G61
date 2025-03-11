@@ -6,6 +6,11 @@ const BrandRouter = require('./brand.routes')
 const ProductRouter = require('./product.routes')
 const ProductReviewRouter = require('./product-review.routes')
 const AddressRouter = require('./user-address.routes')
+const CartRouter = require('./cart.routes')
+const DiscountRouter = require('./discount.routes')
+const OrderRouter = require('./order.routes')
+const ShippingRouter = require('./shipping.routes')
+const PaymentRouter = require('./payment.routes')
 module.exports = {
     AuthRouter,
     UserRouter,
@@ -14,5 +19,10 @@ module.exports = {
     BrandRouter,
     ProductRouter,
     ProductReviewRouter,
-    AddressRouter
+    AddressRouter,
+    CartRouter,
+    DiscountRouter,
+    OrderRouter,
+    ShippingRouter,
+    PaymentRouter
 }

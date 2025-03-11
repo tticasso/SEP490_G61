@@ -6,6 +6,13 @@ const Brand = require('./brand.model')
 const Product = require('./product.model')
 const ProductReview = require('./product-review.model')
 const Address = require('./user-address.model')
+const Cart = require('./cart.model')
+const CartItem = require('./cart-items.model')
+const Discount = require('./discount.model')
+const Order = require('./order.model')
+const OrderDetail = require('./order-detail.model')
+const Shipping = require('./shipping.model')
+const Payment = require('./payment.model')
 // Cau hinh mongoose dang global
 mongoose.Promise = global.Promise
 // Dinh nghia doi tuong DB
@@ -22,16 +29,23 @@ db.brand = Brand
 db.product = Product
 db.productReview = ProductReview
 db.address = Address
+db.cart = Cart
+db.cartItem = CartItem
+db.discount = Discount
+db.order = Order
+db.orderDetail = OrderDetail
+db.shipping = Shipping
+db.payment = Payment
 // Thuoc tinh tham chieu toi action ket noi CSDL
 db.connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, {
         dbName: process.env.DB_NAME
     })
-    .then(() => console.log("Connect to MongoDB success"))
-    .catch(error => {
-        console.error(error.message);
-        process.exit()
-    })
+        .then(() => console.log("Connect to MongoDB success"))
+        .catch(error => {
+            console.error(error.message);
+            process.exit()
+        })
 }
 
 module.exports = db

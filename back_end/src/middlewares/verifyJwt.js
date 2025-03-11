@@ -37,7 +37,7 @@ async function isSeller(req, res, next) {
             throw createHttpError.Forbidden("Forbidden access");
         }
         if (roles.some(role => role.name === "MOD")) {
-            return next(); // Nếu có vai trò MOD, tiếp tục
+            return next(); 
         }
         throw createHttpError.Unauthorized("Require Seller role!");
     } catch (error) {
@@ -56,7 +56,7 @@ async function isAdmin(req, res, next) {
             throw createHttpError.Forbidden("Forbidden access");
         }
         if (roles.some(role => role.name === "ADMIN")) {
-            return next(); // Nếu có vai trò ADMIN, tiếp tục
+            return next(); 
         }
         throw createHttpError.Unauthorized("Require Admin role!");
     } catch (error) {

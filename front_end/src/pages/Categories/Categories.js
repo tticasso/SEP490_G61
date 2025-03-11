@@ -1,72 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, Grid, List, Filter, X as XIcon, Minus as MinusIcon, Plus as PlusIcon } from 'lucide-react';
 import dongho from '../../assets/dongho.png'
+import ApiService from '../../services/ApiService';
 
 const Categories = () => {
-    // Sample product data (you would typically fetch this from an API)
-    const [products, setProducts] = useState([
-        {
-            id: 1,
-            name: 'dwdqw123',
-            image: dongho,
-            price: 1212000,
-            rating: 5,
-            soldCount: 0,
-            location: 'Phú Thọ',
-            isNew: true
-        },
-        {
-            id: 2,
-            name: 'Đồng hồ trắng',
-            image: dongho,
-            price: 326000,
-            rating: 5,
-            soldCount: 5,
-            location: 'Hải Phòng',
-            isNew: true
-        },
-        {
-            id: 3,
-            name: 'Đồng hồ đen',
-            image: dongho,
-            price: 4420000,
-            rating: 5,
-            soldCount: 0,
-            location: 'Ninh Bình',
-            isNew: true
-        },
-        {
-            id: 4,
-            name: 'Đồng hồ đẳng cấp số 1 Châu Á',
-            image: dongho,
-            price: 2700000,
-            rating: 5,
-            soldCount: 0,
-            location: 'Phú Thọ',
-            isNew: true
-        },
-        {
-            id: 5,
-            name: 'Đồng hồ Casio',
-            image: dongho,
-            price: 23459000,
-            rating: 5,
-            soldCount: 0,
-            location: 'Hưng yên',
-            isNew: true
-        },
-        {
-            id: 6,
-            name: 'Đồng hồ Legion 5 pro',
-            image: dongho,
-            price: 19990000,
-            rating: 5,
-            soldCount: 0,
-            location: 'Quảng Ngãi',
-            discount: 9
-        }
-    ]);
+    // State cho dữ liệu từ API
+    const [products, setProducts] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
+    // State cho bộ lọc
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [priceRange, setPriceRange] = useState({ min: '', max: '' });
+    // const [selectedRatings, setSelectedRatings] = useState([]);
+    const [selectedLocations, setSelectedLocations] = useState([]);
+
+    // State cho chế độ xem và sắp xếp
+    const [viewMode, setViewMode] = useState('grid');
+    const [sortOption, setSortOption] = useState('Đặc sắc');
+
+    // State cho tương tác sản phẩm
+    const [hoveredProduct, setHoveredProduct] = useState(null);
+    const [showProductModal, setShowProductModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [quantity, setQuantity] = useState(1);
+
+    // Danh sách các tỉnh thành
     const provinces = [
         "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
         "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước",
@@ -82,36 +42,175 @@ const Categories = () => {
         "Trà Vinh", "Tuyên Quang", "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
     ];
 
-    // State for view mode and sorting
-    const [viewMode, setViewMode] = useState('grid');
-    const [sortOption, setSortOption] = useState('Đặc sắc');
+    // Lấy dữ liệu danh mục và sản phẩm từ backend
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                
+                // Lấy danh mục
+                const categoriesData = await ApiService.get('/categories', false);
+                setCategories(categoriesData);
+                
+                // Lấy sản phẩm
+                const productsData = await ApiService.get('/product', false);
+                setProducts(productsData);
+                
+                // Xác định danh mục từ URL nếu có
+                const urlParams = new URLSearchParams(window.location.search);
+                const categoryId = urlParams.get('category');
+                if (categoryId) {
+                    setSelectedCategory(categoryId);
+                }
+                
+                setLoading(false);
+            } catch (err) {
+                console.error("Error fetching data:", err);
+                setError(err.message || "Có lỗi xảy ra khi tải dữ liệu");
+                setLoading(false);
+            }
+        };
 
-    // Add these states for hover and modal functionality
-    const [hoveredProduct, setHoveredProduct] = useState(null);
-    const [showProductModal, setShowProductModal] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    const [quantity, setQuantity] = useState(1);
+        fetchData();
+    }, []);
 
-    // Sidebar categories
-    const categories = [
-        'Đồ điện tử',
-        'Đồng hồ',
-        "Thời Trang Nam",
-        "Thời Trang Nữ",
-        "Đồ gia dụng",
-        "Đồ cho thú cưng",
-    ];
+    // Lọc sản phẩm dựa trên bộ lọc đã chọn
+    const filteredProducts = products.filter(product => {
+        // Lọc theo danh mục
+        if (selectedCategory && product.category_id) {
+            // Kiểm tra nếu category_id là mảng hoặc đối tượng
+            if (Array.isArray(product.category_id)) {
+                const categoryMatch = product.category_id.some(catId => 
+                    catId === selectedCategory || (catId._id && catId._id === selectedCategory)
+                );
+                if (!categoryMatch) return false;
+            } else if (product.category_id._id) {
+                if (product.category_id._id !== selectedCategory) return false;
+            } else if (product.category_id !== selectedCategory) {
+                return false;
+            }
+        }
+        
+        // Lọc theo khoảng giá
+        if (priceRange.min && product.price < parseFloat(priceRange.min)) return false;
+        if (priceRange.max && product.price > parseFloat(priceRange.max)) return false;
+        
+        // Lọc theo đánh giá
+        // if (selectedRatings.length > 0) {
+        //     const productRating = product.rating || 0;
+        //     const matchRating = selectedRatings.some(rating => productRating >= rating);
+        //     if (!matchRating) return false;
+        // }
+        
+        // Lọc theo địa điểm
+        if (selectedLocations.length > 0) {
+            // Giả định mỗi sản phẩm có trường location
+            // Nếu không có, bạn cần điều chỉnh logic này
+            const productLocation = product.location || 'Hà Nội';
+            if (!selectedLocations.includes(productLocation)) return false;
+        }
+        
+        return true;
+    });
 
-    // Render product card
+    // Sắp xếp sản phẩm dựa trên tùy chọn đã chọn
+    const sortedProducts = [...filteredProducts].sort((a, b) => {
+        if (sortOption === 'Giá thấp') {
+            return a.price - b.price;
+        } else if (sortOption === 'Giá cao') {
+            return b.price - a.price;
+        } else {
+            // Đặc sắc (Featured) - sắp xếp theo is_hot, is_feature, hoặc rating
+            // Đầu tiên theo is_hot
+            if ((a.is_hot && !b.is_hot) || (a.is_hot === true && b.is_hot !== true)) return -1;
+            if ((!a.is_hot && b.is_hot) || (a.is_hot !== true && b.is_hot === true)) return 1;
+            
+            // Sau đó theo is_feature
+            if ((a.is_feature && !b.is_feature) || (a.is_feature === true && b.is_feature !== true)) return -1;
+            if ((!a.is_feature && b.is_feature) || (a.is_feature !== true && b.is_feature === true)) return 1;
+            
+            // Sau đó theo rating
+            return (b.rating || 0) - (a.rating || 0);
+        }
+    });
+
+    // Xử lý khi chọn danh mục
+    const handleCategorySelect = (categoryId) => {
+        setSelectedCategory(categoryId === selectedCategory ? null : categoryId);
+    };
+
+    // Xử lý khi thay đổi khoảng giá
+    const handlePriceChange = (type, value) => {
+        setPriceRange(prev => ({ ...prev, [type]: value }));
+    };
+
+    // Xử lý khi áp dụng bộ lọc giá
+    const applyPriceFilter = () => {
+        // Đã được xử lý trong filteredProducts
+        console.log("Applied price filter:", priceRange);
+    };
+
+    // Xử lý khi chọn đánh giá
+    // const handleRatingSelect = (rating) => {
+    //     setSelectedRatings(prev => {
+    //         if (prev.includes(rating)) {
+    //             return prev.filter(r => r !== rating);
+    //         } else {
+    //             return [...prev, rating];
+    //         }
+    //     });
+    // };
+
+    // Xử lý khi chọn địa điểm
+    const handleLocationSelect = (location) => {
+        setSelectedLocations(prev => {
+            if (prev.includes(location)) {
+                return prev.filter(loc => loc !== location);
+            } else {
+                return [...prev, location];
+            }
+        });
+    };
+
+    // Xóa tất cả bộ lọc
+    const clearFilters = () => {
+        setSelectedCategory(null);
+        setPriceRange({ min: '', max: '' });
+        // setSelectedRatings([]);
+        setSelectedLocations([]);
+    };
+
+    // Xử lý tăng giảm số lượng
+    const handleIncrement = () => {
+        setQuantity(prev => prev + 1);
+    };
+
+    const handleDecrement = () => {
+        if (quantity > 1) {
+            setQuantity(prev => prev - 1);
+        }
+    };
+
+    // Định dạng giá tiền
+    const formatPrice = (price) => {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+            .format(price)
+            .replace('₫', 'đ');
+    };
+
+    // Hiển thị card sản phẩm
     const renderProductCard = (product) => {
+        // Quy đổi _id hoặc id để sử dụng nhất quán
+        const productId = product._id || product.id;
+        
         return (
             <div
-                key={product.id}
+                key={productId}
                 className={`
                     border rounded-lg p-4 relative cursor-pointer
                     ${viewMode === 'grid' ? 'w-full' : 'flex items-center'}
                 `}
-                onMouseEnter={() => setHoveredProduct(product.id)}
+                onMouseEnter={() => setHoveredProduct(productId)}
                 onMouseLeave={() => setHoveredProduct(null)}
                 onClick={() => {
                     setSelectedProduct(product);
@@ -119,20 +218,20 @@ const Categories = () => {
                     setQuantity(1);
                 }}
             >
-                {product.isNew && (
-                    <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded z-10">
-                        Mới
+                {product.is_hot && (
+                    <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded z-10">
+                        HOT
                     </div>
                 )}
-                {product.discount && (
-                    <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded z-10">
-                        -{product.discount}%
+                {product.is_feature && !product.is_hot && (
+                    <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded z-10">
+                        Đặc sắc
                     </div>
                 )}
                 <div className={`${viewMode === 'grid' ? 'flex flex-col' : 'flex items-center'} relative`}>
                     <div className="relative">
                         <img
-                            src={product.image}
+                            src={product.thumbnail || dongho}
                             alt={product.name}
                             className={`
                                 object-cover 
@@ -140,13 +239,13 @@ const Categories = () => {
                             `}
                         />
 
-                        {/* Add to Cart Button - Shows on hover */}
-                        {hoveredProduct === product.id && (
+                        {/* Nút Thêm giỏ hàng - hiển thị khi hover */}
+                        {hoveredProduct === productId && (
                             <div
                                 className="absolute bottom-0 left-0 right-0 py-2 bg-white bg-opacity-95 flex items-center justify-center transition-opacity duration-300 shadow-md z-10"
                                 onClick={(e) => {
-                                    e.stopPropagation(); // Prevent opening the modal
-                                    // Add to cart logic here
+                                    e.stopPropagation(); // Ngăn mở modal
+                                    // Logic thêm vào giỏ hàng
                                     alert(`Đã thêm ${product.name} vào giỏ hàng!`);
                                 }}
                             >
@@ -159,24 +258,25 @@ const Categories = () => {
 
                     <div className="flex-grow mt-2">
                         <h3 className="text-sm font-medium">{product.name}</h3>
-                        <div className="flex items-center mt-1">
+                        {/* <div className="flex items-center mt-1">
                             {[...Array(5)].map((_, i) => (
                                 <Star
                                     key={i}
                                     size={16}
                                     className={`
-                                        ${i < product.rating ? 'text-yellow-400' : 'text-gray-300'}
+                                        ${i < (product.rating || 0) ? 'text-yellow-400' : 'text-gray-300'}
                                     `}
-                                    fill={i < product.rating ? '#fbbf24' : 'none'}
+                                    fill={i < (product.rating || 0) ? '#fbbf24' : 'none'}
                                 />
                             ))}
-                            <span className="ml-2 text-xs text-gray-500">Đã bán {product.soldCount}</span>
-                        </div>
+                            
+                        </div> */}
+                        <span className="text-xs text-gray-500">Đã bán {product.sold || 0}</span>
                         <p className="text-purple-600 font-bold mt-1">
-                            {product.price.toLocaleString()} đ
+                            {formatPrice(product.price)}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                            Còn {Math.floor(Math.random() * 300)} Sản phẩm | {product.location}
+                            {product.condition || ''} {product.location ? `| ${product.location}` : ''}
                         </p>
                     </div>
                 </div>
@@ -184,37 +284,65 @@ const Categories = () => {
         );
     };
 
-    // Handle increment and decrement quantity
-    const handleIncrement = () => {
-        setQuantity(prev => prev + 1);
-    };
+    // Hiển thị trạng thái đang tải
+    if (loading) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8 flex justify-center items-center min-h-screen">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mx-auto"></div>
+                    <p className="mt-4 text-gray-700">Đang tải dữ liệu...</p>
+                </div>
+            </div>
+        );
+    }
 
-    const handleDecrement = () => {
-        if (quantity > 1) {
-            setQuantity(prev => prev - 1);
-        }
-    };
+    // Hiển thị trạng thái lỗi
+    if (error) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8 flex justify-center items-center min-h-screen">
+                <div className="text-center">
+                    <div className="text-red-500 text-xl mb-4">❌ Đã xảy ra lỗi</div>
+                    <p className="text-gray-700">{error}</p>
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="mt-4 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+                    >
+                        Tải lại trang
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="flex">
+            <div className="flex flex-col md:flex-row">
                 {/* Sidebar Categories */}
-                <div className="pr-6 border-r w-1/4">
+                <div className="md:pr-6 md:border-r md:w-1/4 mb-6 md:mb-0">
                     <h2 className="text-lg font-bold mb-4">DANH MỤC LIÊN QUAN</h2>
                     <ul className="space-y-2">
-                        {categories.map((category, index) => (
+                        {categories.map((category) => (
                             <li
-                                key={index}
-                                className="text-sm text-gray-700 hover:text-purple-600 cursor-pointer"
+                                key={category._id}
+                                className={`
+                                    text-sm cursor-pointer
+                                    ${selectedCategory === category._id 
+                                        ? 'text-purple-600 font-bold' 
+                                        : 'text-gray-700 hover:text-purple-600'}
+                                `}
+                                onClick={() => handleCategorySelect(category._id)}
                             >
-                                {category}
+                                {category.name}
                             </li>
                         ))}
                     </ul>
                     <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
                     <div className="mt-8">
                         <h3 className="text-lg font-bold mb-4">BỘ LỌC</h3>
-                        <div className="flex items-center text-gray-500">
+                        <div 
+                            className="flex items-center text-gray-500 cursor-pointer hover:text-purple-600"
+                            onClick={clearFilters}
+                        >
                             <Filter size={16} className="mr-2" />
                             <span>Xóa bộ lọc</span>
                         </div>
@@ -227,67 +355,58 @@ const Categories = () => {
                                 type="number"
                                 placeholder="Min"
                                 className="w-full border rounded px-2 py-1"
+                                value={priceRange.min}
+                                onChange={(e) => handlePriceChange('min', e.target.value)}
                             />
                             <span>-</span>
                             <input
                                 type="number"
                                 placeholder="Max"
                                 className="w-full border rounded px-2 py-1"
+                                value={priceRange.max}
+                                onChange={(e) => handlePriceChange('max', e.target.value)}
                             />
                         </div>
-                        <button className="w-full mt-2 bg-purple-600 text-white py-2 rounded">
+                        <button 
+                            className="w-full mt-2 bg-purple-600 text-white py-2 rounded hover:bg-purple-700"
+                            onClick={applyPriceFilter}
+                        >
                             Áp dụng
                         </button>
-                    </div>
+                    </div>               
                     <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
-                    <div className="mt-4">
-                        <h3 className="text-lg font-bold mb-4">ĐÁNH GIÁ CỦA NGƯỜI BÁN</h3>
-                        <ul>
-                            {[5, 4, 3, 2, 1].map((rating, index, array) => (
-                                <li key={rating} className="flex items-center space-x-2">
-                                    <input type="checkbox" id={`rating-${rating}`} />
-                                    <label htmlFor={`rating-${rating}`} className="flex items-center">
-                                        {[...Array(5)].map((_, i) => (
-                                            <Star
-                                                key={i}
-                                                size={16}
-                                                className={`${i < rating ? 'text-yellow-400' : 'text-gray-300'}`}
-                                                fill={i < rating ? '#fbbf24' : 'none'}
-                                            />
-                                        ))}
-                                        {index !== 0 && ( // Kiểm tra nếu không phải phần tử đầu tiên (5 sao)
-                                            <span className="ml-2 text-sm text-gray-700">({rating}) Trở lên</span>
-                                        )}
-                                        {index !== 5 || index !== 0 && (
-                                            <span className="ml-2 text-sm text-gray-700">(5)</span>
-                                        )}
-                                    </label>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                    <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
-                    <div className="mt-4">
+                    {/* <div className="mt-4">
                         <h3 className="text-lg font-bold mb-4">NƠI BÁN</h3>
-                        <ul>
-                            {provinces.map((province) => (
-                                <li key={province} className="flex items-center space-x-2">
-                                    <input type="checkbox" id={`location-${province}`} />
-                                    <label htmlFor={`location-${province}`} className="text-sm text-gray-700">
-                                        {province} (0)
-                                    </label>
-                                </li>
-                            ))}
+                        <ul className="max-h-60 overflow-y-auto">
+                            {provinces.map((province) => {
+                                // Tính toán số lượng sản phẩm trên mỗi địa điểm
+                                const productCount = products.filter(p => p.location === province).length;
+                                if (productCount === 0) return null; // Không hiển thị tỉnh không có sản phẩm
+                                
+                                return (
+                                    <li key={province} className="flex items-center space-x-2">
+                                        <input 
+                                            type="checkbox" 
+                                            id={`location-${province}`} 
+                                            checked={selectedLocations.includes(province)}
+                                            onChange={() => handleLocationSelect(province)}
+                                        />
+                                        <label htmlFor={`location-${province}`} className="text-sm text-gray-700">
+                                            {province} ({productCount})
+                                        </label>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     </div>
-                    <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
+                    <div className='w-full h-[1px] bg-gray-600 mt-8'></div> */}
                 </div>
 
                 {/* Product Listing */}
-                <div className="flex-grow pl-6">
+                <div className="md:flex-grow md:pl-6">
                     <div className="flex justify-between items-center mb-4">
                         <div className="text-gray-700">
-                            <span>14 Sản phẩm</span>
+                            <span>{sortedProducts.length} Sản phẩm</span>
                         </div>
                         <div className="flex items-center space-x-4">
                             <div className="flex space-x-2">
@@ -323,17 +442,104 @@ const Categories = () => {
                             </div>
                         </div>
                     </div>
-                    <div
-                        className={`
-                            grid gap-4 
-                            ${viewMode === 'grid'
-                                ? 'grid-cols-4'
-                                : 'grid-cols-1'
-                            }
-                        `}
-                    >
-                        {products.map(renderProductCard)}
-                    </div>
+
+                    {/* Hiện thị bộ lọc đang áp dụng */}
+                    {(selectedCategory || priceRange.min || priceRange.max > 0 || selectedLocations.length > 0) && (
+                        <div className="mb-4 p-3 bg-gray-100 rounded">
+                            <div className="flex flex-wrap gap-2 items-center">
+                                <span className="text-sm font-medium text-gray-700">Bộ lọc đang áp dụng:</span>
+                                
+                                {selectedCategory && (
+                                    <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs flex items-center">
+                                        {categories.find(c => c._id === selectedCategory)?.name}
+                                        <XIcon 
+                                            size={14} 
+                                            className="ml-1 cursor-pointer" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedCategory(null);
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                                
+                                {(priceRange.min || priceRange.max) && (
+                                    <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs flex items-center">
+                                        Giá: {priceRange.min ? formatPrice(priceRange.min) : '0đ'} - {priceRange.max ? formatPrice(priceRange.max) : '∞'}
+                                        <XIcon 
+                                            size={14} 
+                                            className="ml-1 cursor-pointer" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPriceRange({ min: '', max: '' });
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                                
+                                {/* {selectedRatings.length > 0 && (
+                                    <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs flex items-center">
+                                        Đánh giá: {selectedRatings.sort().join(', ')} sao trở lên
+                                        <XIcon 
+                                            size={14} 
+                                            className="ml-1 cursor-pointer" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedRatings([]);
+                                            }}
+                                        />
+                                    </div>
+                                )} */}
+                                
+                                {selectedLocations.length > 0 && (
+                                    <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs flex items-center">
+                                        Địa điểm: {selectedLocations.length > 2 
+                                            ? `${selectedLocations.slice(0, 2).join(', ')} +${selectedLocations.length - 2}` 
+                                            : selectedLocations.join(', ')}
+                                        <XIcon 
+                                            size={14} 
+                                            className="ml-1 cursor-pointer" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedLocations([]);
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                                
+                                <button 
+                                    className="text-xs text-red-500 hover:text-red-700 ml-auto"
+                                    onClick={clearFilters}
+                                >
+                                    Xóa tất cả
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {sortedProducts.length > 0 ? (
+                        <div
+                            className={`
+                                grid gap-4 
+                                ${viewMode === 'grid'
+                                    ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
+                                    : 'grid-cols-1'
+                                }
+                            `}
+                        >
+                            {sortedProducts.map(renderProductCard)}
+                        </div>
+                    ) : (
+                        <div className="py-8 text-center">
+                            <p className="text-gray-500">Không tìm thấy sản phẩm phù hợp với bộ lọc hiện tại.</p>
+                            <button 
+                                className="mt-4 text-purple-600 hover:text-purple-800"
+                                onClick={clearFilters}
+                            >
+                                Xóa bộ lọc và thử lại
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -351,11 +557,11 @@ const Categories = () => {
                         <div className="p-6">
                             <h2 className="text-xl font-bold mb-6">CHỌN BIẾN THỂ</h2>
 
-                            <div className="flex gap-8">
+                            <div className="flex flex-col md:flex-row gap-8">
                                 {/* Product Image */}
-                                <div className="w-1/3">
+                                <div className="w-full md:w-1/3">
                                     <img
-                                        src={selectedProduct.image}
+                                        src={selectedProduct.thumbnail || dongho}
                                         alt={selectedProduct.name}
                                         className="w-full h-auto rounded"
                                     />
@@ -363,14 +569,14 @@ const Categories = () => {
                                     <div className="flex gap-2 mt-4">
                                         <div className="border border-gray-300 p-1 w-16 h-16">
                                             <img
-                                                src={selectedProduct.image}
+                                                src={selectedProduct.thumbnail || dongho}
                                                 alt="Thumbnail"
                                                 className="w-full h-full object-cover"
                                             />
                                         </div>
                                         <div className="border border-gray-300 p-1 w-16 h-16">
                                             <img
-                                                src={selectedProduct.image}
+                                                src={selectedProduct.thumbnail || dongho}
                                                 alt="Thumbnail"
                                                 className="w-full h-full object-cover"
                                             />
@@ -379,9 +585,9 @@ const Categories = () => {
                                 </div>
 
                                 {/* Product Details */}
-                                <div className="w-2/3">
+                                <div className="w-full md:w-2/3">
                                     <h3 className="text-lg font-bold mb-1">{selectedProduct.name}</h3>
-                                    <p className="text-red-500 font-bold text-lg mb-6">{selectedProduct.price.toLocaleString()} đ</p>
+                                    <p className="text-red-500 font-bold text-lg mb-6">{formatPrice(selectedProduct.price)}</p>
 
                                     {/* Color Selection */}
                                     <div className="mb-6">
@@ -444,7 +650,7 @@ const Categories = () => {
                             </div>
 
                             {/* Add to Cart Button */}
-                            <div className='flex gap-4'>
+                            <div className='flex flex-col sm:flex-row gap-4'>
                                 <button
                                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium mt-4"
                                     onClick={() => {
@@ -454,11 +660,13 @@ const Categories = () => {
                                 >
                                     THÊM VÀO GIỎ HÀNG
                                 </button>
-                                <button onClick={() => window.location.href = '/product-detail'} className='w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium mt-4'>
+                                <button 
+                                    onClick={() => window.location.href = `/product-detail?id=${selectedProduct._id || selectedProduct.id}`}
+                                    className='w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium mt-4'
+                                >
                                     Xem thông tin chi tiết
                                 </button>
                             </div>
-
                         </div>
                     </div>
                 </div>

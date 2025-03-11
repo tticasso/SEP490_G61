@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { shopOwnerController } = require('../controller');
-const { VerifyJwt } = require('../middleware/VerifyJwt');
+const VerifyJwt  = require('../middlewares/verifyJwt');
 
 const ShopOwnerRouter = express.Router();
 ShopOwnerRouter.use(bodyParser.json());

@@ -5,7 +5,6 @@ const httpErrors = require('http-errors');
 const db = require('./src/models');
 require('dotenv').config();
 
-const { AuthRouter, UserRouter, RoleRouter, CategoriesRouter, BrandRouter, ProductRouter, ProductReviewRouter, AddressRouter, ProductVariantRouter ,ShopOwnerRouter } = require('./src/routes');
 
 const { AuthRouter, 
     UserRouter, 
@@ -19,7 +18,9 @@ const { AuthRouter,
     DiscountRouter, 
     OrderRouter,
     ShippingRouter,
-    PaymentRouter
+    PaymentRouter,
+    ProductVariantRouter,
+    ShopOwnerRouter
 } = require('./src/routes');
 
 const session = require('express-session');
@@ -61,11 +62,8 @@ app.use('/api/brand', BrandRouter);
 app.use('/api/product', ProductRouter);
 app.use('/api/product-review', ProductReviewRouter);
 app.use('/api/address', AddressRouter);
-
 app.use('/api/product-variant',ProductVariantRouter);
 app.use('/api/seller',ShopOwnerRouter);
-
-
 app.use('/api/cart', CartRouter);
 app.use('/api/discount', DiscountRouter);
 app.use('/api/order', OrderRouter);

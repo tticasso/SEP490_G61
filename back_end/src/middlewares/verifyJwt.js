@@ -64,10 +64,31 @@ async function isAdmin(req, res, next) {
     }
 }
 
+// Thêm phương thức kiểm tra quyền admin hoặc seller
+async function isAdminOrSeller(req, res, next) {
+    try {
+        const existUser = await User.findById(req.userId).exec();
+        if (!existUser) {
+            throw createHttpError.Forbidden("User not found");
+        }
+        const roles = await Role.find({ _id: { $in: existUser.roles } });
+        if (!roles) {
+            throw createHttpError.Forbidden("Forbidden access");
+        }
+        if (roles.some(role => role.name === "ADMIN") || roles.some(role => role.name === "MOD")) {
+            return next(); 
+        }
+        throw createHttpError.Unauthorized("Require Admin or Seller role!");
+    } catch (error) {
+        next(error);
+    }
+}
+
 const VerifyJwt = {
     verifyToken,
     isSeller,
-    isAdmin
+    isAdmin,
+    isAdminOrSeller
 };
 
 module.exports = VerifyJwt; 

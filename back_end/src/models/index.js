@@ -13,8 +13,10 @@ const Order = require('./order.model')
 const OrderDetail = require('./order-detail.model')
 const Shipping = require('./shipping.model')
 const Payment = require('./payment.model')
-const ShopOwner = require('./shopowner.model')
+const Shop = require('./shops.model')
 const ProductVariant = require('./product-variant.model')
+
+
 // Cau hinh mongoose dang global
 mongoose.Promise = global.Promise
 // Dinh nghia doi tuong DB
@@ -38,8 +40,9 @@ db.order = Order
 db.orderDetail = OrderDetail
 db.shipping = Shipping
 db.payment = Payment
-db.shopowner = ShopOwner
+db.shop = Shop
 db.productvariant = ProductVariant
+
 // Thuoc tinh tham chieu toi action ket noi CSDL
 db.connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, {

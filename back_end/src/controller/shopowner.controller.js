@@ -1,6 +1,7 @@
-const ShopOwner = require('../models/ShopOwner');
+const db = require("../models")
 const User = db.user;
 const Role = db.role;
+const ShopOwner = db.shopowner
 
 const shopOwnerController = {
   // Lấy tất cả shop owners (chỉ người bán hàng có quyền)

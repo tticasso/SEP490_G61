@@ -6,15 +6,15 @@ const ProductVariantRouter = express.Router()
 ProductVariantRouter.use(bodyParser.json())
 
 // Lấy danh sách các biến thể của một sản phẩm
-ProductVariantRouter.get('/products/:productId/variants', productVariantController.getProductVariants);
+ProductVariantRouter.get("/", productVariantController.getProductVariants);
 
 // Tạo mới một biến thể sản phẩm
-ProductVariantRouter.post('/products/:productId/variants', productVariantController.createProductVariant);
+ProductVariantRouter.post("/create", productVariantController.createProductVariant);
 
 // Cập nhật thông tin một biến thể sản phẩm
-ProductVariantRouter.put('/variants/:variantId', productVariantController.updateProductVariant);
+ProductVariantRouter.put("/edit/:variantId", productVariantController.updateProductVariant);
 
 // Xóa một biến thể sản phẩm
-ProductVariantRouter.delete('/variants/:variantId', productVariantController.deleteProductVariant);
+ProductVariantRouter.delete("/delete/:variantId", productVariantController.deleteProductVariant);
 
 module.exports = ProductVariantRouter

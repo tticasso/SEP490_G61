@@ -16,7 +16,9 @@ const { AuthRouter,
     DiscountRouter, 
     OrderRouter,
     ShippingRouter,
-    PaymentRouter
+    PaymentRouter,
+    ProductVariantRouter,
+    ShopOwnerRouter
 } = require('./src/routes');
 const session = require('express-session');
 const passport = require('passport');
@@ -62,6 +64,8 @@ app.use('/api/discount', DiscountRouter);
 app.use('/api/order', OrderRouter);
 app.use('/api/shipping', ShippingRouter);
 app.use('/api/payment', PaymentRouter);
+app.use('/api/product-variant',ProductVariantRouter);
+app.use('/api/seller',ShopOwnerRouter);
 // Kiểm soát các lỗi trong Express web server
 app.use(async (req, res, next) => {
     next(httpErrors.NotFound());

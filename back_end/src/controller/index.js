@@ -6,6 +6,11 @@ const brandController = require('./brand.controller')
 const productController = require('./product.controller')
 const productReviewController = require('./product-review.controller')
 const addressController = require('./user-address.controller')
+const cartController = require('./cart.controller')
+const discountController = require('./discount.controller')
+const orderController = require('./order.controller')
+const shippingController = require('./shipping.controller')
+const paymentController = require('./payment.controller')
 module.exports = {
     authController,
     userController,
@@ -14,5 +19,10 @@ module.exports = {
     brandController,
     productController,
     productReviewController,
-    addressController
+    addressController,
+    cartController,
+    discountController,
+    orderController,
+    shippingController,
+    paymentController
 }

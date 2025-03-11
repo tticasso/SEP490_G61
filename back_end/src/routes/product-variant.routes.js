@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const { productVariantController } = require('../controller');
-const { VerifyJwt } = require('../middleware/VerifyJwt');
+const productVariantController = require('../controller/product-variant.controller');
+const VerifyJwt = require('../middlewares/verifyJwt');
 
 const ProductVariantRouter = express.Router();
 ProductVariantRouter.use(bodyParser.json());

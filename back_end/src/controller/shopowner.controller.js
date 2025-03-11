@@ -1,6 +1,6 @@
-const ShopOwner = require('../models/ShopOwner');
-const User = db.user;
-const Role = db.role;
+const db = require('../models'); 
+const ShopOwner = db.ShopOwner; 
+
 
 const shopOwnerController = {
   // Lấy tất cả shop owners (chỉ người bán hàng có quyền)
@@ -24,7 +24,7 @@ const shopOwnerController = {
       }
       const shopOwner = await ShopOwner.findById(req.params.id);
       if (!shopOwner) {
-        return res.status(404).json({ message: 'Shop owner not found' });
+        return res.status(404).json({ message: 'Không tìm thấy chủ cửa hàng' });
       }
       res.status(200).json(shopOwner);
     } catch (error) {
@@ -52,7 +52,7 @@ const shopOwnerController = {
       res.status(201).json(shopOwner);
     } catch (error) {
       if (error.code === 11000) {
-        return res.status(400).json({ message: 'Email already exists' });
+        return res.status(400).json({ message: 'Email đã tồn tại' });
       }
       res.status(500).json({ message: error.message });
     }
@@ -78,7 +78,7 @@ const shopOwnerController = {
         { new: true }
       );
       if (!shopOwner) {
-        return res.status(404).json({ message: 'Shop owner not found' });
+        return res.status(404).json({ message: 'Không tìm thấy chủ cửa hàng' });
       }
       res.status(200).json(shopOwner);
     } catch (error) {
@@ -94,9 +94,9 @@ const shopOwnerController = {
       }
       const shopOwner = await ShopOwner.findByIdAndDelete(req.params.id);
       if (!shopOwner) {
-        return res.status(404).json({ message: 'Shop owner not found' });
+        return res.status(404).json({ message: 'Không tìm thấy chủ cửa hàng' });
       }
-      res.status(200).json({ message: 'Shop owner deleted successfully' });
+      res.status(200).json({ message: 'Xóa chủ cửa hàng thành công' });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }

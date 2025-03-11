@@ -5,9 +5,8 @@ const httpErrors = require('http-errors');
 const db = require('./src/models');
 require('dotenv').config();
 
-const { AuthRouter, UserRouter, RoleRouter, CategoriesRouter, BrandRouter, ProductRouter, ProductReviewRouter, AddressRouter, ProductVariantRouter ,ShopOwnerRouter } = require('./src/routes');
-
-const { AuthRouter, 
+const { 
+    AuthRouter, 
     UserRouter, 
     RoleRouter, 
     CategoriesRouter, 
@@ -19,7 +18,9 @@ const { AuthRouter,
     DiscountRouter, 
     OrderRouter,
     ShippingRouter,
-    PaymentRouter
+    PaymentRouter,
+    ProductVariantRouter,
+    ShopOwnerRouter 
 } = require('./src/routes');
 
 const session = require('express-session');
@@ -38,11 +39,12 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(cors({
-    origin: 'http://localhost:3000', // Thay đổi thành domain frontend của bạn
+    origin: 'http://localhost:3000', 
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token']
 }));
+
 // Bổ sung middleware kiểm soát hoạt động của Web server
 app.use(bodyParser.json());
 app.use(morgan("dev"));
@@ -53,6 +55,8 @@ app.get("/", (req, res, next) => {
         message: "Welcome to RESTFul API - NodeJS"
     });
 });
+
+// Định tuyến cho các router 
 app.use('/api/auth', AuthRouter);
 app.use('/api/user', UserRouter);
 app.use('/api/role', RoleRouter);
@@ -61,11 +65,8 @@ app.use('/api/brand', BrandRouter);
 app.use('/api/product', ProductRouter);
 app.use('/api/product-review', ProductReviewRouter);
 app.use('/api/address', AddressRouter);
-
-app.use('/api/product-variant',ProductVariantRouter);
-app.use('/api/seller',ShopOwnerRouter);
-
-
+app.use('/api/product-variant', ProductVariantRouter);
+app.use('/api/seller', ShopOwnerRouter);
 app.use('/api/cart', CartRouter);
 app.use('/api/discount', DiscountRouter);
 app.use('/api/order', OrderRouter);

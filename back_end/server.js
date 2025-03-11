@@ -4,6 +4,9 @@ const bodyParser = require('body-parser');
 const httpErrors = require('http-errors');
 const db = require('./src/models');
 require('dotenv').config();
+
+const { AuthRouter, UserRouter, RoleRouter, CategoriesRouter, BrandRouter, ProductRouter, ProductReviewRouter, AddressRouter, ProductVariantRouter ,ShopOwnerRouter } = require('./src/routes');
+
 const { AuthRouter, 
     UserRouter, 
     RoleRouter, 
@@ -18,6 +21,7 @@ const { AuthRouter,
     ShippingRouter,
     PaymentRouter
 } = require('./src/routes');
+
 const session = require('express-session');
 const passport = require('passport');
 const cors = require('cors');
@@ -57,11 +61,17 @@ app.use('/api/brand', BrandRouter);
 app.use('/api/product', ProductRouter);
 app.use('/api/product-review', ProductReviewRouter);
 app.use('/api/address', AddressRouter);
+
+app.use('/api/product-variant',ProductVariantRouter);
+app.use('/api/seller',ShopOwnerRouter);
+
+
 app.use('/api/cart', CartRouter);
 app.use('/api/discount', DiscountRouter);
 app.use('/api/order', OrderRouter);
 app.use('/api/shipping', ShippingRouter);
 app.use('/api/payment', PaymentRouter);
+
 // Kiểm soát các lỗi trong Express web server
 app.use(async (req, res, next) => {
     next(httpErrors.NotFound());

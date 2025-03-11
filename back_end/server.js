@@ -20,7 +20,7 @@ const { AuthRouter,
     ShippingRouter,
     PaymentRouter,
     ProductVariantRouter,
-    ShopOwnerRouter
+    ShopRouter
 } = require('./src/routes');
 
 const session = require('express-session');
@@ -63,7 +63,7 @@ app.use('/api/product', ProductRouter);
 app.use('/api/product-review', ProductReviewRouter);
 app.use('/api/address', AddressRouter);
 app.use('/api/product-variant',ProductVariantRouter);
-app.use('/api/seller',ShopOwnerRouter);
+app.use('/api/shops',ShopRouter);
 app.use('/api/cart', CartRouter);
 app.use('/api/discount', DiscountRouter);
 app.use('/api/order', OrderRouter);

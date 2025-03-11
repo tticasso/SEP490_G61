@@ -15,8 +15,8 @@ shopRouter.get("/find/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], shopCont
 // Tạo cửa hàng mới (bất kỳ ai có quyền)
 shopRouter.post("/create", VerifyJwt.verifyToken, shopController.createShop);
 
-// Cập nhật thông tin cửa hàng (chỉ seller có quyền)
-shopRouter.put("/edit/:id", [VerifyJwt.verifyToken, VerifyJwt.isSeller], shopController.updateShop);
+// Cập nhật thông tin cửa hàng (cho cả admin và seller)
+shopRouter.put("/edit/:id", [VerifyJwt.verifyToken], shopController.updateShop);
 
 // Xóa cửa hàng (chỉ admin có quyền)
 shopRouter.delete("/delete/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], shopController.deleteShop);

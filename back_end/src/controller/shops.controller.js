@@ -8,8 +8,7 @@ const getAllShops = async (req, res) => {
         const shops = await Shop.find({ is_active: 1 }); 
         res.status(200).json(shops);
     } catch (error) {
-        console.error("Error fetching shops:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -22,8 +21,7 @@ const getShopById = async (req, res) => {
         }
         res.status(200).json(shop);
     } catch (error) {
-        console.error("Error fetching shop by ID:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -54,8 +52,7 @@ const createShop = async (req, res) => {
         const savedShop = await newShop.save();
         res.status(201).json({ message: "Shop created successfully", shop: savedShop });
     } catch (error) {
-        console.error("Error creating shop:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -72,8 +69,7 @@ const updateShop = async (req, res) => {
         await shop.save();
         res.status(200).json({ message: "Shop updated successfully", shop });
     } catch (error) {
-        console.error("Error updating shop:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -89,8 +85,7 @@ const deleteShop = async (req, res) => {
         await shop.save();
         res.status(200).json({ message: "Shop deleted successfully" });
     } catch (error) {
-        console.error("Error deleting shop:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -101,8 +96,7 @@ const getShopStatistics = async (req, res) => {
 
         res.status(200).json({ totalShops });
     } catch (error) {
-        console.error("Error fetching shop statistics:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        res.status(500).json({ message: error.message });
     }
 };
 

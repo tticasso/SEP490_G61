@@ -36,7 +36,7 @@ async function isSeller(req, res, next) {
         if (!roles) {
             throw createHttpError.Forbidden("Forbidden access");
         }
-        if (roles.some(role => role.name === "MOD")) {
+        if (roles.some(role => role.name === "Seller")) {
             return next(); 
         }
         throw createHttpError.Unauthorized("Require Seller role!");
@@ -64,7 +64,7 @@ async function isAdmin(req, res, next) {
     }
 }
 
-// Thêm phương thức kiểm tra quyền admin hoặc seller
+
 async function isAdminOrSeller(req, res, next) {
     try {
         const existUser = await User.findById(req.userId).exec();
@@ -75,7 +75,7 @@ async function isAdminOrSeller(req, res, next) {
         if (!roles) {
             throw createHttpError.Forbidden("Forbidden access");
         }
-        if (roles.some(role => role.name === "ADMIN") || roles.some(role => role.name === "MOD")) {
+        if (roles.some(role => role.name === "ADMIN") || roles.some(role => role.name === "MOD") || roles.some(role => role.name === "Seller")) {
             return next(); 
         }
         throw createHttpError.Unauthorized("Require Admin or Seller role!");

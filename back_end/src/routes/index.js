@@ -12,8 +12,7 @@ const OrderRouter = require('./order.routes')
 const ShippingRouter = require('./shipping.routes')
 const PaymentRouter = require('./payment.routes')
 const ProductVariantRouter = require('./product-variant.routes')
-const ShopRouter = require('./shops.routes')
-
+const ShopOwnerRouter = require('./shopowner.routes')
 module.exports = {
     AuthRouter,
     UserRouter,
@@ -29,5 +28,5 @@ module.exports = {
     ShippingRouter,
     PaymentRouter,
     ProductVariantRouter,
-    ShopRouter
+    ShopOwnerRouter
 }

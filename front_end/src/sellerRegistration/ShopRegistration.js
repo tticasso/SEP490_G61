@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Store, 
   CheckCircle, 
@@ -9,51 +9,92 @@ import {
   Phone, 
   Mail,
   FileText,
-  CreditCard
+  CreditCard,
+  AlertCircle,
+  Loader
 } from 'lucide-react';
-// Giả lập các hình ảnh danh mục
-import laptopCategory from '../assets/laptopCategory.jpg';
-import donghoAvatar from '../assets/donghoAvatar.jpg';
-import quanao from '../assets/quanao.jpg';
-import kitchenware from '../assets/kitchenWare.jpg';
-import babyToys from '../assets/babyToys.jpg';
-import cosmetic from '../assets/cosmetic.jpg';
-
+import { useNavigate } from 'react-router-dom';
+import ApiService from '../services/ApiService';
+import AuthService from '../services/AuthService';
 
 const ShopRegistration = () => {
+  const navigate = useNavigate();
+  
   // State quản lý form
   const [formData, setFormData] = useState({
-    shopName: '',
-    shopDescription: '',
-    fullName: '',
+    name: '',
+    username: '',
     phone: '',
     email: '',
+    CCCD: '',
     address: '',
-    identityCard: '',
-    bankAccount: '',
-    bankName: '',
-    categories: [],
-    profileImage: null,
-    coverImage: null,
-    identityCardImage: null,
-    businessLicense: null,
+    description: '',
+    website: '',
+    nation_id: null,
+    province_id: null,
+    logo: null,
+    image_cover: null,
+    identityCardImage: null, // Không có trong model nhưng cần cho quá trình xác minh
+    businessLicense: null    // Không có trong model nhưng cần cho quá trình xác minh
   });
   
   // State quản lý các bước đăng ký
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [terms, setTerms] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [user, setUser] = useState(null);
   
-  // Danh sách danh mục sản phẩm
-  const categories = [
-    { id: 1, name: 'MÁY TÍNH & LAPTOP', image: laptopCategory, count: 14 },
-    { id: 2, name: 'ĐỒNG HỒ', image: donghoAvatar, count: 10 },
-    { id: 3, name: 'THỜI TRANG NAM', image: quanao, count: 7 },
-    { id: 4, name: 'THỜI TRANG NỮ', image: quanao, count: 5 },
-    { id: 5, name: 'ĐỒ GIA DỤNG', image: kitchenware, count: 8 },
-    { id: 6, name: 'MẸ & BÉ', image: babyToys, count: 6 },
-    { id: 7, name: 'MỸ PHẨM', image: cosmetic, count: 12 }
-  ];
+  // Fetch user và categories khi component mount
+  useEffect(() => {
+    const fetchUserAndCategories = async () => {
+      try {
+        // Kiểm tra đăng nhập
+        if (!AuthService.isLoggedIn()) {
+          navigate('/login', { state: { from: '/shop/register' } });
+          return;
+        }
+        
+        const userData = AuthService.getCurrentUser();
+        setUser(userData);
+        
+        // Pre-fill form với thông tin user
+        setFormData(prev => ({
+          ...prev,
+          email: userData.email || '',
+          phone: userData.phone || '',
+          // Tạo username từ email (loại bỏ @...)
+          username: userData.email ? userData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() : ''
+        }));
+        
+        // Fetch danh mục
+        setLoading(true);
+        const categoriesData = await ApiService.get('/categories', false); // public API, không cần token
+        setCategories(categoriesData || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError('Không thể tải dữ liệu. Vui lòng thử lại sau.');
+        
+        // Fallback categories nếu API fail
+        setCategories([
+          { _id: "1", name: 'MÁY TÍNH & LAPTOP', count: 14 },
+          { _id: "2", name: 'ĐỒNG HỒ', count: 10 },
+          { _id: "3", name: 'THỜI TRANG NAM', count: 7 },
+          { _id: "4", name: 'THỜI TRANG NỮ', count: 5 },
+          { _id: "5", name: 'ĐỒ GIA DỤNG', count: 8 },
+          { _id: "6", name: 'MẸ & BÉ', count: 6 },
+          { _id: "7", name: 'MỸ PHẨM', count: 12 }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchUserAndCategories();
+  }, [navigate]);
   
   // Xử lý thay đổi input
   const handleChange = (e) => {
@@ -84,13 +125,40 @@ const ShopRegistration = () => {
   
   // Xử lý chuyển bước
   const handleNextStep = () => {
+    setError(null);
+    
     if (currentStep === 1 && selectedCategories.length === 0) {
-      alert('Vui lòng chọn ít nhất một danh mục sản phẩm');
+      setError('Vui lòng chọn ít nhất một danh mục sản phẩm');
       return;
     }
     
+    if (currentStep === 2) {
+      // Validate fields in step 2
+      const requiredFields = ['name', 'username', 'phone', 'email', 'CCCD', 'address'];
+      const missingFields = requiredFields.filter(field => !formData[field]);
+      
+      if (missingFields.length > 0) {
+        setError('Vui lòng điền đầy đủ các trường bắt buộc');
+        return;
+      }
+      
+      // Validate username format (no spaces, special chars)
+      const usernameRegex = /^[a-zA-Z0-9_]+$/;
+      if (!usernameRegex.test(formData.username)) {
+        setError('Username chỉ được chứa chữ cái, số và dấu gạch dưới');
+        return;
+      }
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        setError('Email không hợp lệ');
+        return;
+      }
+    }
+    
     if (currentStep === 3 && !terms) {
-      alert('Vui lòng đồng ý với điều khoản dịch vụ');
+      setError('Vui lòng đồng ý với điều khoản dịch vụ');
       return;
     }
     
@@ -108,17 +176,267 @@ const ShopRegistration = () => {
     }
   };
   
-  // Xử lý submit form
-  const handleSubmit = () => {
-    // Tạo form data để gửi lên server
-    const submitData = {
-      ...formData,
-      categories: selectedCategories
+  // Helper function để upload file trực tiếp với ApiService
+  const uploadFile = async (url, formData) => {
+    try {
+      const token = AuthService.getToken();
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'x-access-token': token
+        },
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        throw new Error(errorData.message || 'Upload failed');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('File upload error:', error);
+      throw error;
+    }
+  };
+  
+  // Upload shop images (logo & image_cover)
+  const uploadShopImages = async (shopId) => {
+    try {
+      const uploadPromises = [];
+      
+      // Upload logo
+      if (formData.logo) {
+        const logoFormData = new FormData();
+        logoFormData.append('image', formData.logo);
+        logoFormData.append('field', 'logo');
+        
+        const logoUpload = uploadFile(
+          `${ApiService.API_URL}/shops/upload/${shopId}`, 
+          logoFormData
+        );
+        
+        uploadPromises.push(logoUpload);
+      }
+      
+      // Upload image_cover
+      if (formData.image_cover) {
+        const coverFormData = new FormData();
+        coverFormData.append('image', formData.image_cover);
+        coverFormData.append('field', 'image_cover');
+        
+        const coverUpload = uploadFile(
+          `${ApiService.API_URL}/shops/upload/${shopId}`, 
+          coverFormData
+        );
+        
+        uploadPromises.push(coverUpload);
+      }
+      
+      // Wait for all uploads to complete
+      await Promise.all(uploadPromises);
+      
+    } catch (error) {
+      console.error('Error uploading shop images:', error);
+      throw new Error('Không thể tải lên hình ảnh cửa hàng');
+    }
+  };
+  
+  // Upload documents (identityCardImage & businessLicense)
+  const uploadDocuments = async () => {
+    try {
+      // Skip if no documents to upload
+      if (!formData.identityCardImage && !formData.businessLicense) {
+        return;
+      }
+      
+      const documentsFormData = new FormData();
+      
+      if (formData.identityCardImage) {
+        documentsFormData.append('identityCardImage', formData.identityCardImage);
+      }
+      
+      if (formData.businessLicense) {
+        documentsFormData.append('businessLicense', formData.businessLicense);
+      }
+      
+      await uploadFile(
+        `${ApiService.API_URL}/documents/upload`, 
+        documentsFormData
+      );
+      
+    } catch (error) {
+      console.error('Error uploading documents:', error);
+      throw new Error('Không thể tải lên giấy tờ xác minh');
+    }
+  };
+  
+  // Save shop categories
+  const saveShopCategories = async (shopId) => {
+    try {
+      const token = AuthService.getToken();
+      const response = await fetch(
+        `${ApiService.API_URL}/shop-categories/${shopId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-access-token': token
+          },
+          body: JSON.stringify({ categoryIds: selectedCategories })
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save shop categories');
+      }
+    } catch (error) {
+      console.error('Error saving shop categories:', error);
+      throw new Error('Không thể lưu danh mục sản phẩm');
+    }
+  };
+  
+  // Xử lý submit form - FIXED VERSION
+  // This is the fixed handleSubmit function with extensive token debugging
+
+const handleSubmit = async () => {
+  if (!AuthService.isLoggedIn()) {
+    setError('Bạn cần đăng nhập để thực hiện chức năng này');
+    navigate('/login', { state: { from: '/shop/register' } });
+    return;
+  }
+  
+  try {
+    setLoading(true);
+    setError(null);
+    
+    // Debug user object
+    const user = AuthService.getCurrentUser();
+    console.log("Current user object:", user);
+    
+    // Debug token
+    const token = AuthService.getToken();
+    console.log("Token from AuthService:", token);
+    
+    if (!token) {
+      throw new Error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
+    }
+    
+    // 1. Tạo shop mới
+    const shopData = {
+      name: formData.name,
+      username: formData.username,
+      phone: formData.phone,
+      email: formData.email,
+      CCCD: formData.CCCD,
+      address: formData.address,
+      description: formData.description || '',
+      website: formData.website || '',
+      nation_id: formData.nation_id || null,
+      province_id: formData.province_id || null
     };
     
-    console.log('Form submitted:', submitData);
-    alert('Đăng ký cửa hàng thành công! Chúng tôi sẽ liên hệ với bạn trong vòng 24h.');
-    window.location.href = '/'
+    console.log("Sending request to create shop with data:", shopData);
+    console.log("API URL:", `${ApiService.API_URL}/shops/create`);
+    console.log("Using token header:", { 'x-access-token': token });
+    
+    // Make the request with explicit debugging
+    const response = await fetch(`${ApiService.API_URL}/shops/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-access-token': token
+      },
+      body: JSON.stringify(shopData)
+    });
+    
+    console.log("Response status:", response.status);
+    console.log("Response status text:", response.statusText);
+    
+    // Handle 401 Unauthorized
+    if (response.status === 401) {
+      console.error('Authentication failed - token invalid or expired');
+      
+      // Attempt to get full error details
+      const errorText = await response.text();
+      console.error('Full error response:', errorText);
+      
+      // Clear user data and force re-login
+      AuthService.logout();
+      throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+    
+    // Handle other errors
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => {
+        return { message: `Server error: ${response.status} ${response.statusText}` };
+      });
+      console.error('Error response data:', errorData);
+      throw new Error(errorData.message || `Lỗi server: ${response.status}`);
+    }
+    
+    // Parse successful response
+    const data = await response.json();
+    console.log("Shop creation successful:", data);
+    const shopId = data.shop._id;
+    
+    // Rest of your function...
+    // Upload images, documents, etc.
+    
+    setSuccess(true);
+    setTimeout(() => {
+      navigate('/shop/my-shop');
+    }, 3000);
+    
+  } catch (error) {
+    console.error('Error in shop registration:', error);
+    
+    setError(error.message || 'Có lỗi xảy ra khi đăng ký cửa hàng');
+    
+    if (error.message.includes('đăng nhập') || 
+        error.message.includes('token') || 
+        error.message.includes('Unauthorized')) {
+      setTimeout(() => {
+        navigate('/login', { state: { from: '/shop/register' } });
+      }, 2000);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+  
+  // Hiển thị thông báo lỗi
+  const renderError = () => {
+    if (!error) return null;
+    
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex items-start">
+        <AlertCircle className="mr-2 flex-shrink-0 mt-0.5" size={18} />
+        <span>{error}</span>
+      </div>
+    );
+  };
+  
+  // Hiển thị thông báo thành công
+  const renderSuccess = () => {
+    if (!success) return null;
+    
+    return (
+      <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4 flex items-start">
+        <CheckCircle className="mr-2 flex-shrink-0 mt-0.5" size={18} />
+        <div>
+          <p className="font-medium">Đăng ký cửa hàng thành công!</p>
+          <p>Chúng tôi đang xem xét thông tin của bạn và sẽ liên hệ trong vòng 24h. Bạn sẽ được chuyển hướng đến trang quản lý cửa hàng...</p>
+        </div>
+      </div>
+    );
   };
   
   // Render step 1: Chọn danh mục
@@ -128,31 +446,42 @@ const ShopRegistration = () => {
         <h2 className="text-xl font-bold mb-4">Chọn danh mục sản phẩm bạn muốn bán</h2>
         <p className="text-gray-600 mb-6">Bạn có thể chọn nhiều danh mục phù hợp với sản phẩm của mình</p>
         
+        {loading && (
+          <div className="flex justify-center items-center py-10">
+            <Loader className="animate-spin text-purple-600 mr-2" />
+            <span>Đang tải danh mục...</span>
+          </div>
+        )}
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {categories.map(category => (
             <div 
-              key={category.id}
+              key={category._id}
               className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                selectedCategories.includes(category.id) 
+                selectedCategories.includes(category._id) 
                   ? 'border-purple-500 bg-purple-50' 
                   : 'border-gray-200 hover:border-purple-300'
               }`}
-              onClick={() => handleCategorySelect(category.id)}
+              onClick={() => handleCategorySelect(category._id)}
             >
-              <div className="relative h-40 mb-3">
-                <img 
-                  src={category.image} 
-                  alt={category.name}
-                  className="w-full h-full object-cover rounded"
-                />
-                {selectedCategories.includes(category.id) && (
+              <div className="relative h-40 mb-3 bg-gray-100 flex items-center justify-center rounded">
+                {category.image ? (
+                  <img 
+                    src={category.image} 
+                    alt={category.name}
+                    className="w-full h-full object-cover rounded"
+                  />
+                ) : (
+                  <Package size={48} className="text-gray-400" />
+                )}
+                {selectedCategories.includes(category._id) && (
                   <div className="absolute top-2 right-2 bg-purple-500 text-white rounded-full p-1">
                     <CheckCircle size={16} />
                   </div>
                 )}
               </div>
               <h3 className="font-bold text-center">{category.name}</h3>
-              <p className="text-gray-500 text-sm text-center">{category.count} Sản phẩm</p>
+              <p className="text-gray-500 text-sm text-center">{category.count || 0} Sản phẩm</p>
             </div>
           ))}
         </div>
@@ -173,34 +502,35 @@ const ShopRegistration = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Tên cửa hàng *</label>
               <input
                 type="text"
-                name="shopName"
-                value={formData.shopName}
+                name="name"
+                value={formData.name}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 required
               />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập *</label>
+              <input
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">Tên đăng nhập phải là duy nhất, không chứa khoảng trắng và ký tự đặc biệt</p>
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả cửa hàng</label>
               <textarea
-                name="shopDescription"
-                value={formData.shopDescription}
+                name="description"
+                value={formData.description}
                 onChange={handleChange}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên chủ cửa hàng *</label>
-              <input
-                type="text"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                required
               />
             </div>
             
@@ -246,8 +576,8 @@ const ShopRegistration = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Số CMND/CCCD *</label>
               <input
                 type="text"
-                name="identityCard"
-                value={formData.identityCard}
+                name="CCCD"
+                value={formData.CCCD}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 required
@@ -255,27 +585,46 @@ const ShopRegistration = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tài khoản ngân hàng *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
               <input
-                type="text"
-                name="bankAccount"
-                value={formData.bankAccount}
+                type="url"
+                name="website"
+                value={formData.website}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                required
               />
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tên ngân hàng *</label>
-              <input
-                type="text"
-                name="bankName"
-                value={formData.bankName}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quốc gia</label>
+                <select
+                  name="nation_id"
+                  value={formData.nation_id || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Chọn quốc gia</option>
+                  <option value="1">Việt Nam</option>
+                  {/* Thêm các quốc gia khác nếu cần */}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tỉnh/Thành phố</label>
+                <select
+                  name="province_id"
+                  value={formData.province_id || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Chọn tỉnh/thành</option>
+                  <option value="1">Hà Nội</option>
+                  <option value="2">TP. Hồ Chí Minh</option>
+                  <option value="3">Đà Nẵng</option>
+                  {/* Thêm các tỉnh thành khác */}
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -285,17 +634,22 @@ const ShopRegistration = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ảnh đại diện cửa hàng</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Logo cửa hàng</label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                 <Upload className="mx-auto text-gray-400 mb-2" />
                 <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
                 <input
                   type="file"
-                  name="profileImage"
+                  name="logo"
                   onChange={handleFileChange}
                   className="w-full mt-2"
                   accept="image/*"
                 />
+                {formData.logo && (
+                  <div className="mt-2 text-sm text-green-600">
+                    Đã chọn: {formData.logo.name}
+                  </div>
+                )}
               </div>
             </div>
             
@@ -306,11 +660,16 @@ const ShopRegistration = () => {
                 <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
                 <input
                   type="file"
-                  name="coverImage"
+                  name="image_cover"
                   onChange={handleFileChange}
                   className="w-full mt-2"
                   accept="image/*"
                 />
+                {formData.image_cover && (
+                  <div className="mt-2 text-sm text-green-600">
+                    Đã chọn: {formData.image_cover.name}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -340,6 +699,11 @@ const ShopRegistration = () => {
                 accept="image/*"
                 required
               />
+              {formData.identityCardImage && (
+                <div className="mt-2 text-sm text-green-600">
+                  Đã chọn: {formData.identityCardImage.name}
+                </div>
+              )}
             </div>
           </div>
           
@@ -355,6 +719,11 @@ const ShopRegistration = () => {
                 className="w-full mt-2"
                 accept="image/*,.pdf"
               />
+              {formData.businessLicense && (
+                <div className="mt-2 text-sm text-green-600">
+                  Đã chọn: {formData.businessLicense.name}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -440,32 +809,48 @@ const ShopRegistration = () => {
       
       {renderStepIndicators()}
       
-      <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
-        {currentStep === 1 && renderCategorySelection()}
-        {currentStep === 2 && renderShopInfo()}
-        {currentStep === 3 && renderDocuments()}
-        
-        <div className="flex justify-between mt-10">
-          <button
-            type="button"
-            onClick={handlePrevStep}
-            className={`px-6 py-2 border border-gray-300 rounded-md text-gray-700 ${
-              currentStep === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
-            }`}
-            disabled={currentStep === 1}
-          >
-            Quay lại
-          </button>
+      {success ? (
+        renderSuccess()
+      ) : (
+        <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
+          {renderError()}
           
-          <button
-            type="button"
-            onClick={handleNextStep}
-            className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-          >
-            {currentStep === 3 ? 'Đăng ký cửa hàng' : 'Tiếp tục'}
-          </button>
+          {currentStep === 1 && renderCategorySelection()}
+          {currentStep === 2 && renderShopInfo()}
+          {currentStep === 3 && renderDocuments()}
+          
+          <div className="flex justify-between mt-10">
+            <button
+              type="button"
+              onClick={handlePrevStep}
+              className={`px-6 py-2 border border-gray-300 rounded-md text-gray-700 ${
+                currentStep === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
+              }`}
+              disabled={currentStep === 1 || loading}
+            >
+              Quay lại
+            </button>
+            
+            <button
+              type="button"
+              onClick={handleNextStep}
+              className={`px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center ${
+                loading ? 'opacity-70 cursor-wait' : ''
+              }`}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
+                  Đang xử lý...
+                </>
+              ) : (
+                currentStep === 3 ? 'Đăng ký cửa hàng' : 'Tiếp tục'
+              )}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
       
       <div className="bg-gray-50 rounded-lg p-6">
         <h2 className="text-lg font-bold mb-4">Lợi ích khi bán hàng trên Trooc</h2>

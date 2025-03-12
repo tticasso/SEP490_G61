@@ -5,6 +5,10 @@ import AuthService from './AuthService';
 const API_URL = "http://localhost:9999/api";
 
 class ApiService {
+  constructor() {
+    this.API_URL = API_URL; // Expose API_URL for external use
+  }
+
   // Phương thức GET
   async get(endpoint, secure = true) {
     const headers = this.getHeaders(secure);
@@ -63,6 +67,46 @@ class ApiService {
     }
   }
 
+  // Phương thức PATCH
+  async patch(endpoint, data, secure = true) {
+    const headers = this.getHeaders(secure);
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(data)
+      });
+      return this.handleResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  // Phương thức Upload File (mới thêm)
+  async uploadFile(endpoint, formData, secure = true) {
+    try {
+      // Chỉ thêm token, không thêm Content-Type vì sẽ được tự động thiết lập bởi fetch khi sử dụng FormData
+      const headers = {};
+      
+      if (secure) {
+        const token = AuthService.getToken();
+        if (token) {
+          headers['x-access-token'] = token;
+        }
+      }
+
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+      
+      return this.handleResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
   // Lấy headers, bao gồm token nếu là API bảo mật
   getHeaders(secure) {
     const headers = {
@@ -78,21 +122,6 @@ class ApiService {
 
     return headers;
   }
-
-  // Phương thức PATCH
-async patch(endpoint, data, secure = true) {
-  const headers = this.getHeaders(secure);
-  try {
-      const response = await fetch(`${API_URL}${endpoint}`, {
-          method: 'PATCH',
-          headers,
-          body: JSON.stringify(data)
-      });
-      return this.handleResponse(response);
-  } catch (error) {
-      return this.handleError(error);
-  }
-}
 
   // Xử lý response
   async handleResponse(response) {

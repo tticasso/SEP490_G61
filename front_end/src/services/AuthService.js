@@ -15,7 +15,13 @@ class AuthService {
             .then(this.handleResponse)
             .then((data) => {
                 if (data.accessToken) {
-                    localStorage.setItem("user", JSON.stringify(data));
+                    // Store with timestamp to check expiration
+                    const userData = {
+                        ...data,
+                        loginTime: new Date().getTime()
+                    };
+                    localStorage.setItem("user", JSON.stringify(userData));
+                    console.log("User logged in and token stored:", userData);
                 }
                 return data;
             });
@@ -24,6 +30,7 @@ class AuthService {
     // Đăng xuất
     logout() {
         localStorage.removeItem("user");
+        console.log("User logged out, token removed");
     }
 
     // Đăng ký
@@ -67,33 +74,81 @@ class AuthService {
 
     // Lấy thông tin user hiện tại
     getCurrentUser() {
-        const userStr = localStorage.getItem("user");
-        if (userStr) return JSON.parse(userStr);
-        return null;
+        try {
+            const userStr = localStorage.getItem("user");
+            if (!userStr) return null;
+            
+            const user = JSON.parse(userStr);
+            return user;
+        } catch (error) {
+            console.error("Error parsing user from localStorage:", error);
+            // If there's an error parsing, clear the corrupt data
+            localStorage.removeItem("user");
+            return null;
+        }
     }
 
-    // Kiểm tra người dùng đã đăng nhập chưa
+    // Kiểm tra người dùng đã đăng nhập chưa và token còn hạn sử dụng
     isLoggedIn() {
-        return !!this.getCurrentUser();
+        const user = this.getCurrentUser();
+        if (!user) return false;
+        
+        // Check if token exists
+        if (!user.accessToken) return false;
+        
+        // Optional: Check for token expiration based on login time
+        // Assuming a token lasts for 24 hours (86400000 milliseconds)
+        const TOKEN_EXPIRY = 86400000; // 24 hours
+        const now = new Date().getTime();
+        const loginTime = user.loginTime || 0;
+        
+        if (now - loginTime > TOKEN_EXPIRY) {
+            console.log("Token expired, logging out");
+            this.logout();
+            return false;
+        }
+        
+        return true;
     }
 
     // Lấy token
     getToken() {
-        const user = this.getCurrentUser();
-        return user?.accessToken;
+        try {
+            const user = this.getCurrentUser();
+            if (!user) return null;
+            
+            // Ensure token is a string and not undefined/null
+            const token = user.accessToken;
+            if (!token) {
+                console.error("Token not found in user object:", user);
+                return null;
+            }
+            
+            return token;
+        } catch (error) {
+            console.error("Error getting token:", error);
+            return null;
+        }
     }
 
     // Kiểm tra user có role cụ thể không
     hasRole(role) {
         const user = this.getCurrentUser();
-        if (!user) return false;
+        if (!user || !user.roles) return false;
         return user.roles.includes(role);
     }
 
     // Xử lý response
     handleResponse(response) {
         return response.text().then((text) => {
-            const data = text && JSON.parse(text);
+            let data;
+            try {
+                data = text && JSON.parse(text);
+            } catch (e) {
+                console.error("Error parsing response:", e);
+                return Promise.reject("Invalid JSON response");
+            }
+            
             if (!response.ok) {
                 const error = (data && data.message) || response.statusText;
                 return Promise.reject(error);
@@ -104,7 +159,19 @@ class AuthService {
 
     // Lưu thông tin người dùng vào localStorage
     setUser(user) {
-        localStorage.setItem("user", JSON.stringify(user));
+        if (!user) {
+            console.error("Attempted to set null/undefined user");
+            return;
+        }
+        
+        // Add timestamp for expiration checking
+        const userData = {
+            ...user,
+            loginTime: new Date().getTime()
+        };
+        
+        localStorage.setItem("user", JSON.stringify(userData));
+        console.log("User data updated in localStorage");
     }
 }
 

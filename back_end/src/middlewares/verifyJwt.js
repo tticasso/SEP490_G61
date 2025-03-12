@@ -1,7 +1,7 @@
 const createHttpError = require("http-errors");
 const config = require("../config/auth.config");
 const db = require("../models");
-const { user: User, role: Role } = db;
+const { user: User, role: Role, shop: Shop } = db;
 const jwt = require('jsonwebtoken');
 
 async function verifyToken(req, res, next) {
@@ -56,6 +56,7 @@ async function isAdmin(req, res, next) {
             throw createHttpError.Forbidden("Forbidden access");
         }
         if (roles.some(role => role.name === "ADMIN")) {
+            req.isAdmin = true;
             return next(); 
         }
         throw createHttpError.Unauthorized("Require Admin role!");
@@ -74,10 +75,46 @@ async function isAdminOrSeller(req, res, next) {
         if (!roles) {
             throw createHttpError.Forbidden("Forbidden access");
         }
-        if (roles.some(role => role.name === "ADMIN") || roles.some(role => role.name === "MOD")) {
+        if (roles.some(role => role.name === "ADMIN")) {
+            req.isAdmin = true;
+            return next(); 
+        }
+        if (roles.some(role => role.name === "MOD")) {
+            req.isSeller = true;
             return next(); 
         }
         throw createHttpError.Unauthorized("Require Admin or Seller role!");
+    } catch (error) {
+        next(error);
+    }
+}
+
+// Mới: Kiểm tra chủ sở hữu shop
+async function isShopOwner(req, res, next) {
+    try {
+        const shopId = req.params.id;
+        const userId = req.userId;
+
+        const shop = await Shop.findById(shopId);
+        
+        if (!shop || shop.is_active === 0) {
+            throw createHttpError.NotFound("Shop not found");
+        }
+
+        if (shop.user_id.toString() === userId.toString()) {
+            return next();
+        }
+
+        // Kiểm tra xem người dùng có phải là admin không
+        const existUser = await User.findById(userId).exec();
+        const roles = await Role.find({ _id: { $in: existUser.roles } });
+        
+        if (roles.some(role => role.name === "ADMIN")) {
+            req.isAdmin = true;
+            return next();
+        }
+
+        throw createHttpError.Forbidden("You are not the owner of this shop");
     } catch (error) {
         next(error);
     }
@@ -87,7 +124,8 @@ const VerifyJwt = {
     verifyToken,
     isSeller,
     isAdmin,
-    isAdminOrSeller
+    isAdminOrSeller,
+    isShopOwner // Thêm middleware mới
 };
 
-module.exports = VerifyJwt; 
+module.exports = VerifyJwt;

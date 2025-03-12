@@ -21,12 +21,15 @@ const { AuthRouter,
     PaymentRouter,
     ProductVariantRouter,
     ShopRouter,
+    DocumentRouter, // Thêm vào đây,
     ShopFollowRouter
 } = require('./src/routes');
 
 const session = require('express-session');
 const passport = require('passport');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 
 // Khởi tạo Express trước khi dùng app.use()
 const app = express();
@@ -45,9 +48,27 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token']
 }));
+
 // Bổ sung middleware kiểm soát hoạt động của Web server
 app.use(bodyParser.json());
 app.use(morgan("dev"));
+
+// Cấu hình static files cho uploads - đặt trước các routes
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Đảm bảo thư mục uploads tồn tại
+const uploadDirs = [
+  path.join(__dirname, 'uploads'),
+  path.join(__dirname, 'uploads/shops'),
+  path.join(__dirname, 'uploads/documents')
+];
+
+uploadDirs.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`Created directory: ${dir}`);
+  }
+});
 
 // Định tuyến cho root router
 app.get("/", (req, res, next) => {
@@ -55,6 +76,8 @@ app.get("/", (req, res, next) => {
         message: "Welcome to RESTFul API - NodeJS"
     });
 });
+
+// Đăng ký tất cả các routes
 app.use('/api/auth', AuthRouter);
 app.use('/api/user', UserRouter);
 app.use('/api/role', RoleRouter);
@@ -63,14 +86,15 @@ app.use('/api/brand', BrandRouter);
 app.use('/api/product', ProductRouter);
 app.use('/api/product-review', ProductReviewRouter);
 app.use('/api/address', AddressRouter);
-app.use('/api/product-variant', ProductVariantRouter);
-app.use('/api/shops', ShopRouter);
+app.use('/api/product-variant',  ProductVariantRouter);
+app.use('/api/shops',  ShopRouter);
 app.use('/api/shop-follow', ShopFollowRouter); // New route for shop follow functionality
 app.use('/api/cart', CartRouter);
 app.use('/api/discount', DiscountRouter);
 app.use('/api/order', OrderRouter);
 app.use('/api/shipping', ShippingRouter);
 app.use('/api/payment', PaymentRouter);
+app.use('/api/documents', DocumentRouter); // Thêm route cho documents
 
 // Kiểm soát các lỗi trong Express web server
 app.use(async (req, res, next) => {

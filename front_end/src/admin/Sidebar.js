@@ -23,7 +23,7 @@ const Sidebar = () => {
     ]},
     { id: 'stores', icon: <ShoppingBag size={20} />, label: 'Cửa hàng', hasSubmenu: true, submenus: [
       { id: 'storeList', label: 'Danh sách cửa hàng', path: '/admin/stores' },
-      { id: 'addStore', label: 'Thêm mới cửa hàng', path: '/admin/add-store' }
+      { id: 'addStore', label: 'Thêm mới cửa hàng', path: '/admin/store-requests' }
     ]},
     { id: 'customers', icon: <Users size={20} />, label: 'Khách hàng', hasSubmenu: true, submenus: [
       { id: 'customerManagement', label: 'Quản lý khách hàng', path: '/admin/customers' }

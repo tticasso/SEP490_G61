@@ -7,10 +7,10 @@ const shippingSchema = new Schema({
         required: true,
         unique: true
     },
-    user_id: {
-        type: Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+    name: {
+        type: String,
+        required: true,
+        maxlength: 50
     },
     price: {
         type: Number,

@@ -35,7 +35,7 @@ const mongoose = require('mongoose');
        },
        rating: {
          type: Number,
-         default: 4.5,
+         default: 0,
          required: true
        },
        nation_id: {

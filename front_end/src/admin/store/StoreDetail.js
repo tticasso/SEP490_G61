@@ -1,53 +1,121 @@
-import React, { useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
-import ShopAvatar from '../../assets/ShopAvatar.png'
-import ShopOwner from '../../assets/ShopOwner.png'
-import nguoidep from '../../assets/nguoidep.jpg'
-import ShopBackground from '../../assets/ShopBackground.png'
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, UserIcon } from 'lucide-react';
+import ShopService from './services/Shopservice';
+import { toast } from 'react-toastify'; // Assuming you use react-toastify for notifications
 
-const StoreDetail = ({ onBack, storeData: initialData }) => {
-    // Store data fixed for demo
-    const [storeData, setStoreData] = useState(initialData || {
-        // Basic info
-        name: 'dinh shop',
-        username: 'shodinh',
-        phone: '033583800',
-        website: '',
-        email: 'vuvandinh203@gmail.com',
-        description: '',
-        logo: ShopOwner,
+const StoreDetail = ({ onBack, shopId }) => {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [shopData, setShopData] = useState({});
+    const [userData, setUserData] = useState(null);
+    const [provinceData, setProvinceData] = useState(null);
 
-        // Location
-        country: 'Việt Nam',
-        province: 'An Giang',
-        address: '18/1/2 đường số 8 linh xuân',
+    // Load shop data on component mount
+    useEffect(() => {
+        if (shopId) {
+            fetchShopData();
+        } else {
+            setLoading(false);
+        }
+    }, [shopId]);
 
-        // Contact person
-        contactLastName: 'vu',
-        contactFirstName: 'dinh',
-        contactPhone: '0123-456-789',
-        idNumber: '068203002554',
-    });
-
-    // Handle input changes
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setStoreData({
-            ...storeData,
-            [name]: value
-        });
+    // Fetch shop data from API
+    const fetchShopData = async () => {
+        try {
+            setLoading(true);
+            const data = await ShopService.getShopById(shopId);
+            
+            // Update state with fetched data
+            setShopData(data);
+            
+            // Fetch user data if user_id exists
+            if (data.user_id) {
+                fetchUserData(data.user_id);
+            }
+            
+            // Fetch province data if province_id exists
+            if (data.province_id) {
+                fetchProvinceData(data.province_id);
+            }
+            
+            setLoading(false);
+        } catch (err) {
+            console.error('Error fetching shop data:', err);
+            setError('Failed to load shop details. Please try again later.');
+            setLoading(false);
+            toast.error('Failed to load shop details');
+        }
     };
 
-    // Handle save
-    const handleSave = () => {
-        console.log("Saving store data:", storeData);
-        // API call would go here
+    // Fetch user data
+    const fetchUserData = async (userId) => {
+        try {
+            const userData = await ShopService.getUserById(userId);
+            setUserData(userData);
+        } catch (err) {
+            console.error('Error fetching user data:', err);
+        }
     };
 
-    // Handle lock account
-    const handleLockAccount = () => {
-        console.log("Locking account:", storeData.username);
-        // API call would go here
+    // Fetch province data
+    const fetchProvinceData = async (provinceId) => {
+        try {
+            const provinceData = await ShopService.getProvinceById(provinceId);
+           
+            
+            setProvinceData(provinceData);
+        } catch (err) {
+            console.error('Error fetching province data:', err);
+        }
+    };
+
+    // Handle approve shop
+    const handleApproveShop = async () => {
+        try {
+            setLoading(true);
+            await ShopService.updateShopStatus(shopId, 'active');
+            
+            // Update local state
+            setShopData({
+                ...shopData,
+                status: 'active'
+            });
+            
+            toast.success('Cửa hàng đã được duyệt thành công');
+            setLoading(false);
+        } catch (err) {
+            console.error('Error approving shop:', err);
+            toast.error('Không thể duyệt cửa hàng');
+            setLoading(false);
+        }
+    };
+
+    // Handle toggle account lock status
+    const handleToggleAccountStatus = async () => {
+        try {
+            setLoading(true);
+            
+            const isCurrentlyActive = shopData.is_active === 1;
+            const newStatus = isCurrentlyActive ? 0 : 1;
+            const actionText = isCurrentlyActive ? 'khóa' : 'mở khóa';
+            
+            // Update just the is_active field
+            await ShopService.toggleShopActiveStatus(shopId, newStatus);
+            
+            // Update local state
+            setShopData({
+                ...shopData,
+                is_active: newStatus
+            });
+            
+            toast.success(`Cửa hàng đã được ${actionText} thành công`);
+            setLoading(false);
+            
+        } catch (err) {
+            console.error('Error toggling account status:', err);
+            toast.error('Không thể thay đổi trạng thái tài khoản');
+            setLoading(false);
+        }
     };
 
     return (
@@ -64,246 +132,229 @@ const StoreDetail = ({ onBack, storeData: initialData }) => {
                     </button>
                 </div>
                 <div className="flex space-x-4">
-                    <button
-                        className="px-6 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
-                        onClick={handleLockAccount}
-                    >
-                        Khóa tài khoản
-                    </button>
-                    <button
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                        onClick={handleSave}
-                    >
-                        Lưu chỉnh sửa
-                    </button>
+                    {shopId && (
+                        <>
+                            {shopData.status === 'pending' && (
+                                <button
+                                    className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md"
+                                    onClick={handleApproveShop}
+                                    disabled={loading}
+                                >
+                                    Duyệt cửa hàng
+                                </button>
+                            )}
+                            <button
+                                className={`px-6 py-2 ${shopData.is_active === 1 ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white rounded-md`}
+                                onClick={handleToggleAccountStatus}
+                                disabled={loading}
+                            >
+                                {shopData.is_active === 1 ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
             <div className="p-6">
-                <h1 className="text-2xl font-bold text-gray-800 mb-8">QUẢN LÝ THÔNG TIN CỬA HÀNG</h1>
+                <h1 className="text-2xl font-bold text-gray-800 mb-8">THÔNG TIN CỬA HÀNG</h1>
 
-                {/* Form content */}
-                <div className="grid grid-cols-2 gap-8">
-                    {/* Left section - Store info */}
-                    <div>
-                        <div className="mb-8">
-                            <h2 className="text-lg font-medium text-gray-700 mb-2">CỬA HÀNG</h2>
-                            <p className="text-sm text-gray-500 mb-4">Các thông tin về cửa hàng của bạn</p>
+                {loading ? (
+                    <div className="text-center py-10">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        <p className="mt-2">Đang tải dữ liệu...</p>
+                    </div>
+                ) : error ? (
+                    <div className="text-center py-10 text-red-500">
+                        {error}
+                    </div>
+                ) : (
+                    /* Detail content */
+                    <div className="grid grid-cols-2 gap-8">
+                        {/* Left section - Store info */}
+                        <div>
+                            <div className="mb-8">
+                                <h2 className="text-lg font-medium text-gray-700 mb-4">THÔNG TIN CƠ BẢN</h2>
 
-                            <div className="mb-8 flex justify-center">
-                                <div className="relative">
-                                    <img
-                                        src={ShopBackground}
-                                        alt="Store logo"
-                                        className="w-40 h-40 rounded-full object-cover border-4 border-gray-200"
-                                    />
-                                    <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full shadow-md">
-                                        <p className="text-sm text-center">Ảnh đại diện</p>
+                                <div className="mb-8 flex justify-center">
+                                    <div className="relative">
+                                        <img
+                                            src={shopData.logo || shopData.image_cover || 'https://via.placeholder.com/150'}
+                                            alt="Store logo"
+                                            className="w-40 h-40 rounded-full object-cover border-4 border-gray-200"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Tên cửa hàng</h3>
+                                            <p className="mt-1 text-lg font-medium">{shopData.name || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Tên tài khoản</h3>
+                                            <p className="mt-1 text-lg font-medium">{shopData.username || 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Số điện thoại</h3>
+                                            <p className="mt-1">{shopData.phone || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Email</h3>
+                                            <p className="mt-1">{shopData.email || 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <h3 className="text-sm font-medium text-gray-500">Website</h3>
+                                    <p className="mt-1">{shopData.website || 'N/A'}</p>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <h3 className="text-sm font-medium text-gray-500">Mô tả</h3>
+                                    <p className="mt-1">{shopData.description || 'Không có mô tả'}</p>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <h3 className="text-sm font-medium text-gray-500">Căn cước công dân</h3>
+                                    <p className="mt-1">{shopData.CCCD || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right section - Additional info */}
+                        <div>
+                            {/* Owner Information */}
+                            <div className="mb-8">
+                                <h2 className="text-lg font-medium text-gray-700 mb-4">THÔNG TIN CHỦ SỞ HỮU</h2>
+                                
+                                {userData ? (
+                                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                        <div className="flex items-center mb-4">
+                                            <div className="bg-blue-100 rounded-full p-3 mr-3">
+                                                <UserIcon size={24} className="text-blue-500" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-medium">{userData.firstName} {userData.lastName}</h3>
+                                                <p className="text-sm text-gray-500">{userData.email}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <h3 className="text-sm font-medium text-gray-500">Số điện thoại</h3>
+                                                <p className="mt-1">{userData.phone || 'N/A'}</p>
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-medium text-gray-500">User ID</h3>
+                                                <p className="mt-1">{userData._id || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-gray-50 rounded-lg p-4 mb-4 text-center text-gray-500">
+                                        Đang tải thông tin chủ sở hữu...
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Location Information */}
+                            <div className="mb-8">
+                                <h2 className="text-lg font-medium text-gray-700 mb-4">VỊ TRÍ</h2>
+                                
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Quốc gia</h3>
+                                            <p className="mt-1">{shopData.nation_id ? 'Việt Nam' : 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Tỉnh / Thành phố</h3>
+                                            <p className="mt-1">
+                                                {provinceData ? provinceData.data_name : (shopData.province_id ? `ID: ${shopData.province_id}` : 'N/A')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <h3 className="text-sm font-medium text-gray-500">Địa chỉ</h3>
+                                        <p className="mt-1">{shopData.address || 'N/A'}</p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Tên cửa hàng <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={storeData.name}
-                                        onChange={handleInputChange}
-                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                    />
+                            {/* Status Information */}
+                            <div className="mb-8">
+                                <h2 className="text-lg font-medium text-gray-700 mb-4">TRẠNG THÁI</h2>
+                                
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Trạng thái cửa hàng</h3>
+                                            <div className="mt-1">
+                                                <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${
+                                                    shopData.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                                }`}>
+                                                    {shopData.status === 'active' ? 'Đã duyệt' : 'Chờ duyệt'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Tài khoản</h3>
+                                            <div className="mt-1">
+                                                <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${
+                                                    shopData.is_active === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                }`}>
+                                                    {shopData.is_active === 1 ? 'Đang hoạt động' : 'Đã khóa'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Tên tài khoản <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="username"
-                                        value={storeData.username}
-                                        onChange={handleInputChange}
-                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                    />
+                            </div>
+
+                            {/* Statistics */}
+                            <div className="mb-8">
+                                <h2 className="text-lg font-medium text-gray-700 mb-4">THỐNG KÊ</h2>
+                                
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                        <h3 className="text-sm font-medium text-gray-500">Đánh giá</h3>
+                                        <p className="mt-1 text-2xl font-semibold">{shopData.rating || 0}/5</p>
+                                    </div>
+                                    <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                        <h3 className="text-sm font-medium text-gray-500">Số người theo dõi</h3>
+                                        <p className="mt-1 text-2xl font-semibold">{shopData.follower || 0}</p>
+                                    </div>
                                 </div>
                             </div>
 
+                            {/* Timestamps */}
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Số điện thoại <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="tel"
-                                    name="phone"
-                                    value={storeData.phone}
-                                    onChange={handleInputChange}
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                />
-                            </div>
-
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Website
-                                </label>
-                                <input
-                                    type="url"
-                                    name="website"
-                                    placeholder="https://"
-                                    value={storeData.website}
-                                    onChange={handleInputChange}
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                />
-                            </div>
-
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Email <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={storeData.email}
-                                    onChange={handleInputChange}
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                />
-                            </div>
-
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Giới thiệu chung về cửa hàng
-                                </label>
-                                <textarea
-                                    name="description"
-                                    value={storeData.description}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter some text..."
-                                    rows={5}
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                />
-                                <p className="text-sm text-gray-500 mt-1">Các mô tả về cửa hàng</p>
+                                <h2 className="text-lg font-medium text-gray-700 mb-4">THỜI GIAN</h2>
+                                
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Ngày tạo</h3>
+                                            <p className="mt-1">{shopData.created_at ? new Date(shopData.created_at).toLocaleString() : 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-500">Cập nhật gần nhất</h3>
+                                            <p className="mt-1">{shopData.updated_at ? new Date(shopData.updated_at).toLocaleString() : 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-
-                    {/* Right section - Location and contact */}
-                    <div>
-                        <div className="mb-8">
-                            <h2 className="text-lg font-medium text-gray-700 mb-2">VỊ TRÍ</h2>
-                            <p className="text-sm text-gray-500 mb-4">Vị trí của cửa hàng</p>
-
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Quốc gia
-                                    </label>
-                                    <select
-                                        name="country"
-                                        value={storeData.country}
-                                        onChange={handleInputChange}
-                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                    >
-                                        <option value="Việt Nam">Việt Nam</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Tỉnh / Thành phố
-                                    </label>
-                                    <select
-                                        name="province"
-                                        value={storeData.province}
-                                        onChange={handleInputChange}
-                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                    >
-                                        <option value="An Giang">An Giang</option>
-                                        <option value="Hà Nội">Hà Nội</option>
-                                        <option value="TP Hồ Chí Minh">TP Hồ Chí Minh</option>
-                                        <option value="Đà Nẵng">Đà Nẵng</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <p className="text-sm text-gray-500 mb-4">We lied, this isn't required.</p>
-
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Địa chỉ <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    name="address"
-                                    value={storeData.address}
-                                    onChange={handleInputChange}
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <h2 className="text-lg font-medium text-gray-700 mb-2">LIÊN HỆ</h2>
-                            <p className="text-sm text-gray-500 mb-4">Các thông tin chủ cửa hàng</p>
-
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Họ đệm <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="contactLastName"
-                                        value={storeData.contactLastName}
-                                        onChange={handleInputChange}
-                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Tên <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="contactFirstName"
-                                        value={storeData.contactFirstName}
-                                        onChange={handleInputChange}
-                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Số điện thoại
-                                </label>
-                                <div className="flex">
-                                    <select className="w-20 p-2 border border-gray-300 rounded-l-md">
-                                        <option>+84</option>
-                                    </select>
-                                    <input
-                                        type="tel"
-                                        name="contactPhone"
-                                        value={storeData.contactPhone}
-                                        onChange={handleInputChange}
-                                        className="flex-1 p-2 border border-gray-300 border-l-0 rounded-r-md"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Căn cước công dân
-                                </label>
-                                <input
-                                    type="text"
-                                    name="idNumber"
-                                    value={storeData.idNumber}
-                                    onChange={handleInputChange}
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                )}
             </div>
         </div>
     );

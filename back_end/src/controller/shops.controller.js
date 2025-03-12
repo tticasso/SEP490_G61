@@ -6,7 +6,7 @@ const User = db.user;
 // Lấy tất cả cửa hàng
 const getAllShops = async (req, res, next) => {
     try {
-        const shops = await Shop.find({ is_active: 1 }); 
+        const shops = await Shop.find({}); 
         res.status(200).json(shops);
     } catch (error) {
         next(createHttpError.InternalServerError("Error fetching shops"));

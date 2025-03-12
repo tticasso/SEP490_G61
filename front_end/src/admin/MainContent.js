@@ -16,6 +16,7 @@ import AddPayment from './payment/AddPayment';
 import ShippingManagement from './shipping/ShippingManagement';
 import AddShipping from './shipping/AddShipping';
 import logo from '../assets/logo.png'
+import StoreRequestsPage from './store/StoreRequestsPage';
 
 // Main Content Component
 const MainContent = () => {
@@ -53,15 +54,22 @@ const MainContent = () => {
       <div className="flex-1">
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
+
           <Route path="/products" element={<ProductManagement />} />
+
           <Route path="/categories" element={<CategoryManagement />} />
           <Route path="/add-category" element={<AddCategory />} />
+
           <Route path="/brands" element={<BrandList />} />
           <Route path="/add-brand" element={<AddBrand />} />
+
           <Route path="/stores" element={<StoreList />} />
           <Route path="/store/:id" element={<StoreDetail onBack={() => navigate('/admin/stores')} />} />
+          <Route path="/store-requests" element={<StoreRequestsPage />} />
+
           <Route path="/customers" element={<CustomerManagement />} />
           <Route path="/orders" element={<OrderManagement />} />
+
           <Route path="/shippings" element={<ShippingManagement />} />
           <Route path="/add-shipping" element={<AddShipping />} />
 
@@ -70,6 +78,7 @@ const MainContent = () => {
 
           <Route path="/support" element={<div className="p-6">Nội dung Hỗ trợ</div>} />
           <Route path="/settings" element={<div className="p-6">Nội dung Cài đặt</div>} />
+
           <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
         </Routes>

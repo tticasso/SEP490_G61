@@ -31,6 +31,14 @@ const Sidebar = () => {
     { id: 'orders', icon: <Truck size={20} />, label: 'Đơn hàng', hasSubmenu: true, submenus: [
       { id: 'orderManagement', label: 'Tất cả đơn hàng', path: '/admin/orders' }
     ]},
+    { id: 'payments', icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>, label: 'Thanh toán', hasSubmenu: true, submenus: [
+      { id: 'paymentManagement', label: 'Phương thức thanh toán', path: '/admin/payments' },
+      { id: 'addPayment', label: 'Thêm phương thức thanh toán', path: '/admin/add-payment' }
+    ]},
+    { id: 'shipping', icon: <Truck size={20} />, label: 'Vận chuyển', hasSubmenu: true, submenus: [
+      { id: 'shippingManagement', label: 'Phương thức vận chuyển', path: '/admin/shippings' },
+      { id: 'addShipping', label: 'Thêm phương thức vận chuyển', path: '/admin/add-shipping' }
+    ]},
     { id: 'support', icon: <HelpCircle size={20} />, label: 'Hỗ trợ', hasSubmenu: false, path: '/admin/support' },
     { id: 'settings', icon: <Settings size={20} />, label: 'Cài đặt', hasSubmenu: false, path: '/admin/settings' },
   ];

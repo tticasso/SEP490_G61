@@ -17,5 +17,5 @@ userRouter.get("/admin", [VerifyJwt.verifyToken], [VerifyJwt.isAdmin] ,userContr
 userRouter.get("/seller", [VerifyJwt.verifyToken], [VerifyJwt.isSeller] ,userController.accessBySeller)
 userRouter.post('/forgot-password', userController.forgotPassword);
 userRouter.post('/reset-password', userController.resetPassword);
-userRouter.get('/users/:id', userController.getUserById);
+userRouter.get('/:id', userController.getUserById);
 module.exports = userRouter

@@ -11,6 +11,10 @@ import StoreList from './store/StoreList';
 import StoreDetail from './store/StoreDetail';
 import CustomerManagement from './customer/CustomerManagement';
 import OrderManagement from './order/OrderManagement';
+import PaymentManagement from './payment/PaymentManagement';
+import AddPayment from './payment/AddPayment';
+import ShippingManagement from './shipping/ShippingManagement';
+import AddShipping from './shipping/AddShipping';
 import logo from '../assets/logo.png'
 
 // Main Content Component
@@ -58,6 +62,12 @@ const MainContent = () => {
           <Route path="/store/:id" element={<StoreDetail onBack={() => navigate('/admin/stores')} />} />
           <Route path="/customers" element={<CustomerManagement />} />
           <Route path="/orders" element={<OrderManagement />} />
+          <Route path="/shippings" element={<ShippingManagement />} />
+          <Route path="/add-shipping" element={<AddShipping />} />
+
+          <Route path="/payments" element={<PaymentManagement />} />
+          <Route path="/add-payment" element={<AddPayment />} />
+
           <Route path="/support" element={<div className="p-6">Nội dung Hỗ trợ</div>} />
           <Route path="/settings" element={<div className="p-6">Nội dung Cài đặt</div>} />
           <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />

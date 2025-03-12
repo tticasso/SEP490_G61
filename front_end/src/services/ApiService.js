@@ -79,6 +79,21 @@ class ApiService {
     return headers;
   }
 
+  // Phương thức PATCH
+async patch(endpoint, data, secure = true) {
+  const headers = this.getHeaders(secure);
+  try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify(data)
+      });
+      return this.handleResponse(response);
+  } catch (error) {
+      return this.handleError(error);
+  }
+}
+
   // Xử lý response
   async handleResponse(response) {
     const text = await response.text();

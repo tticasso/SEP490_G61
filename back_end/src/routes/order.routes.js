@@ -19,10 +19,10 @@ orderRouter.get("/user/:userId", [VerifyJwt.verifyToken], orderController.getOrd
 orderRouter.post("/create", [VerifyJwt.verifyToken], orderController.createOrder)
 
 // Cập nhật trạng thái đơn hàng (chỉ admin có quyền)
-orderRouter.patch("/status/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], orderController.updateOrderStatus)
+orderRouter.put("/status/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], orderController.updateOrderStatus)
 
 // Hủy đơn hàng
-orderRouter.patch("/cancel/:id", [VerifyJwt.verifyToken], orderController.cancelOrder)
+orderRouter.put("/cancel/:id", [VerifyJwt.verifyToken], orderController.cancelOrder)
 
 // Xóa đơn hàng (xóa mềm) (chỉ admin có quyền)
 orderRouter.delete("/delete/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], orderController.deleteOrder)

@@ -13,6 +13,7 @@ const ShippingRouter = require('./shipping.routes')
 const PaymentRouter = require('./payment.routes')
 const ProductVariantRouter = require('./product-variant.routes')
 const ShopRouter = require('./shops.routes')
+const DocumentRouter = require('./document.routes') // Thêm mới
 const ShopFollowRouter = require('./shop-follow.routes')
 
 module.exports = {
@@ -31,5 +32,6 @@ module.exports = {
     PaymentRouter,
     ProductVariantRouter,
     ShopRouter,
+    DocumentRouter, // Thêm mới,
     ShopFollowRouter
 }

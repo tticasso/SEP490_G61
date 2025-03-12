@@ -27,6 +27,7 @@ import ForgotPassword from './forgotPassword/ForgotPassword';
 import ResetPassword from './forgotPassword/ResetPassword';
 import AdminLayout from './admin/AdminLayout';
 import ChatBot from './chatbot/ChatBot'
+import StoreRequestsPage from './admin/store/StoreRequestsPage';
 
 function useGoogleAuth() {
   const location = useLocation();
@@ -119,6 +120,7 @@ function App() {
         {/* Admin routers */}
         <Route path="/admin/*" element={<AdminLayout />} />
         <Route path="/shop-registration" element={<ShopRegistration />} />
+        <Route path="/admin/store-requests" element={<StoreRequestsPage />} />
 
       </Routes>
       {!noHeaderPage && <Footer />}

@@ -6,11 +6,20 @@ import clockBanner from '../../assets/clockBanner.jpg'
 import clothesBanner from '../../assets/clothesBanner.jpg'
 import phoneBanner from '../../assets/phoneBanner.jpg'
 import ApiService from '../../services/ApiService';
+import AuthService from '../../services/AuthService';
+import CartModal from '../cart/CartModal'; // Import CartModal component
 
 const TroocEcommerce = () => {
     const [hoveredProduct, setHoveredProduct] = useState(null);
     const [showProductModal, setShowProductModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
+    const [productQuantity, setProductQuantity] = useState(1); // Track quantity for modal
+    const [selectedColor, setSelectedColor] = useState('Đen'); // Default color
+    const [selectedSize, setSelectedSize] = useState('M'); // Default size
+    const [addCartMessage, setAddCartMessage] = useState(''); // Message for cart confirmation
+    const [showMessage, setShowMessage] = useState(false); // Control message visibility
+    const [showCartModal, setShowCartModal] = useState(false); // State for CartModal visibility
+    const [cartRefreshTrigger, setCartRefreshTrigger] = useState(0); // Trigger để làm mới CartModal
     
     // States cho dữ liệu từ API
     const [products, setProducts] = useState([]);
@@ -19,6 +28,10 @@ const TroocEcommerce = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // Get current user information
+    const currentUser = AuthService.getCurrentUser();
+    const userId = currentUser?._id || currentUser?.id || "";
 
     // Gọi API lấy danh sách sản phẩm khi component được mount
     useEffect(() => {
@@ -93,6 +106,78 @@ const TroocEcommerce = () => {
         }
     };
 
+    
+    const addToCart = async (product, quantity = 1, fromModal = false) => {
+        if (!userId) {
+            // Redirect to login if user is not logged in
+            window.location.href = "/login";
+            return;
+        }
+    
+        try {
+            // First find if the user already has a cart
+            let cartId;
+            try {
+                const cartResponse = await ApiService.get(`/cart/user/${userId}`, false);
+                cartId = cartResponse._id;
+            } catch (error) {
+                // If cart doesn't exist, create a new one
+                const newCart = await ApiService.post('/cart/create', { user_id: userId });
+                cartId = newCart._id;
+            }
+    
+            // Now add the item to the cart
+            const payload = {
+                cart_id: cartId,
+                product_id: product._id,
+                quantity: fromModal ? productQuantity : quantity
+            };
+    
+            // If options are selected in modal, include them
+            if (fromModal && (selectedColor || selectedSize)) {
+                payload.selected_options = {
+                    color: selectedColor,
+                    size: selectedSize
+                };
+            }
+    
+            // Use the correct path - matches with your router
+            await ApiService.post('/cart/add-item', payload);
+    
+            // Đóng cart modal nếu đang mở
+            if (showCartModal) {
+                setShowCartModal(false);
+            }
+    
+            // Show success message
+            setAddCartMessage(`${product.name} đã được thêm vào giỏ hàng!`);
+            setShowMessage(true);
+    
+            // Hide message after 3 seconds
+            setTimeout(() => {
+                setShowMessage(false);
+            }, 3000);
+    
+            // Always trigger a refresh of the cart when adding items,
+            // regardless of whether the cart modal is open or not
+            setCartRefreshTrigger(prev => prev + 1);
+    
+            // If adding from modal, close it
+            if (fromModal) {
+                setShowProductModal(false);
+                setProductQuantity(1); // Reset quantity
+            }
+        } catch (error) {
+            console.error("Error adding item to cart:", error);
+            setAddCartMessage("Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại sau.");
+            setShowMessage(true);
+    
+            setTimeout(() => {
+                setShowMessage(false);
+            }, 3000);
+        }
+    };
+
     // Component hiển thị sản phẩm
     const ProductCard = ({ product, index, isHoveredProduct }) => {
         return (
@@ -107,7 +192,9 @@ const TroocEcommerce = () => {
                         name: product.name,
                         price: formatPrice(product.price),
                         condition: product.condition || "Mới 100%",
-                        image: product.thumbnail || dongho
+                        image: product.thumbnail || dongho,
+                        // Pass the full product for cart functionality
+                        fullProduct: product
                     });
                     setShowProductModal(true);
                 }}
@@ -121,7 +208,13 @@ const TroocEcommerce = () => {
                 {/* Add to Cart Button - Appears on hover at the bottom of the product */}
                 {isHoveredProduct && (
                     <div className="absolute bottom-0 left-0 right-0 py-2 bg-white bg-opacity-95 flex items-center justify-center transition-opacity duration-300 shadow-md">
-                        <button className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-4 rounded-md font-medium text-sm">
+                        <button 
+                            className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-4 rounded-md font-medium text-sm"
+                            onClick={(e) => {
+                                e.stopPropagation(); // Prevent opening modal when clicking button
+                                addToCart(product);
+                            }}
+                        >
                             Thêm Giỏ Hàng
                         </button>
                     </div>
@@ -173,7 +266,21 @@ const TroocEcommerce = () => {
     }
 
     return (
-        <div className='bg-[#F1F5F9] pb-20'>
+        <div className='bg-[#F1F5F9] pb-20 relative'>
+            {/* Success/Error Message */}
+            {showMessage && (
+                <div className="fixed top-5 right-5 bg-white p-4 rounded-lg shadow-lg z-50 border-l-4 border-green-500">
+                    <p>{addCartMessage}</p>
+                </div>
+            )}
+            
+            {/* Cart Modal Component */}
+            <CartModal 
+                isOpen={showCartModal} 
+                onClose={() => setShowCartModal(false)}
+                refreshTrigger={cartRefreshTrigger} // Sử dụng prop này để kích hoạt refresh
+            />
+            
             <div className="max-w-7xl mx-auto">
 
                 {/* Main Content */}
@@ -357,13 +464,22 @@ const TroocEcommerce = () => {
                                     <div className="mb-6">
                                         <p className="text-gray-600 mb-2">Màu:</p>
                                         <div className="flex gap-2">
-                                            <button className="border border-gray-300 px-4 py-2 rounded bg-black text-white">
+                                            <button 
+                                                className={`border ${selectedColor === 'Đen' ? 'border-purple-500' : 'border-gray-300'} px-4 py-2 rounded bg-black text-white`}
+                                                onClick={() => setSelectedColor('Đen')}
+                                            >
                                                 Đen
                                             </button>
-                                            <button className="border border-purple-500 px-4 py-2 rounded bg-white text-gray-800">
+                                            <button 
+                                                className={`border ${selectedColor === 'Trắng' ? 'border-purple-500' : 'border-gray-300'} px-4 py-2 rounded bg-white text-gray-800`}
+                                                onClick={() => setSelectedColor('Trắng')}
+                                            >
                                                 Trắng
                                             </button>
-                                            <button className="border border-gray-300 px-4 py-2 rounded bg-white text-gray-800">
+                                            <button 
+                                                className={`border ${selectedColor === 'Hồng' ? 'border-purple-500' : 'border-gray-300'} px-4 py-2 rounded bg-white text-gray-800`}
+                                                onClick={() => setSelectedColor('Hồng')}
+                                            >
                                                 Hồng
                                             </button>
                                         </div>
@@ -373,13 +489,22 @@ const TroocEcommerce = () => {
                                     <div className="mb-6">
                                         <p className="text-gray-600 mb-2">Kích thước:</p>
                                         <div className="flex gap-2">
-                                            <button className="border border-purple-500 px-4 py-2 rounded bg-white text-gray-800">
+                                            <button 
+                                                className={`border ${selectedSize === 'M' ? 'border-purple-500' : 'border-gray-300'} px-4 py-2 rounded bg-white text-gray-800`}
+                                                onClick={() => setSelectedSize('M')}
+                                            >
                                                 M<br/>&lt;45kg&gt;
                                             </button>
-                                            <button className="border border-gray-300 px-4 py-2 rounded bg-white text-gray-800">
+                                            <button 
+                                                className={`border ${selectedSize === 'L' ? 'border-purple-500' : 'border-gray-300'} px-4 py-2 rounded bg-white text-gray-800`}
+                                                onClick={() => setSelectedSize('L')}
+                                            >
                                                 L<br/>&lt;55kg&gt;
                                             </button>
-                                            <button className="border border-gray-300 px-4 py-2 rounded bg-white text-gray-800">
+                                            <button 
+                                                className={`border ${selectedSize === 'XL' ? 'border-purple-500' : 'border-gray-300'} px-4 py-2 rounded bg-white text-gray-800`}
+                                                onClick={() => setSelectedSize('XL')}
+                                            >
                                                 XL<br/>&lt;70kg&gt;
                                             </button>
                                         </div>
@@ -389,16 +514,22 @@ const TroocEcommerce = () => {
                                     <div className="mb-8">
                                         <p className="text-gray-600 mb-2">Số lượng:</p>
                                         <div className="flex items-center">
-                                            <button className="border border-gray-300 px-3 py-1 flex items-center justify-center">
+                                            <button 
+                                                className="border border-gray-300 px-3 py-1 flex items-center justify-center"
+                                                onClick={() => setProductQuantity(Math.max(1, productQuantity - 1))}
+                                            >
                                                 <MinusIcon size={16} />
                                             </button>
                                             <input 
                                                 type="text" 
-                                                value="1" 
+                                                value={productQuantity} 
                                                 className="border-t border-b border-gray-300 w-16 py-1 text-center" 
                                                 readOnly
                                             />
-                                            <button className="border border-gray-300 px-3 py-1 flex items-center justify-center">
+                                            <button 
+                                                className="border border-gray-300 px-3 py-1 flex items-center justify-center"
+                                                onClick={() => setProductQuantity(productQuantity + 1)}
+                                            >
                                                 <PlusIcon size={16} />
                                             </button>
                                             <span className="text-gray-500 ml-4">12 sản phẩm có sẵn</span>
@@ -409,7 +540,10 @@ const TroocEcommerce = () => {
                             
                             {/* Add to Cart Button */}
                             <div className='flex gap-4'>
-                            <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium mt-4">
+                            <button 
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium mt-4"
+                                onClick={() => addToCart(selectedProduct.fullProduct, productQuantity, true)}
+                            >
                                 THÊM VÀO GIỎ HÀNG
                             </button>
                             <button 
@@ -426,6 +560,16 @@ const TroocEcommerce = () => {
                     </div>
                 </div>
             )}
+
+            {/* Cart Button (now more visible) */}
+            <button
+                className="fixed bottom-8 right-8 bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 z-40 flex items-center justify-center"
+                onClick={() => {
+                    setShowCartModal(true);
+                }}
+            >
+                <ShoppingCartIcon size={24} />
+            </button>
         </div>
     );
 };

@@ -15,10 +15,12 @@ import {
   Download
 } from 'lucide-react';
 import ApiService from '../../services/ApiService';
+import ShopService from '../store/services/Shopservice'; // Import ShopService để sử dụng getUserById
 
 const StoreRequestsPage = () => {
   const [loading, setLoading] = useState(true);
   const [storeRequests, setStoreRequests] = useState([]);
+  const [storeOwners, setStoreOwners] = useState({}); // Lưu trữ thông tin chủ cửa hàng theo user_id
   const [error, setError] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
   const [processingId, setProcessingId] = useState(null);
@@ -50,6 +52,24 @@ const StoreRequestsPage = () => {
         approved: response.filter(shop => shop.status === 'active').length,
         rejected: response.filter(shop => shop.status === 'rejected').length
       });
+
+      // Fetch owner information for each store
+      const ownersData = {};
+      await Promise.all(
+        pendingStores.map(async (store) => {
+          if (store.user_id) {
+            try {
+              const userData = await ShopService.getUserById(store.user_id);
+              ownersData[store.user_id] = userData;
+            } catch (err) {
+              console.error(`Error fetching user data for ID ${store.user_id}:`, err);
+              // Set a default value in case of error
+              ownersData[store.user_id] = { firstName: 'N/A', lastName: 'N/A' };
+            }
+          }
+        })
+      );
+      setStoreOwners(ownersData);
     } catch (err) {
       console.error('Error fetching store requests:', err);
       setError('Không thể tải dữ liệu yêu cầu cửa hàng. Vui lòng thử lại sau.');
@@ -62,6 +82,16 @@ const StoreRequestsPage = () => {
   useEffect(() => {
     fetchStoreRequests();
   }, []);
+
+  // Get owner name display
+  const getOwnerName = (store) => {
+    if (!store.user_id || !storeOwners[store.user_id]) {
+      return 'Chưa có thông tin';
+    }
+    
+    const owner = storeOwners[store.user_id];
+    return `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || 'Chưa có thông tin';
+  };
 
   // Handle approve store
   const handleApproveStore = async (storeId) => {
@@ -318,6 +348,9 @@ const StoreRequestsPage = () => {
   const renderStoreDetails = () => {
     if (!selectedStore) return null;
     
+    // Lấy thông tin chủ sở hữu từ state đã lưu
+    const ownerData = selectedStore.user_id ? storeOwners[selectedStore.user_id] : null;
+    
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -390,6 +423,41 @@ const StoreRequestsPage = () => {
               </div>
               
               <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Thông tin chủ sở hữu</h3>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    {ownerData ? (
+                      <>
+                        <div className="flex items-start">
+                          <User className="text-gray-500 mr-2 mt-1" size={18} />
+                          <div>
+                            <p className="text-sm text-gray-500">Họ tên</p>
+                            <p className="font-medium">{`${ownerData.firstName || ''} ${ownerData.lastName || ''}`.trim() || 'N/A'}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start">
+                          <Mail className="text-gray-500 mr-2 mt-1" size={18} />
+                          <div>
+                            <p className="text-sm text-gray-500">Email</p>
+                            <p className="font-medium">{ownerData.email || 'N/A'}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start">
+                          <Phone className="text-gray-500 mr-2 mt-1" size={18} />
+                          <div>
+                            <p className="text-sm text-gray-500">Số điện thoại</p>
+                            <p className="font-medium">{ownerData.phone || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-gray-500">Không có thông tin chủ sở hữu</p>
+                    )}
+                  </div>
+                </div>
+                
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Hình ảnh cửa hàng</h3>
                   <div className="grid grid-cols-2 gap-4">
@@ -539,11 +607,11 @@ const StoreRequestsPage = () => {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
+    <div className="flex-1 p-6">
+      <p className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Yêu cầu đăng ký cửa hàng</h1>
         <p className="text-gray-600">Quản lý và phê duyệt các yêu cầu đăng ký cửa hàng mới từ người dùng.</p>
-      </div>
+      </p>
       
       {renderStats()}
       {renderStoreTable()}

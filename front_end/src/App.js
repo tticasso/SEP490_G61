@@ -120,7 +120,6 @@ function App() {
         {/* Admin routers */}
         <Route path="/admin/*" element={<AdminLayout />} />
         <Route path="/shop-registration" element={<ShopRegistration />} />
-        <Route path="/admin/store-requests" element={<StoreRequestsPage />} />
 
       </Routes>
       {!noHeaderPage && <Footer />}

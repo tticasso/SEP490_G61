@@ -24,6 +24,11 @@ const orderSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Discount'
     },
+    user_address_id: {
+        type: Schema.Types.ObjectId,
+        ref: 'addresses',
+        required: true
+    },
     total_price: {
         type: Number,
         required: true

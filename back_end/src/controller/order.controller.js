@@ -11,8 +11,8 @@ const getAllOrders = async (req, res) => {
             .populate('customer_id', 'name email')
             .populate('shipping_id')
             .populate('payment_id')
-            .populate('discount_id');
-        
+            .populate('discount_id')
+            .populate('user_address_id');
         res.status(200).json(orders);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -26,7 +26,8 @@ const getOrderById = async (req, res) => {
             .populate('customer_id', 'name email')
             .populate('shipping_id')
             .populate('payment_id')
-            .populate('discount_id');
+            .populate('discount_id')
+            .populate('user_address_id');
             
         if (!order) {
             return res.status(404).json({ message: "Order not found" });
@@ -54,6 +55,7 @@ const getOrdersByUserId = async (req, res) => {
         .populate('shipping_id')
         .populate('payment_id')
         .populate('discount_id')
+        .populate('user_address_id')
         .sort({ created_at: -1 });
         
         res.status(200).json(orders);
@@ -71,7 +73,8 @@ const createOrder = async (req, res) => {
             payment_id,
             order_payment_id,
             discount_id,
-            orderItems
+            orderItems,
+            user_address_id,
         } = req.body;
 
         // Kiểm tra xem có sản phẩm không

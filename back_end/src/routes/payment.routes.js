@@ -22,6 +22,6 @@ paymentRouter.put("/edit/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], payme
 paymentRouter.delete("/delete/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], paymentController.deletePayment)
 
 // Kích hoạt/vô hiệu hóa phương thức thanh toán (chỉ admin có quyền)
-paymentRouter.patch("/toggle-status/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], paymentController.togglePaymentStatus)
+paymentRouter.put("/toggle-status/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], paymentController.togglePaymentStatus)
 
 module.exports = paymentRouter

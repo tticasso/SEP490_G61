@@ -37,7 +37,7 @@ const getShippingByUserId = async (req, res) => {
 // Tạo phương thức vận chuyển mới
 const createShipping = async (req, res) => {
     try {
-        const { user_id, price, description } = req.body;
+        const { name, price, description } = req.body;
 
         // Tạo ID cho phương thức vận chuyển
         const shippingId = `SHP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -45,8 +45,8 @@ const createShipping = async (req, res) => {
         // Tạo phương thức vận chuyển mới
         const newShipping = new Shipping({
             id: shippingId,
-            user_id,
             price,
+            name,
             description,
             created_by: req.userId // Từ middleware verifyToken
         });

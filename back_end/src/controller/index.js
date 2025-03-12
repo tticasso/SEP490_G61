@@ -13,6 +13,7 @@ const shippingController = require('./shipping.controller')
 const paymentController = require('./payment.controller')
 const productVariantController = require('./product-variant.controller')
 const shopController = require('./shops.controller')
+const shopFollowController = require('./shop-follow.controller')
 
 module.exports = {
     authController,
@@ -29,5 +30,6 @@ module.exports = {
     shippingController,
     paymentController,
     productVariantController,
-    shopController
+    shopController,
+    shopFollowController
 }

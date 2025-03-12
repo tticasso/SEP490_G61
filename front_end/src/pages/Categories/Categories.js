@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Star, Grid, List, Filter, X as XIcon, Minus as MinusIcon, Plus as PlusIcon } from 'lucide-react';
+import { Star, Grid, List, Filter, X as XIcon, Minus as MinusIcon, Plus as PlusIcon, ShoppingCartIcon } from 'lucide-react';
 import dongho from '../../assets/dongho.png'
 import ApiService from '../../services/ApiService';
+import AuthService from '../../services/AuthService';
+import CartModal from '../cart/CartModal'; // Import CartModal component
 
 const Categories = () => {
     // State cho dữ liệu từ API
@@ -25,6 +27,18 @@ const Categories = () => {
     const [showProductModal, setShowProductModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [quantity, setQuantity] = useState(1);
+    const [selectedColor, setSelectedColor] = useState('Đen'); // Default color
+    const [selectedSize, setSelectedSize] = useState('M'); // Default size
+    
+    // State cho giỏ hàng
+    const [showCartModal, setShowCartModal] = useState(false);
+    const [cartRefreshTrigger, setCartRefreshTrigger] = useState(0);
+    const [addCartMessage, setAddCartMessage] = useState('');
+    const [showMessage, setShowMessage] = useState(false);
+
+    // Get current user information
+    const currentUser = AuthService.getCurrentUser();
+    const userId = currentUser?._id || currentUser?.id || "";
 
     // Danh sách các tỉnh thành
     const provinces = [
@@ -73,6 +87,79 @@ const Categories = () => {
 
         fetchData();
     }, []);
+
+    // Thêm sản phẩm vào giỏ hàng
+    const addToCart = async (product, quantity = 1, fromModal = false) => {
+        if (!userId) {
+            // Redirect to login if user is not logged in
+            window.location.href = "/login";
+            return;
+        }
+    
+        try {
+            // First find if the user already has a cart
+            let cartId;
+            try {
+                const cartResponse = await ApiService.get(`/cart/user/${userId}`, false);
+                cartId = cartResponse._id;
+            } catch (error) {
+                // If cart doesn't exist, create a new one
+                const newCart = await ApiService.post('/cart/create', { user_id: userId });
+                cartId = newCart._id;
+            }
+    
+            // Now add the item to the cart
+            const payload = {
+                cart_id: cartId,
+                product_id: product._id,
+                quantity: fromModal ? quantity : 1
+            };
+    
+            // If options are selected in modal, include them
+            if (fromModal && (selectedColor || selectedSize)) {
+                payload.selected_options = {
+                    color: selectedColor,
+                    size: selectedSize
+                };
+            }
+    
+            // Use the correct path - matches with your router
+            await ApiService.post('/cart/add-item', payload);
+    
+            // Đóng cart modal nếu đang mở
+            if (showCartModal) {
+                setShowCartModal(false);
+            }
+    
+            // Show success message
+            setAddCartMessage(`${product.name} đã được thêm vào giỏ hàng!`);
+            setShowMessage(true);
+    
+            // Hide message after 3 seconds
+            setTimeout(() => {
+                setShowMessage(false);
+            }, 3000);
+    
+            // Always trigger a refresh of the cart when adding items,
+            // regardless of whether the cart modal is open or not
+            setCartRefreshTrigger(prev => prev + 1);
+    
+            // If adding from modal, close it
+            if (fromModal) {
+                setShowProductModal(false);
+                setQuantity(1); // Reset quantity
+            }
+        } catch (error) {
+            console.error("Error adding item to cart:", error);
+            setAddCartMessage("Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại sau.");
+            setShowMessage(true);
+    
+            setTimeout(() => {
+                setShowMessage(false);
+            }, 3000);
+        }
+    };
+    
 
     // Lọc sản phẩm dựa trên bộ lọc đã chọn
     const filteredProducts = products.filter(product => {
@@ -245,8 +332,7 @@ const Categories = () => {
                                 className="absolute bottom-0 left-0 right-0 py-2 bg-white bg-opacity-95 flex items-center justify-center transition-opacity duration-300 shadow-md z-10"
                                 onClick={(e) => {
                                     e.stopPropagation(); // Ngăn mở modal
-                                    // Logic thêm vào giỏ hàng
-                                    alert(`Đã thêm ${product.name} vào giỏ hàng!`);
+                                    addToCart(product);
                                 }}
                             >
                                 <button className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-4 rounded-md font-medium text-sm">
@@ -315,7 +401,21 @@ const Categories = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 py-8 relative">
+            {/* Cart Modal Component */}
+            <CartModal 
+                isOpen={showCartModal} 
+                onClose={() => setShowCartModal(false)}
+                refreshTrigger={cartRefreshTrigger}
+            />
+            
+            {/* Success/Error Message */}
+            {showMessage && (
+                <div className="fixed top-5 right-5 bg-white p-4 rounded-lg shadow-lg z-50 border-l-4 border-green-500">
+                    <p>{addCartMessage}</p>
+                </div>
+            )}
+            
             <div className="flex flex-col md:flex-row">
                 {/* Sidebar Categories */}
                 <div className="md:pr-6 md:border-r md:w-1/4 mb-6 md:mb-0">

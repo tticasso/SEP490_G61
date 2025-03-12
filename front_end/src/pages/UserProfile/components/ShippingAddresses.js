@@ -12,7 +12,9 @@ const ShippingAddresses = () => {
 
   // Lấy userId từ thông tin người dùng đã đăng nhập
   const currentUser = AuthService.getCurrentUser();
-  const userId = currentUser?._id || currentUser?.id || "";
+  
+  // Xử lý userId có thể được lưu trữ với nhiều tên thuộc tính khác nhau
+  const userId = currentUser?._id || currentUser?.id || currentUser?.userId || "";
   
   // Lấy tên người dùng để hiển thị
   const userName = currentUser ? 
@@ -21,35 +23,46 @@ const ShippingAddresses = () => {
   
   // Dữ liệu mẫu khi API không hoạt động
   const mockAddresses = [
-    // {
-    //   _id: "mock-address-1",
-    //   user_id: userId,
-    //   address_line1: "123 Đường Lê Lợi",
-    //   address_line2: "Phường Bến Nghé",
-    //   city: "Hồ Chí Minh",
-    //   country: "Việt Nam",
-    //   phone: "0901234567",
-    //   status: true
-    // },
-    // {
-    //   _id: "mock-address-2",
-    //   user_id: userId,
-    //   address_line1: "45 Đường Nguyễn Huệ",
-    //   address_line2: "Phường Bến Thành",
-    //   city: "Hồ Chí Minh",
-    //   country: "Việt Nam",
-    //   phone: "0907654321",
-    //   status: true
-    // }
+    
   ];
+
+  // Xử lý phản hồi API
+  const processApiResponse = (response) => {
+    console.log("Processing API response:", response);
+    
+    if (Array.isArray(response)) {
+      console.log("Response is an array, setting directly:", response);
+      setAddresses(response);
+      setError(null);
+    } else if (response && typeof response === 'object' && Array.isArray(response.data)) {
+      // Xử lý trường hợp API trả về dữ liệu trong thuộc tính data
+      console.log("Response has data array, setting from response.data:", response.data);
+      setAddresses(response.data);
+      setError(null);
+    } else if (response && typeof response === 'object' && response.addresses && Array.isArray(response.addresses)) {
+      // Xử lý trường hợp response có thuộc tính 'addresses'
+      console.log("Response has addresses array, setting from response.addresses:", response.addresses);
+      setAddresses(response.addresses);
+      setError(null);
+    } else if (response && typeof response === 'object' && !Array.isArray(response)) {
+      // Trường hợp response là một object duy nhất - bọc trong mảng
+      console.log("Response is a single object, wrapping in array:", [response]);
+      setAddresses([response]);
+      setError(null);
+    } else {
+      console.warn("Dữ liệu không phải là mảng hoặc không có định dạng dự kiến:", response);
+      setAddresses([]);
+      setError("Định dạng dữ liệu không đúng");
+    }
+  };
 
   // Fetch addresses từ API hoặc sử dụng dữ liệu mẫu
   const fetchAddresses = async () => {
     try {
       setLoading(true);
       
-      // Kiểm tra môi trường phát triển
-      const isDevelopment = process.env.NODE_ENV === 'development';
+      // Kiểm tra môi trường phát triển - ưu tiên ghi đè biến isDevelopment để dễ debug
+      const isDevelopment = false; // Ghi đè - set false để luôn gọi API, true để sử dụng dữ liệu mẫu
       
       if (isDevelopment) {
         console.log("Đang chạy ở chế độ DEV - Sử dụng dữ liệu mẫu");
@@ -64,30 +77,98 @@ const ShippingAddresses = () => {
         return;
       }
       
-      // ===== CODE GỌI API THỰC TẾ =====
-      // Bỏ comment phần code bên dưới khi backend đã sẵn sàng
-      /*
+      // Kiểm tra userId
       if (!userId) {
         throw new Error("User ID không tồn tại");
       }
       
       console.log("Đang gọi API với userId:", userId);
-      const apiEndpoint = `/user-address/user/${userId}`;
       
-      const response = await ApiService.get(apiEndpoint);
+      // Kiểm tra các endpoints khác nhau mà backend có thể đã đăng ký
+      const possibleEndpoints = [
+        `/address/list`, // Lấy tất cả địa chỉ rồi lọc phía client
+        `/user-address/list`, // Lấy tất cả địa chỉ rồi lọc phía client  
+        `/user-address/user/${userId}`,
+        `/address/user/${userId}`
+      ];
       
-      if (Array.isArray(response)) {
-        setAddresses(response);
-        setError(null);
-      } else {
-        console.warn("Dữ liệu không phải là mảng:", response);
-        setAddresses([]);
-        setError("Định dạng dữ liệu không đúng");
+      let foundData = false;
+      let lastError = null;
+      
+      // Thử từng endpoint cho đến khi tìm thấy dữ liệu
+      for (const endpoint of possibleEndpoints) {
+        try {
+          console.log(`Đang thử endpoint: ${endpoint}`);
+          const response = await ApiService.get(endpoint);
+          
+          // Nếu là endpoint list, lọc theo userId
+          if (endpoint.includes('/list')) {
+            const allAddresses = Array.isArray(response) ? response : 
+                              (response.data && Array.isArray(response.data)) ? response.data : [];
+            
+            console.log("All addresses before filtering:", allAddresses);
+            
+            // Lọc địa chỉ theo userId - chuyển đổi cả hai thành chuỗi để so sánh chắc chắn
+            const filteredAddresses = allAddresses.filter(addr => 
+              String(addr.user_id) === String(userId)
+            );
+            
+            console.log("Filtered addresses for userId", userId, ":", filteredAddresses);
+            
+            if (filteredAddresses.length > 0) {
+              setAddresses(filteredAddresses);
+              foundData = true;
+              setError(null);
+              console.log(`Endpoint ${endpoint} hoạt động và tìm thấy ${filteredAddresses.length} địa chỉ!`);
+              break;
+            } else {
+              console.log(`Endpoint ${endpoint} hoạt động nhưng không tìm thấy địa chỉ cho userId ${userId}`);
+            }
+          } else {
+            // Nếu là endpoint user, sử dụng dữ liệu trực tiếp
+            console.log("Direct response from user endpoint:", response);
+            processApiResponse(response);
+            foundData = true;
+            setError(null);
+            console.log(`Endpoint ${endpoint} hoạt động!`);
+            break;
+          }
+        } catch (apiError) {
+          console.log(`Endpoint ${endpoint} không hoạt động:`, apiError.message);
+          lastError = apiError;
+        }
       }
-      */
+      
+      // Nếu không tìm thấy dữ liệu từ bất kỳ endpoint nào
+      if (!foundData) {
+        // Nếu không tìm thấy dữ liệu, sử dụng dữ liệu mẫu trong môi trường phát triển
+        console.log("Không tìm thấy dữ liệu từ API, sử dụng dữ liệu mẫu");
+        setAddresses(mockAddresses);
+        
+        // Thông báo lỗi nhưng vẫn hiển thị dữ liệu mẫu
+        setError("Không tìm thấy API, hiển thị dữ liệu mẫu. Lỗi: " + (lastError?.message || "API không tồn tại"));
+      }
+      
     } catch (err) {
       console.error("Error fetching addresses:", err);
-      setError(`Không thể tải danh sách địa chỉ: ${err.message || "Lỗi không xác định"}`);
+      // Cải thiện thông báo lỗi với thông tin chi tiết hơn
+      let errorMessage = "Không thể tải danh sách địa chỉ";
+      
+      if (err.message) {
+        if (err.message.includes("401")) {
+          errorMessage += ": Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại";
+        } else if (err.message.includes("404")) {
+          errorMessage += ": API không tồn tại hoặc đường dẫn không đúng";
+        } else if (err.message.includes("500")) {
+          errorMessage += ": Lỗi máy chủ, vui lòng thử lại sau";
+        } else if (err.message.includes("User ID")) {
+          errorMessage += ": Vui lòng đăng nhập để xem địa chỉ của bạn";
+        } else {
+          errorMessage += `: ${err.message}`;
+        }
+      }
+      
+      setError(errorMessage);
       setAddresses([]);
     } finally {
       setLoading(false);
@@ -98,6 +179,7 @@ const ShippingAddresses = () => {
   useEffect(() => {
     // In ra thông tin user hiện tại để debug
     console.log("Current user object:", currentUser);
+    console.log("User ID being used:", userId);
     
     // Hiển thị thông tin tên người dùng
     console.log("User name:", getUserName());
@@ -122,10 +204,44 @@ const ShippingAddresses = () => {
         
         if (response.status === 404) {
           console.log("API auth/check không tồn tại, nhưng server đang chạy");
+          // Kiểm tra các endpoint khác để xác nhận server đang chạy
+          await checkAvailableEndpoints();
         }
       } catch (err) {
         console.error("Không thể kết nối đến server:", err);
         setError("Không thể kết nối đến server. Vui lòng kiểm tra xem server đã được khởi động chưa.");
+      }
+    };
+    
+    // Kiểm tra các endpoint có sẵn
+    const checkAvailableEndpoints = async () => {
+      try {
+        // Kiểm tra các endpoint có thể có
+        const endpoints = [
+          '/user-address/list',
+          '/address/list'
+        ];
+        
+        for (const endpoint of endpoints) {
+          try {
+            const resp = await fetch(`http://localhost:9999/api${endpoint}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-access-token': AuthService.getToken()
+              }
+            });
+            console.log(`API endpoint ${endpoint} status:`, resp.status);
+            
+            if (resp.status !== 404) {
+              console.log(`Endpoint ${endpoint} có thể được sử dụng`);
+            }
+          } catch (endpointErr) {
+            console.error(`Không thể truy cập endpoint ${endpoint}:`, endpointErr);
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi khi kiểm tra endpoints:", err);
       }
     };
     
@@ -155,13 +271,14 @@ const ShippingAddresses = () => {
         address_line2: newAddressData.address_line2 || "",
         city: newAddressData.province,
         country: newAddressData.country,
-        phone: newAddressData.phone
+        phone: newAddressData.phone,
+        status: true
       };
-
+  
       console.log("Đang gửi dữ liệu:", formattedAddress);
       
       // Kiểm tra môi trường phát triển
-      const isDevelopment = process.env.NODE_ENV === 'development';
+      const isDevelopment = false; // Ghi đè để luôn gọi API
       
       if (isDevelopment) {
         console.log("Đang chạy ở chế độ DEV - Thêm địa chỉ vào dữ liệu mẫu");
@@ -181,12 +298,33 @@ const ShippingAddresses = () => {
         return;
       }
       
-      // ===== CODE GỌI API THỰC TẾ =====
-      // Bỏ comment khi backend đã sẵn sàng
-      /*
-      await ApiService.post('/user-address/create', formattedAddress);
-      fetchAddresses(); // Refresh data after adding
-      */
+      let savedAddress = null;
+      
+      try {
+        // Thử với endpoint mới trước
+        savedAddress = await ApiService.post('/address/create', formattedAddress);
+        console.log("Address created successfully with new endpoint:", savedAddress);
+      } catch (apiError) {
+        console.log("Thử lại với endpoint thay thế", apiError);
+        // Thử lại với endpoint cũ nếu endpoint mới không hoạt động
+        savedAddress = await ApiService.post('/user-address/create', formattedAddress);
+        console.log("Address created successfully with old endpoint:", savedAddress);
+      }
+      
+      // Tạo địa chỉ tạm thời dựa trên dữ liệu đã gửi để cập nhật UI ngay lập tức
+      const tempAddress = {
+        _id: savedAddress?._id || `temp-address-${Date.now()}`,
+        ...formattedAddress
+      };
+      
+      // Cập nhật state UI trước để phản hồi ngay cho người dùng
+      setAddresses(prevAddresses => [...prevAddresses, tempAddress]);
+      
+      // Sau đó tải lại dữ liệu từ server sau một khoảng thời gian nhỏ
+      setTimeout(() => {
+        fetchAddresses(); // Refresh data after adding
+      }, 1000);
+      
       setShowAddAddressPopup(false);
     } catch (err) {
       console.error("Error saving address:", err);
@@ -199,7 +337,7 @@ const ShippingAddresses = () => {
       if (!currentAddress || !currentAddress._id) {
         throw new Error("Không tìm thấy ID địa chỉ để cập nhật");
       }
-
+  
       const formattedAddress = {
         address_line1: updatedAddressData.address,
         address_line2: updatedAddressData.address_line2 || "",
@@ -210,7 +348,7 @@ const ShippingAddresses = () => {
       };
       
       // Kiểm tra môi trường phát triển
-      const isDevelopment = process.env.NODE_ENV === 'development';
+      const isDevelopment = false; // Ghi đè để luôn gọi API
       
       if (isDevelopment) {
         console.log("Đang chạy ở chế độ DEV - Cập nhật địa chỉ mẫu");
@@ -230,12 +368,36 @@ const ShippingAddresses = () => {
         return;
       }
       
-      // ===== CODE GỌI API THỰC TẾ =====
-      // Bỏ comment khi backend đã sẵn sàng
-      /*
-      await ApiService.put(`/user-address/edit/${currentAddress._id}`, formattedAddress);
-      fetchAddresses(); // Refresh data after updating
-      */
+      let updatedAddress = null;
+      
+      try {
+        // Thử với endpoint mới trước
+        updatedAddress = await ApiService.put(`/address/edit/${currentAddress._id}`, formattedAddress);
+        console.log("Address updated successfully with new endpoint:", updatedAddress);
+      } catch (apiError) {
+        console.log("Thử lại với endpoint thay thế", apiError);
+        // Thử lại với endpoint cũ nếu endpoint mới không hoạt động
+        updatedAddress = await ApiService.put(`/user-address/edit/${currentAddress._id}`, formattedAddress);
+        console.log("Address updated successfully with old endpoint:", updatedAddress);
+      }
+      
+      // Cập nhật state UI trước
+      setAddresses(prevAddresses => 
+        prevAddresses.map(addr => 
+          addr._id === currentAddress._id ? {
+            ...addr,
+            ...formattedAddress,
+            _id: currentAddress._id,
+            user_id: addr.user_id
+          } : addr
+        )
+      );
+      
+      // Sau đó tải lại dữ liệu từ server sau một khoảng thời gian nhỏ
+      setTimeout(() => {
+        fetchAddresses(); // Refresh data after updating
+      }, 1000);
+      
       setShowEditAddressPopup(false);
       setCurrentAddress(null);
     } catch (err) {
@@ -248,7 +410,7 @@ const ShippingAddresses = () => {
     if (window.confirm("Bạn có chắc muốn xóa địa chỉ này không?")) {
       try {
         // Kiểm tra môi trường phát triển
-        const isDevelopment = process.env.NODE_ENV === 'development';
+        const isDevelopment = false; // Ghi đè để luôn gọi API
         
         if (isDevelopment) {
           console.log("Đang chạy ở chế độ DEV - Xóa địa chỉ mẫu");
@@ -261,15 +423,27 @@ const ShippingAddresses = () => {
           return;
         }
         
-        // ===== CODE GỌI API THỰC TẾ =====
-        // Bỏ comment khi backend đã sẵn sàng
-        /*
-        await ApiService.delete(`/user-address/delete/${addressId}`);
-        fetchAddresses(); // Refresh data after deleting
-        */
+        // Xóa địa chỉ khỏi UI trước
+        setAddresses(prevAddresses => prevAddresses.filter(addr => addr._id !== addressId));
+        
+        try {
+          // Thử với endpoint mới trước
+          await ApiService.delete(`/address/delete/${addressId}`);
+          console.log("Address deleted successfully with new endpoint");
+        } catch (apiError) {
+          console.log("Thử lại với endpoint thay thế", apiError);
+          // Thử lại với endpoint cũ nếu endpoint mới không hoạt động
+          await ApiService.delete(`/user-address/delete/${addressId}`);
+          console.log("Address deleted successfully with old endpoint");
+        }
+        
+        // Không cần tải lại dữ liệu từ server vì đã xóa khỏi UI
+        
       } catch (err) {
         console.error("Error deleting address:", err);
         alert("Không thể xóa địa chỉ. Vui lòng thử lại sau.");
+        // Tải lại dữ liệu trong trường hợp xảy ra lỗi
+        fetchAddresses();
       }
     }
   };
@@ -324,14 +498,37 @@ const ShippingAddresses = () => {
     };
   };
 
+  // Thêm button để refresh dữ liệu
+  const handleRefreshData = () => {
+    fetchAddresses();
+  };
+
   return (
     <div className="p-6">
-      <h2 className="text-xl font-semibold mb-4">Địa chỉ nhận hàng</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">Địa chỉ nhận hàng</h2>
+        <button 
+          onClick={handleRefreshData}
+          className="text-purple-600 hover:text-purple-800"
+        >
+          ↻ Làm mới
+        </button>
+      </div>
       
       {loading ? (
         <div className="text-center py-4">Đang tải...</div>
       ) : error ? (
-        <div className="text-red-500 text-center py-4">{error}</div>
+        <div className="text-red-500 text-center py-4">
+          {error}
+          <div className="mt-2">
+            <button
+              onClick={handleRefreshData}
+              className="text-purple-600 hover:underline"
+            >
+              Thử lại
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="space-y-4">
           {addresses.length === 0 ? (
@@ -1014,3 +1211,4 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
 };
 
 export default ShippingAddresses;
+

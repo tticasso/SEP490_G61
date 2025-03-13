@@ -8,6 +8,7 @@ const productReviewController = require('./product-review.controller')
 const addressController = require('./user-address.controller')
 const cartController = require('./cart.controller')
 const discountController = require('./discount.controller')
+const couponController = require('./coupon.controller') // Add coupon controller
 const orderController = require('./order.controller')
 const shippingController = require('./shipping.controller')
 const paymentController = require('./payment.controller')
@@ -26,6 +27,7 @@ module.exports = {
     addressController,
     cartController,
     discountController,
+    couponController, // Add coupon controller to exports
     orderController,
     shippingController,
     paymentController,

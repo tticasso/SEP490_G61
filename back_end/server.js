@@ -16,12 +16,13 @@ const { AuthRouter,
     AddressRouter,
     CartRouter,
     DiscountRouter,
+    CouponRouter, // Add coupon router
     OrderRouter,
     ShippingRouter,
     PaymentRouter,
     ProductVariantRouter,
     ShopRouter,
-    DocumentRouter, // Thêm vào đây,
+    DocumentRouter,
     ShopFollowRouter
 } = require('./src/routes');
 
@@ -58,16 +59,16 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Đảm bảo thư mục uploads tồn tại
 const uploadDirs = [
-  path.join(__dirname, 'uploads'),
-  path.join(__dirname, 'uploads/shops'),
-  path.join(__dirname, 'uploads/documents')
+    path.join(__dirname, 'uploads'),
+    path.join(__dirname, 'uploads/shops'),
+    path.join(__dirname, 'uploads/documents')
 ];
 
 uploadDirs.forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-    console.log(`Created directory: ${dir}`);
-  }
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`Created directory: ${dir}`);
+    }
 });
 
 // Định tuyến cho root router
@@ -86,15 +87,16 @@ app.use('/api/brand', BrandRouter);
 app.use('/api/product', ProductRouter);
 app.use('/api/product-review', ProductReviewRouter);
 app.use('/api/address', AddressRouter);
-app.use('/api/product-variant',  ProductVariantRouter);
-app.use('/api/shops',  ShopRouter);
-app.use('/api/shop-follow', ShopFollowRouter); // New route for shop follow functionality
+app.use('/api/product-variant', ProductVariantRouter);
+app.use('/api/shops', ShopRouter);
+app.use('/api/shop-follow', ShopFollowRouter);
 app.use('/api/cart', CartRouter);
 app.use('/api/discount', DiscountRouter);
+app.use('/api/coupon', CouponRouter); // Add coupon routes
 app.use('/api/order', OrderRouter);
 app.use('/api/shipping', ShippingRouter);
 app.use('/api/payment', PaymentRouter);
-app.use('/api/documents', DocumentRouter); // Thêm route cho documents
+app.use('/api/documents', DocumentRouter);
 
 // Kiểm soát các lỗi trong Express web server
 app.use(async (req, res, next) => {

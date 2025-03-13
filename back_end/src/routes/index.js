@@ -8,12 +8,13 @@ const ProductReviewRouter = require('./product-review.routes')
 const AddressRouter = require('./user-address.routes')
 const CartRouter = require('./cart.routes')
 const DiscountRouter = require('./discount.routes')
+const CouponRouter = require('./coupon.routes') // Add coupon routes
 const OrderRouter = require('./order.routes')
 const ShippingRouter = require('./shipping.routes')
 const PaymentRouter = require('./payment.routes')
 const ProductVariantRouter = require('./product-variant.routes')
 const ShopRouter = require('./shops.routes')
-const DocumentRouter = require('./document.routes') // Thêm mới
+const DocumentRouter = require('./document.routes')
 const ShopFollowRouter = require('./shop-follow.routes')
 
 module.exports = {
@@ -27,11 +28,12 @@ module.exports = {
     AddressRouter,
     CartRouter,
     DiscountRouter,
+    CouponRouter, // Add coupon routes to exports
     OrderRouter,
     ShippingRouter,
     PaymentRouter,
     ProductVariantRouter,
     ShopRouter,
-    DocumentRouter, // Thêm mới,
+    DocumentRouter,
     ShopFollowRouter
 }

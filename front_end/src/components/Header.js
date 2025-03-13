@@ -19,6 +19,7 @@ import {
 import CartModal from '../pages/cart/CartModal';
 import logo from '../assets/logo.png';
 import AuthService from '../services/AuthService';
+import { useAuth } from '../pages/Login/context/AuthContext';
 
 const ProductCategoriesSidebar = ({ isOpen, onClose, buttonRef }) => {
     const sidebarRef = useRef(null);
@@ -83,6 +84,7 @@ const ProductCategoriesSidebar = ({ isOpen, onClose, buttonRef }) => {
         </div>
     );
 };
+
 const Header = () => {
     const navigate = useNavigate();
     const [isCartOpen, setIsCartOpen] = useState(false);
@@ -90,13 +92,16 @@ const Header = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isCategoriesSidebarOpen, setIsCategoriesSidebarOpen] = useState(false);
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+
+    // Use auth context instead of direct AuthService calls
+    const { currentUser, isLoggedIn, logout } = useAuth();
+
     const categoriesButtonRef = useRef(null);
     const userDropdownRef = useRef(null);
     const userButtonRef = useRef(null);
 
-    // Kiểm tra trạng thái đăng nhập
-    const currentUser = AuthService.getCurrentUser();
-    const isLoggedIn = AuthService.isLoggedIn();
+    // Always check both id and _id for compatibility
+    const userId = currentUser?.id || currentUser?._id || "";
 
     const toggleCategoriesSidebar = () => {
         setIsCategoriesSidebarOpen(!isCategoriesSidebarOpen);
@@ -106,14 +111,11 @@ const Header = () => {
         setIsUserDropdownOpen(!isUserDropdownOpen);
     };
 
-    // Xử lý đăng xuất
+    // Xử lý đăng xuất - now using context's logout
     const handleLogout = () => {
-        AuthService.logout();
+        logout();
         setIsUserDropdownOpen(false);
-        localStorage.clear();
         navigate('/');
-        // Reload để cập nhật trạng thái
-        window.location.reload();
     };
 
     // Xử lý click bên ngoài để đóng dropdown

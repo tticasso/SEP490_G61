@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import AuthService from "../../services/AuthService";
+import { useAuth } from "./context/AuthContext";
 
 const LoginPage = () => {
     const [formData, setFormData] = useState({
@@ -11,18 +11,40 @@ const LoginPage = () => {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    
+    // Use auth context
+    const { isLoggedIn, login, handleGoogleAuthLogin, userRoles } = useAuth();
 
-    // Kiểm tra nếu người dùng đã đăng nhập thì chuyển hướng
-    useEffect(() => {
-        if (AuthService.isLoggedIn()) {
-            navigate("/");
+    // Function to redirect based on user role
+    const redirectBasedOnRole = (roles = []) => {
+        // Default to home page
+        let redirectPath = '/';
+        
+        // Check for admin role first (priority)
+        if (roles.includes('ROLE_ADMIN')) {
+            redirectPath = '/admin';
         }
-    }, [navigate]);
+        // Then check for seller/mod role
+        else if (roles.includes('ROLE_MOD') || roles.includes('ROLE_SELLER')) {
+            redirectPath = '/seller-dashboard';
+        }
+        // For MEMBER or other roles, go to homepage
+        
+        navigate(redirectPath);
+    };
 
+    // Check if user is already logged in and redirect accordingly
+    useEffect(() => {
+        if (isLoggedIn && userRoles) {
+            redirectBasedOnRole(userRoles);
+        }
+    }, [isLoggedIn, userRoles]);
+
+    // Handle Google auth redirect
     useEffect(() => {
         const googleAuthData = searchParams.get('googleAuth');
         if (googleAuthData) {
-            handleGoogleAuthRedirect(googleAuthData);
+            processGoogleAuthData(googleAuthData);
         }
     }, [searchParams]);
 
@@ -40,8 +62,14 @@ const LoginPage = () => {
         setError("");
 
         try {
-            await AuthService.login(formData.email, formData.password);
-            navigate("/"); // Chuyển hướng đến trang chủ sau khi đăng nhập thành công
+            // Use context's login function
+            const result = await login(formData.email, formData.password);
+            
+            // Get roles from the result or from context
+            const roles = result?.roles || userRoles || [];
+            
+            // Redirect based on user role
+            redirectBasedOnRole(roles);
         } catch (error) {
             setError(error || "Đăng nhập thất bại");
         } finally {
@@ -54,23 +82,30 @@ const LoginPage = () => {
         window.location.href = "http://localhost:9999/api/auth/google";
     };
 
-    const handleGoogleAuthRedirect = (userDataEncoded) => {
+    const processGoogleAuthData = (userDataEncoded) => {
         try {
-            // Giải mã dữ liệu người dùng
+            // Decode the user data
             const userData = JSON.parse(decodeURIComponent(userDataEncoded));
-            console.log("Received user data from Google:", userData);
-
-            // Lưu thông tin người dùng vào localStorage
-            AuthService.setUser(userData);
-
-            // Chuyển hướng về trang chủ
-            navigate('/');
+            
+            // Use the context's function to handle Google auth login
+            const success = handleGoogleAuthLogin(userData);
+            
+            if (success) {
+                // Add a delay before redirect to ensure storage is complete
+                setTimeout(() => {
+                    // Redirect based on user roles from the userData
+                    redirectBasedOnRole(userData.roles || []);
+                }, 500);
+            } else {
+                setError("Lỗi xử lý dữ liệu đăng nhập Google");
+            }
         } catch (error) {
-            console.error("Error decoding user data:", error);
-            setError("Lỗi xử lý đăng nhập Google");
+            console.error("Error processing Google auth data:", error);
+            setError("Lỗi xử lý đăng nhập Google: " + error.message);
         }
     };
 
+    // The rest of your component remains the same
     return (
         <div className="flex h-screen w-full">
             {/* Left side with title */}

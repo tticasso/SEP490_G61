@@ -50,23 +50,42 @@ async function signIn(req, res, next) {
     try {
         if (!req.body.email || !req.body.password)
             throw createHttpError.BadRequest("Email or password is required")
+            
+        // Find user and populate roles
         const existUser = await User.findOne({ email: req.body.email }).populate("roles", '-__v')
-        if (!await User.findOne({ email: req.body.email }))
+        if (!existUser)
             throw createHttpError.BadRequest(`Email ${req.body.email} not registered`)
+            
         const isMatchPassword = bcrypt.compareSync(req.body.password, existUser.password)
         if (!isMatchPassword)
             throw createHttpError.BadRequest("Password incorrect")
+            
         // Generate AccessToken - using JsonWebToken
         const token = jwt.sign({ id: existUser._id }, config.secret, {
             algorithm: "HS256",
             expiresIn: config.jwtExpiration
         })
-        console.log(existUser.roles);
-
+        
+        
+        // Process roles with better error handling
         const authorities = []
-        for (let i = 0; i < existUser.roles.length; i++) {
-            authorities.push("ROLE_" + existUser.roles[i].name)
+        if (existUser.roles && existUser.roles.length > 0) {
+            for (let i = 0; i < existUser.roles.length; i++) {
+                const role = existUser.roles[i];
+                if (role && role.name) {
+                    authorities.push("ROLE_" + role.name);
+                } else {
+                    // Default role if structure is invalid
+                    console.warn("Found invalid role structure:", role);
+                    authorities.push("MEMBER");
+                }
+            }
+        } else {
+            // Default role if no roles found
+            console.warn("No roles found for user, adding default MEMBER role");
+            authorities.push("MEMBER");
         }
+        
 
         res.status(200).json({
             id: existUser._id,
@@ -74,7 +93,6 @@ async function signIn(req, res, next) {
             accessToken: token,
             roles: authorities
         })
-
     } catch (error) {
         next(error)
     }
@@ -128,34 +146,49 @@ function googleAuth(req, res, next) {
 function googleAuthCallback(req, res, next) {
     passport.authenticate('google', { session: false }, async (err, user) => {
         if (err || !user) {
-            return res.redirect('http://localhost:3000/login?error=true'); // Thay đổi thành URL frontend
+            return res.redirect('http://localhost:3000/login?error=true');
         }
 
-        // Tạo token JWT
-        const token = jwt.sign({ id: user._id }, config.secret, {
-            algorithm: "HS256",
-            expiresIn: config.jwtExpiration
-        });
+        try {
+            // Fetch roles more explicitly
+            const populatedUser = await User.findById(user._id).populate('roles');
+            
+            // Generate JWT token
+            const token = jwt.sign({ id: user._id }, config.secret, {
+                algorithm: "HS256",
+                expiresIn: config.jwtExpiration
+            });
 
-        // Lấy thông tin user cần thiết
-        const authorities = [];
-        for (let i = 0; i < user.roles.length; i++) {
-            authorities.push("ROLE_" + user.roles[i].name);
+            // Process roles with better handling
+            const authorities = [];
+            if (populatedUser.roles && populatedUser.roles.length > 0) {
+                for (let i = 0; i < populatedUser.roles.length; i++) {
+                    const role = populatedUser.roles[i];
+                    if (role && role.name) {
+                        authorities.push("ROLE_" + role.name);
+                    } else {
+                        authorities.push("MEMBER");
+                    }
+                }
+            } else {
+                authorities.push("MEMBER");
+            }
+            
+
+            // Create user data object
+            const userData = {
+                id: user._id.toString(),
+                email: user.email,
+                accessToken: token,
+                roles: authorities
+            };
+
+            const userDataEncoded = encodeURIComponent(JSON.stringify(userData));
+            res.redirect(`http://localhost:3000/login?googleAuth=${userDataEncoded}`);
+        } catch (error) {
+            console.error("Error in Google auth callback:", error);
+            return res.redirect('http://localhost:3000/login?error=true');
         }
-
-        // Tạo một object chứa thông tin người dùng
-        const userData = {
-            id: user._id.toString(),
-            email: user.email,
-            accessToken: token,
-            roles: authorities // Đảm bảo rằng roles được thêm vào userData
-        };
-
-        // Mã hóa thông tin người dùng để truyền qua URL
-        const userDataEncoded = encodeURIComponent(JSON.stringify(userData));
-
-        // Chuyển hướng tới URL frontend với dữ liệu người dùng
-        res.redirect(`http://localhost:3000/?googleAuth=${userDataEncoded}`); // Thay đổi thành URL frontend
     })(req, res, next);
 }
 

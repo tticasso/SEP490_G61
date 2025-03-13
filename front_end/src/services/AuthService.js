@@ -15,13 +15,41 @@ class AuthService {
             .then(this.handleResponse)
             .then((data) => {
                 if (data.accessToken) {
-                    // Store with timestamp to check expiration
+
+                    // If roles is missing or empty, set a default MEMBER role
+                    if (!data.roles || data.roles.length === 0) {
+                        data.roles = ["MEMBER"];
+                    }
+
+                    // Ensure each role is properly formatted
+                    const formattedRoles = data.roles.map(role => {
+                        // If the role is an object with a name property
+                        if (typeof role === 'object' && role.name) {
+                            return `ROLE_${role.name}`;
+                        }
+                        // If the role is already a string that starts with ROLE_
+                        else if (typeof role === 'string' && role.startsWith('ROLE_')) {
+                            return role;
+                        }
+                        // If the role is just a string (like "MEMBER")
+                        else if (typeof role === 'string') {
+                            return `${role}`;
+                        }
+                        // Default
+                        return "MEMBER";
+                    });
+
+                    // Store with timestamp and formatted roles
                     const userData = {
                         ...data,
+                        roles: formattedRoles,
                         loginTime: new Date().getTime()
                     };
+
                     localStorage.setItem("user", JSON.stringify(userData));
-                    console.log("User logged in and token stored:", userData);
+
+                    // Dispatch a storage event to notify other components
+                    window.dispatchEvent(new Event('storage'));
                 }
                 return data;
             });
@@ -30,7 +58,9 @@ class AuthService {
     // Đăng xuất
     logout() {
         localStorage.removeItem("user");
-        console.log("User logged out, token removed");
+
+        // Dispatch a storage event to notify other components
+        window.dispatchEvent(new Event('storage'));
     }
 
     // Đăng ký
@@ -76,8 +106,10 @@ class AuthService {
     getCurrentUser() {
         try {
             const userStr = localStorage.getItem("user");
-            if (!userStr) return null;
-            
+            if (!userStr) {
+                return null;
+            }
+
             const user = JSON.parse(userStr);
             return user;
         } catch (error) {
@@ -91,23 +123,28 @@ class AuthService {
     // Kiểm tra người dùng đã đăng nhập chưa và token còn hạn sử dụng
     isLoggedIn() {
         const user = this.getCurrentUser();
-        if (!user) return false;
-        
-        // Check if token exists
-        if (!user.accessToken) return false;
-        
+
+        if (!user) {
+            return false;
+        }
+
+        // Check if token exists - handle both accessToken and token fields
+        const token = user.accessToken || user.token;
+        if (!token) {
+            return false;
+        }
+
         // Optional: Check for token expiration based on login time
         // Assuming a token lasts for 24 hours (86400000 milliseconds)
         const TOKEN_EXPIRY = 86400000; // 24 hours
         const now = new Date().getTime();
         const loginTime = user.loginTime || 0;
-        
+
         if (now - loginTime > TOKEN_EXPIRY) {
-            console.log("Token expired, logging out");
             this.logout();
             return false;
         }
-        
+
         return true;
     }
 
@@ -116,14 +153,14 @@ class AuthService {
         try {
             const user = this.getCurrentUser();
             if (!user) return null;
-            
+
             // Ensure token is a string and not undefined/null
-            const token = user.accessToken;
+            const token = user.accessToken || user.token;
             if (!token) {
                 console.error("Token not found in user object:", user);
                 return null;
             }
-            
+
             return token;
         } catch (error) {
             console.error("Error getting token:", error);
@@ -148,7 +185,7 @@ class AuthService {
                 console.error("Error parsing response:", e);
                 return Promise.reject("Invalid JSON response");
             }
-            
+
             if (!response.ok) {
                 const error = (data && data.message) || response.statusText;
                 return Promise.reject(error);
@@ -163,15 +200,52 @@ class AuthService {
             console.error("Attempted to set null/undefined user");
             return;
         }
-        
-        // Add timestamp for expiration checking
+
+
+        // Process roles
+        let roles = [];
+        if (user.roles && Array.isArray(user.roles)) {
+            roles = user.roles.map(role => {
+                // If role is already a string that starts with ROLE_
+                if (typeof role === 'string' && role.startsWith('ROLE_')) {
+                    // Check for undefined
+                    if (role === 'ROLE_undefined') {
+                        return 'MEMBER';
+                    }
+                    return role;
+                }
+                // If role is an object with a name property
+                else if (typeof role === 'object' && role.name) {
+                    return `ROLE_${role.name}`;
+                }
+                // If role is just a string
+                else if (typeof role === 'string') {
+                    return `ROLE_${role}`;
+                }
+                // Default
+                return "MEMBER";
+            });
+        } else {
+            // Default role if none provided
+            roles = ["MEMBER"];
+        }
+
+        // Ensure all critical fields exist
         const userData = {
             ...user,
+            // Ensure consistent field naming
+            id: user.id || (user._id ? user._id.toString() : null),
+            email: user.email,
+            accessToken: user.accessToken || user.token,
+            roles: roles,
             loginTime: new Date().getTime()
         };
-        
+
+
         localStorage.setItem("user", JSON.stringify(userData));
-        console.log("User data updated in localStorage");
+
+        // Dispatch a storage event to notify other components
+        window.dispatchEvent(new Event('storage'));
     }
 }
 

@@ -26,104 +26,120 @@ import ShopRegistration from "./sellerRegistration/ShopRegistration";
 import ForgotPassword from './forgotPassword/ForgotPassword';
 import ResetPassword from './forgotPassword/ResetPassword';
 import AdminLayout from './admin/AdminLayout';
-import ChatBot from './chatbot/ChatBot'
+import ChatBot from './chatbot/ChatBot';
 import StoreRequestsPage from './admin/store/StoreRequestsPage';
-
-function useGoogleAuth() {
-  const location = useLocation();
-  
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const token = params.get('token');
-    
-    if (token) {
-      // Lưu token vào localStorage
-      localStorage.setItem('user', JSON.stringify({ accessToken: token }));
-      // Xóa token khỏi URL để bảo mật
-      window.history.replaceState({}, document.title, location.pathname);
-    }
-  }, [location]);
-}
+import { AuthProvider } from './pages/Login/context/AuthContext';
+import ProtectedRoute, { AdminRoute, SellerRoute } from './route/ProtectedRoute';
 
 function App() {
-  useGoogleAuth();
   const location = useLocation();
-
- // Xử lý đăng nhập Google - đơn giản hóa
- useEffect(() => {
-  // Kiểm tra xem có dữ liệu đăng nhập Google không
-  const params = new URLSearchParams(location.search);
-  const googleAuthData = params.get('googleAuth');
-  
-  if (googleAuthData) {
-    try {
-      console.log('Nhận được dữ liệu googleAuth:', googleAuthData);
-      console.log('URL hiện tại:', window.location.href);
-  console.log('Params:', location.search);
-      // Giải mã dữ liệu nhận được
-      const userData = JSON.parse(decodeURIComponent(googleAuthData));
-      console.log('Đã parse dữ liệu người dùng:', userData);
-      
-      // Lưu dữ liệu người dùng vào localStorage
-      localStorage.setItem('user', JSON.stringify(userData));
-      console.log('Đã lưu dữ liệu vào localStorage');
-      
-      // Xóa thông tin khỏi URL để bảo mật
-      window.history.replaceState({}, document.title, '/');
-      
-      // Tải lại trang để cập nhật trạng thái đăng nhập
-      window.location.href = '/';
-    } catch (error) {
-      console.error('Lỗi xử lý dữ liệu đăng nhập Google:', error);
-    }
-  }
-}, [location.search]); 
 
   const noHeaderPaths = ['/register', '/login', '/admin', '/forgot-password', '/reset-password'];
   const noHeaderPage = noHeaderPaths.includes(location.pathname) || location.pathname.startsWith('/admin/');
 
   return (
     <div className="font-bold">
-      {!noHeaderPage && <Header />}
-      <Routes>
-        <Route path="/" element={<Homepage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/product-detail" element={<ProductDetail />} />
-        <Route path="/shop-detail" element={<ShopDetail />} />
-        <Route path="/user-profile/*" element={<UserProfile />} />
-        <Route path="/categories" element={<Categories />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+      <AuthProvider>
+        {!noHeaderPage && <Header />}
+        <Routes>
+          {/* Public routes - accessible to everyone */}
+          <Route path="/" element={<Homepage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/product-detail" element={<ProductDetail />} />
+          <Route path="/shop-detail" element={<ShopDetail />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/shop-registration" element={<ShopRegistration />} />
 
+          {/* Protected routes - require authentication */}
+          <Route path="/user-profile/*" element={
+            <ProtectedRoute>
+              <UserProfile />
+            </ProtectedRoute>
+          } />
+          <Route path="/cart" element={
+            <ProtectedRoute>
+              <Cart />
+            </ProtectedRoute>
+          } />
+          <Route path="/checkout" element={
+            <ProtectedRoute>
+              <CheckoutPage />
+            </ProtectedRoute>
+          } />
 
-        {/* Routes cho seller dashboard */}
-        <Route path="/seller-dashboard" element={<SellerDashboard />} />
-        <Route path="/seller-dashboard/product" element={<ProductList />} />
-        <Route path="/seller-dashboard/add-product" element={<AddProduct />} />
-        <Route path="/seller-dashboard/discount-product" element={<DiscountProducts />} />
-        <Route path="/seller-dashboard/discount-product/add-discount" element={<AddDiscount />} />
-        <Route path="/seller-dashboard/discounts" element={<AllDiscounts />} />
+          {/* Admin routes - require admin role */}
+          <Route path="/admin/*" element={
+            <AdminRoute>
+              <AdminLayout />
+            </AdminRoute>
+          } />
 
+          {/* Seller routes - require seller/mod role */}
+          <Route path="/seller-dashboard" element={
+            <SellerRoute>
+              <SellerDashboard />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/product" element={
+            <SellerRoute>
+              <ProductList />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/add-product" element={
+            <SellerRoute>
+              <AddProduct />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/discount-product" element={
+            <SellerRoute>
+              <DiscountProducts />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/discount-product/add-discount" element={
+            <SellerRoute>
+              <AddDiscount />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/discounts" element={
+            <SellerRoute>
+              <AllDiscounts />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/inventory-stock" element={
+            <SellerRoute>
+              <InventoryStock />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/import-history" element={
+            <SellerRoute>
+              <ImportHistory />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/create-import" element={
+            <SellerRoute>
+              <AddStock />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/registed-user" element={
+            <SellerRoute>
+              <RegisteredUsers />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/orders" element={
+            <SellerRoute>
+              <AllOrders />
+            </SellerRoute>
+          } />
 
-        {/* Routes cho quản lý kho hàng  của seller*/}
-        <Route path="/seller-dashboard/inventory-stock" element={<InventoryStock />} />
-        <Route path="/seller-dashboard/import-history" element={<ImportHistory />} />
-        <Route path="/seller-dashboard/create-import" element={<AddStock />} />
-
-        {/* /Routes cho quản lí khách hàng của seller */}
-        <Route path="/seller-dashboard/registed-user" element={<RegisteredUsers />} />
-        {/* Routes cho quản lí order của seller */}
-        <Route path="/seller-dashboard/orders" element={<AllOrders />} />
-        {/* Admin routers */}
-        <Route path="/admin/*" element={<AdminLayout />} />
-        <Route path="/shop-registration" element={<ShopRegistration />} />
-
-      </Routes>
-      {!noHeaderPage && <Footer />}
-      <ChatBot/>
+          {/* Catch-all route for 404 pages */}
+          <Route path="*" element={<div className="text-center p-20">Page not found</div>} />
+        </Routes>
+        {!noHeaderPage && <Footer />}
+        <ChatBot />
+      </AuthProvider>
     </div>
   );
 }

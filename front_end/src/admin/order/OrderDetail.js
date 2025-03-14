@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Truck, CreditCard, User, MapPin, Package, ShoppingBag } from 'lucide-react';
 import ApiService from '../../services/ApiService';
-// No need to import AuthService directly since ApiService handles tokens
 import ShopOwner from '../../assets/ShopOwner.png'; // Fallback image
 
 const OrderDetail = ({ orderId, onBack }) => {
@@ -16,6 +15,7 @@ const OrderDetail = ({ orderId, onBack }) => {
   
   // State for enhanced data
   const [customerData, setCustomerData] = useState(null);
+  const [addressData, setAddressData] = useState(null);
   const [productImages, setProductImages] = useState({});
 
   // Fetch order data
@@ -28,6 +28,14 @@ const OrderDetail = ({ orderId, onBack }) => {
     if (orderData && orderData.customer_id) {
       console.log("Customer ID from order:", orderData.customer_id);
       fetchCustomerData(orderData.customer_id);
+    }
+  }, [orderData]);
+
+  // New effect to fetch address data when user_address_id is available
+  useEffect(() => {
+    if (orderData && orderData.user_address_id) {
+      console.log("Address ID from order:", orderData.user_address_id);
+      fetchAddressData(orderData.user_address_id);
     }
   }, [orderData]);
 
@@ -77,6 +85,26 @@ const OrderDetail = ({ orderId, onBack }) => {
       setCustomerData(response);
     } catch (error) {
       console.error("Error fetching customer data:", error);
+    }
+  };
+
+  // New function to fetch address data
+  const fetchAddressData = async (addressId) => {
+    try {
+      const id = typeof addressId === 'object' ? addressId._id : addressId;
+      
+      console.log("Fetching address with ID:", id);
+      
+      if (!id) {
+        console.error("Invalid address ID:", addressId);
+        return;
+      }
+      
+      const response = await ApiService.get(`/address/find/${id}`);
+      console.log("Address data response:", response);
+      setAddressData(response);
+    } catch (error) {
+      console.error("Error fetching address data:", error);
     }
   };
   
@@ -228,6 +256,19 @@ const OrderDetail = ({ orderId, onBack }) => {
     }
   };
 
+  // Format address for display
+  const formatAddress = (address) => {
+    if (!address) return 'Địa chỉ không có sẵn';
+    
+    const parts = [];
+    if (address.address_line1) parts.push(address.address_line1);
+    if (address.address_line2) parts.push(address.address_line2);
+    if (address.city) parts.push(address.city);
+    if (address.country) parts.push(address.country);
+    
+    return parts.join(', ');
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-64">Đang tải dữ liệu...</div>;
   }
@@ -247,14 +288,11 @@ const OrderDetail = ({ orderId, onBack }) => {
   const shippingCost = orderData.shipping_id?.price || 0;
   
   // Giảm giá (nếu có)
-  const discountAmount = orderData.discount_id ? 
-    (orderData.discount_id.type_price === 'fixed' ? 
-      orderData.discount_id.value : 
-      (orderData.discount_id.value / 100) * subtotal) : 
-    0;
+  const discountAmount = orderData.discount_amount || 0;
+  const couponAmount = orderData.coupon_amount || 0;
   
   // Tổng thanh toán - sử dụng giá trị từ API hoặc tính toán nếu cần
-  const total = orderData.total_price || (subtotal + shippingCost - discountAmount);
+  const total = orderData.total_price || (subtotal + shippingCost - discountAmount - couponAmount);
 
   return (
     <div className="flex-1 bg-white">
@@ -418,21 +456,38 @@ const OrderDetail = ({ orderId, onBack }) => {
               <div className="bg-white rounded-md border border-gray-200 p-4">
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-gray-600">Tổng giá sản phẩm</span>
-                  <span className="font-medium">{formatPrice(subtotal)}</span>
+                  <span className="font-medium">{formatPrice(orderData.original_price || subtotal)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-gray-600">Giảm giá</span>
-                  <span className="font-medium">
-                    {orderData.discount_id ? (
-                      <>
-                        {formatPrice(discountAmount)}
+
+                {/* Display both discount and coupon if available */}
+                {discountAmount > 0 && (
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-600">Giảm giá</span>
+                    <span className="font-medium">
+                      {formatPrice(discountAmount)}
+                      {orderData.discount_id && (
                         <span className="text-sm ml-1 text-gray-500">
                           ({orderData.discount_id.code})
                         </span>
-                      </>
-                    ) : '0 ₫'}
-                  </span>
-                </div>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {couponAmount > 0 && (
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-600">Mã giảm giá</span>
+                    <span className="font-medium">
+                      {formatPrice(couponAmount)}
+                      {orderData.coupon_id && (
+                        <span className="text-sm ml-1 text-gray-500">
+                          ({orderData.coupon_id.code})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+
                 {/* Hiển thị chi tiết giảm giá nếu có */}
                 {orderData.discount_id && (
                   <div className="py-2 border-b border-gray-100">
@@ -445,6 +500,20 @@ const OrderDetail = ({ orderId, onBack }) => {
                     </div>
                   </div>
                 )}
+
+                {/* Hiển thị chi tiết coupon nếu có */}
+                {orderData.coupon_id && (
+                  <div className="py-2 border-b border-gray-100">
+                    <div className="text-gray-600 text-sm">
+                      <div><span className="font-medium">Tên coupon:</span> {orderData.coupon_id.name}</div>
+                      <div><span className="font-medium">Mã coupon:</span> {orderData.coupon_id.code}</div>
+                      {orderData.coupon_id.description && (
+                        <div><span className="font-medium">Mô tả:</span> {orderData.coupon_id.description}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-gray-600">Phí vận chuyển</span>
                   <span className="font-medium">{formatPrice(shippingCost)}</span>
@@ -553,9 +622,15 @@ const OrderDetail = ({ orderId, onBack }) => {
               </h2>
               <div className="bg-white rounded-md border border-gray-200 p-4">
                 <p className="text-gray-700">
-                  {/* Địa chỉ có thể cần phải lấy từ API khác vì trong order chỉ có customer_id */}
-                  {orderData.shipping_address || 'Địa chỉ giao hàng không có sẵn'}
+                  {addressData ? formatAddress(addressData) : (
+                    orderData.user_address_id ? `Đang tải địa chỉ...` : 'Địa chỉ giao hàng không có sẵn'
+                  )}
                 </p>
+                {addressData && addressData.phone && (
+                  <p className="text-gray-500 text-sm mt-2">
+                    Số điện thoại: {addressData.phone}
+                  </p>
+                )}
               </div>
             </div>
           </div>

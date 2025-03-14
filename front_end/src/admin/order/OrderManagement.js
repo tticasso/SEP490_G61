@@ -169,7 +169,8 @@ const OrderManagement = () => {
   const handleCancelOrder = async (orderId) => {
     if (window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
       try {
-        await ApiService.patch(`/order/cancel/${orderId}`, {});
+        // Updated to use PUT instead of PATCH to match the backend route
+        await ApiService.put(`/order/cancel/${orderId}`, {});
         // Refresh orders after cancellation
         fetchOrders();
         fetchStatistics();

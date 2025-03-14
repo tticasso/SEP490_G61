@@ -1,3 +1,4 @@
+// user-address.model.js - Updated model registration
 const mongoose = require('mongoose')
 const { Schema } = mongoose
 
@@ -38,6 +39,6 @@ const addressSchema = new Schema({
     timestamps: true
 })
 
-// Export trực tiếp model như cách làm với User
-const Address = mongoose.model("addresses", addressSchema)
+// Change model registration to match the ref in order.model.js
+const Address = mongoose.model("Address", addressSchema)
 module.exports = Address

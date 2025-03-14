@@ -15,6 +15,9 @@ import PaymentManagement from './payment/PaymentManagement';
 import AddPayment from './payment/AddPayment';
 import ShippingManagement from './shipping/ShippingManagement';
 import AddShipping from './shipping/AddShipping';
+import CouponManagement from './coupon/CouponManagement';
+import AddCouponForm from './coupon/AddCoupon';
+import EditCouponForm from './coupon/EditCoupon';
 import logo from '../assets/logo.png'
 import StoreRequestsPage from './store/StoreRequestsPage';
 
@@ -69,6 +72,11 @@ const MainContent = () => {
 
           <Route path="/customers" element={<CustomerManagement />} />
           <Route path="/orders" element={<OrderManagement />} />
+
+          {/* Updated coupon routes to use separate components */}
+          <Route path="/coupons" element={<CouponManagement />} />
+          <Route path="/add-coupon" element={<AddCouponForm />} />
+          <Route path="/edit-coupon/:id" element={<EditCouponForm />} />
 
           <Route path="/shippings" element={<ShippingManagement />} />
           <Route path="/add-shipping" element={<AddShipping />} />

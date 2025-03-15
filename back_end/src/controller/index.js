@@ -15,6 +15,7 @@ const paymentController = require('./payment.controller')
 const productVariantController = require('./product-variant.controller')
 const shopController = require('./shops.controller')
 const shopFollowController = require('./shop-follow.controller')
+const conversationController = require('./conversation.controller')
 
 module.exports = {
     authController,
@@ -33,5 +34,6 @@ module.exports = {
     paymentController,
     productVariantController,
     shopController,
-    shopFollowController
+    shopFollowController,
+    conversationController
 }

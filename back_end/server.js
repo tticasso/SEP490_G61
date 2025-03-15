@@ -3,6 +3,10 @@ const morgan = require('morgan');
 const bodyParser = require('body-parser');
 const httpErrors = require('http-errors');
 const db = require('./src/models');
+const http = require('http');
+const socketIO = require('socket.io');
+const jwt = require('jsonwebtoken');
+const config = require('./src/config/auth.config');
 require('dotenv').config();
 
 
@@ -23,7 +27,8 @@ const { AuthRouter,
     ProductVariantRouter,
     ShopRouter,
     DocumentRouter,
-    ShopFollowRouter
+    ShopFollowRouter,
+    ConversationRouter
 } = require('./src/routes');
 
 const session = require('express-session');
@@ -97,7 +102,8 @@ app.use('/api/order', OrderRouter);
 app.use('/api/shipping', ShippingRouter);
 app.use('/api/payment', PaymentRouter);
 app.use('/api/documents', DocumentRouter);
-
+// Thêm route mới
+app.use('/api/conversation', ConversationRouter);
 // Kiểm soát các lỗi trong Express web server
 app.use(async (req, res, next) => {
     next(httpErrors.NotFound());
@@ -112,8 +118,104 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Lắng nghe request từ client
-app.listen(process.env.PORT || 9999, process.env.HOST_NAME || 'localhost', () => {
+// Tạo server HTTP từ ứng dụng Express
+const server = http.createServer(app);
+const io = socketIO(server, {
+  cors: {
+    origin: 'http://localhost:3000', // Đảm bảo đây là domain của frontend
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token'],
+    credentials: true
+  }
+});
+
+
+
+// Socket.IO - Xử lý kết nối từ client
+io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
+    
+    // Authenticate user using token from query params
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      socket.disconnect();
+      return console.log('User not authenticated');
+    }
+    
+    try {
+      // Verify token
+      const decoded = jwt.verify(token, config.secret);
+      socket.userId = decoded.id;
+      console.log('Authenticated user:', socket.userId);
+      
+      // Join user to their room
+      socket.join(`user-${socket.userId}`);
+      
+      // Handle conversation joining
+      socket.on('join-conversation', (conversationId) => {
+        socket.join(`conversation-${conversationId}`);
+        console.log(`User ${socket.userId} joined conversation ${conversationId}`);
+      });
+      
+      // Handle new message
+      socket.on('send-message', async (data) => {
+        try {
+          const { conversationId, content } = data;
+          
+          // Save message to database
+          const newMessage = new db.message({
+            conversation_id: conversationId,
+            sender_id: socket.userId,
+            content: content,
+            created_at: new Date()
+          });
+          
+          await newMessage.save();
+          
+          // Update conversation last message
+          await db.conversation.findByIdAndUpdate(
+            conversationId,
+            { 
+              last_message: content,
+              last_message_time: new Date()
+            }
+          );
+          
+          // Broadcast message to all users in this conversation
+          io.to(`conversation-${conversationId}`).emit('new-message', {
+            _id: newMessage._id,
+            conversation_id: conversationId,
+            sender_id: socket.userId,
+            content: content,
+            created_at: newMessage.created_at,
+            is_read: false
+          });
+        } catch (error) {
+          console.error('Error sending message:', error);
+        }
+      });
+      
+      // Handle typing status
+      socket.on('typing', ({ conversationId, isTyping }) => {
+        socket.to(`conversation-${conversationId}`).emit('user-typing', {
+          userId: socket.userId,
+          isTyping
+        });
+      });
+      
+      // Handle disconnect
+      socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+      });
+      
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      socket.disconnect();
+    }
+  });
+  
+  // Thay đổi app.listen thành server.listen
+  server.listen(process.env.PORT || 9999, process.env.HOST_NAME || 'localhost', () => {
     console.log(`Server is running at: http://${process.env.HOST_NAME || 'localhost'}:${process.env.PORT || 9999}`);
     db.connectDB();
-});
+  });

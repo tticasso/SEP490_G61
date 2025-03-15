@@ -12,6 +12,11 @@ const productSchema = new Schema({
         ref: 'Brand', // Đảm bảo có model Brand
         required: true
     },
+    shop_id: {
+        type: Schema.Types.ObjectId,
+        ref: 'Shop', // Tham chiếu đến model Shop
+        required: true
+    },
     slug: {
         type: String,
         required: true,

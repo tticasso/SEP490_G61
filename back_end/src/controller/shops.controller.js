@@ -88,7 +88,26 @@ const createShop = async (req, res, next) => {
         });
 
         const savedShop = await newShop.save();
-        res.status(201).json({ message: "Shop registered successfully", shop: savedShop });
+        
+        // Thêm quyền SELLER cho người dùng
+        const sellerRole = await db.role.findOne({ name: "SELLER" });
+        if (sellerRole) {
+            // Kiểm tra xem user đã có role SELLER chưa
+            const hasSellerRole = userExists.roles.some(roleId => 
+                roleId.toString() === sellerRole._id.toString()
+            );
+            
+            // Nếu chưa có role SELLER, thêm vào
+            if (!hasSellerRole) {
+                userExists.roles.push(sellerRole._id);
+                await userExists.save();
+            }
+        }
+        
+        res.status(201).json({ 
+            message: "Shop registered successfully and user role updated to SELLER", 
+            shop: savedShop 
+        });
     } catch (error) {
         if (error.name === 'ValidationError') {
             return next(createHttpError.BadRequest(error.message));

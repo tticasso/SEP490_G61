@@ -30,6 +30,7 @@ import ChatBot from './chatbot/ChatBot';
 import StoreRequestsPage from './admin/store/StoreRequestsPage';
 import { AuthProvider } from './pages/Login/context/AuthContext';
 import ProtectedRoute, { AdminRoute, SellerRoute } from './route/ProtectedRoute';
+import MyShop from './Seller/MyShop';
 
 function App() {
   const location = useLocation();
@@ -131,6 +132,11 @@ function App() {
           <Route path="/seller-dashboard/orders" element={
             <SellerRoute>
               <AllOrders />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/my-shop" element={
+            <SellerRoute>
+              <MyShop />
             </SellerRoute>
           } />
 

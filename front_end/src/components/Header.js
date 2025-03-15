@@ -14,12 +14,13 @@ import {
     Package,
     MapPin,
     Lock,
-    UserCircle
+    UserCircle,
+    Store // Thêm icon Store cho cửa hàng
 } from 'lucide-react';
 import CartModal from '../pages/cart/CartModal';
 import logo from '../assets/logo.png';
 import AuthService from '../services/AuthService';
-import { useAuth } from '../pages/Login/context/AuthContext';
+// import { useAuth } from '../pages/Login/context/AuthContext'; // Không sử dụng AuthContext
 
 const ProductCategoriesSidebar = ({ isOpen, onClose, buttonRef }) => {
     const sidebarRef = useRef(null);
@@ -93,15 +94,58 @@ const Header = () => {
     const [isCategoriesSidebarOpen, setIsCategoriesSidebarOpen] = useState(false);
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
 
-    // Use auth context instead of direct AuthService calls
-    const { currentUser, isLoggedIn, logout } = useAuth();
+    // Use AuthService directly instead of AuthContext
+    const [isLoggedIn, setIsLoggedIn] = useState(AuthService.isLoggedIn());
+    const [currentUser, setCurrentUser] = useState(AuthService.getCurrentUser());
 
     const categoriesButtonRef = useRef(null);
     const userDropdownRef = useRef(null);
     const userButtonRef = useRef(null);
 
+    // Lắng nghe sự kiện localStorage thay đổi
+    useEffect(() => {
+        // Hàm này sẽ được gọi khi sự kiện storage được kích hoạt
+        const handleStorageChange = () => {
+            // Lấy thông tin user mới từ localStorage
+            const user = AuthService.getCurrentUser();
+            // Kiểm tra đăng nhập
+            const loggedIn = AuthService.isLoggedIn();
+            
+            // Cập nhật state
+            setIsLoggedIn(loggedIn);
+            setCurrentUser(user);
+            
+            console.log('Header detected auth change:', { loggedIn, userRoles: user?.roles });
+        };
+
+        // Đăng ký lắng nghe sự kiện storage
+        window.addEventListener('storage', handleStorageChange);
+        
+        // Cập nhật trạng thái ban đầu
+        handleStorageChange();
+        
+        // Cleanup khi component unmount
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, []);
+
     // Always check both id and _id for compatibility
     const userId = currentUser?.id || currentUser?._id || "";
+    
+    // Kiểm tra xem người dùng có role SELLER không - cải tiến phương pháp phát hiện role
+    const isSeller = currentUser?.roles?.some(role => {
+        // Kiểm tra nhiều dạng role có thể có
+        if (typeof role === 'object' && role !== null) {
+            return role.name === "SELLER" || role.name === "ROLE_SELLER";
+        }
+        
+        if (typeof role === 'string') {
+            return role === "SELLER" || role === "ROLE_SELLER";
+        }
+        
+        return false;
+    });
 
     const toggleCategoriesSidebar = () => {
         setIsCategoriesSidebarOpen(!isCategoriesSidebarOpen);
@@ -111,10 +155,12 @@ const Header = () => {
         setIsUserDropdownOpen(!isUserDropdownOpen);
     };
 
-    // Xử lý đăng xuất - now using context's logout
+    // Xử lý đăng xuất - sử dụng AuthService trực tiếp
     const handleLogout = () => {
-        logout();
+        AuthService.logout();
         setIsUserDropdownOpen(false);
+        setIsLoggedIn(false);
+        setCurrentUser(null);
         navigate('/');
     };
 
@@ -292,6 +338,17 @@ const Header = () => {
                                         <Lock size={16} className="mr-2" />
                                         Đổi mật khẩu
                                     </a>
+
+                                    {/* Hiển thị nút truy cập vào SellerDashboard nếu người dùng có role SELLER */}
+                                    {isSeller && (
+                                        <a
+                                            href="/seller-dashboard"
+                                            className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 flex items-center"
+                                        >
+                                            <Store size={16} className="mr-2" />
+                                            Quản lý cửa hàng
+                                        </a>
+                                    )}
 
                                     <div className="border-t mt-1">
                                         <button

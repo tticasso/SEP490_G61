@@ -7,7 +7,8 @@ import {
   Settings, 
   HelpCircle, 
   ChevronDown, 
-  ChevronRight 
+  ChevronRight,
+  Store
 } from 'lucide-react';
 
 const Sidebar = ({ onNavigate }) => {
@@ -47,6 +48,13 @@ const Sidebar = ({ onNavigate }) => {
   };
 
   const menuItems = [
+    // Thêm mục "Cửa hàng của tôi" vào đầu danh sách
+    { 
+      icon: <Store className="mr-3 text-gray-500" />, 
+      label: 'Cửa hàng của tôi', 
+      path: '/seller-dashboard/my-shop',
+      expandable: false
+    },
     { 
       icon: <Package className="mr-3 text-gray-500" />, 
       label: 'Sản phẩm',
@@ -154,7 +162,7 @@ const Sidebar = ({ onNavigate }) => {
                   onClick={() => handleNavigation(item.path)}
                 >
                   {item.icon}
-                  <span className="text-gray-700">{item.label}</span>
+                  <span className={`${item.path === '/shop/my-shop' ? 'text-purple-700 font-medium' : 'text-gray-700'}`}>{item.label}</span>
                 </div>
               )}
             </li>

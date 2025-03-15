@@ -247,6 +247,48 @@ class AuthService {
         // Dispatch a storage event to notify other components
         window.dispatchEvent(new Event('storage'));
     }
+
+    async refreshUserInfo() {
+        try {
+            const currentUser = this.getCurrentUser();
+            if (!currentUser) return null;
+            
+            const token = this.getToken();
+            if (!token) return null;
+    
+            // Lấy thông tin user từ API
+            const response = await fetch(`${API_URL}/user/${currentUser.id || currentUser._id}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-access-token': token
+                }
+            });
+    
+            if (!response.ok) {
+                throw new Error('Failed to fetch updated user data');
+            }
+    
+            const userData = await response.json();
+            
+            // Cập nhật thông tin user trong localStorage, giữ lại token
+            const updatedUser = {
+                ...currentUser,
+                ...userData,
+                roles: userData.roles || currentUser.roles, // Đảm bảo roles được cập nhật
+                loginTime: currentUser.loginTime // Giữ nguyên loginTime
+            };
+            
+            // Lưu vào localStorage và kích hoạt sự kiện storage
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            window.dispatchEvent(new Event('storage'));
+            
+            return updatedUser;
+        } catch (error) {
+            console.error('Error refreshing user info:', error);
+            return this.getCurrentUser(); // Trả về thông tin hiện tại nếu có lỗi
+        }
+    }
 }
 
 export default new AuthService();

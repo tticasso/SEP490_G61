@@ -16,6 +16,7 @@ const ProductVariantRouter = require('./product-variant.routes')
 const ShopRouter = require('./shops.routes')
 const DocumentRouter = require('./document.routes')
 const ShopFollowRouter = require('./shop-follow.routes')
+const ConversationRouter = require('./conversation.routes')
 
 module.exports = {
     AuthRouter,
@@ -35,5 +36,6 @@ module.exports = {
     ProductVariantRouter,
     ShopRouter,
     DocumentRouter,
-    ShopFollowRouter
+    ShopFollowRouter,
+    ConversationRouter
 }

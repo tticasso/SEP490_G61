@@ -6,6 +6,7 @@ import Orders from './components/Orders'
 import Message from './components/Message'
 import Sidebar from './Sidebar'
 import ShippingAddresses from './components/ShippingAddresses'
+import FollowedShops from './components/FollowedShops'; // Import component mới
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 
@@ -168,6 +169,7 @@ const UserProfile = () => {
             <Route path="/orders" element={<Orders />} />
             <Route path="/messages" element={<Message />} />
             <Route path="/addresses" element={<ShippingAddresses />} />
+            <Route path="/followed-shops" element={<FollowedShops />} />
             <Route path="/password" element={<PasswordChange />} />
             {/* Bổ sung route mặc định để redirect về profile */}
             <Route path="*" element={<Navigate to="/user-profile" replace />} />

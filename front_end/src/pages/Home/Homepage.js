@@ -40,7 +40,7 @@ const TroocEcommerce = () => {
             try {
                 setLoading(true);
 
-                // Lấy danh sách sản phẩm
+                // Lấy danh sách sản phẩm - sử dụng API mới
                 const productsData = await ApiService.get('/product', false);
                 setProducts(productsData);
 
@@ -48,13 +48,13 @@ const TroocEcommerce = () => {
                 const categoriesData = await ApiService.get('/categories', false);
                 setCategories(categoriesData);
 
-                // Lọc sản phẩm mới (5 sản phẩm mới nhất)
+                // Lọc sản phẩm mới (5 sản phẩm mới nhất dựa vào created_at)
                 const sortedByDate = [...productsData].sort((a, b) =>
                     new Date(b.created_at) - new Date(a.created_at)
                 );
                 setNewProducts(sortedByDate.slice(0, 5));
 
-                // Lọc sản phẩm đề xuất (sản phẩm có is_feature = true hoặc là các sản phẩm bán chạy nhất)
+                // Lọc sản phẩm đề xuất (sản phẩm có is_feature = true hoặc is_hot = true hoặc bán chạy nhất)
                 const featuredProducts = productsData.filter(product => product.is_feature);
                 const hotProducts = productsData.filter(product => product.is_hot);
                 const sortedBySold = [...productsData].sort((a, b) => b.sold - a.sold);
@@ -73,7 +73,6 @@ const TroocEcommerce = () => {
                 }
 
                 setRecommendedProducts(uniqueProducts);
-
                 setLoading(false);
             } catch (err) {
                 console.error("Error fetching data:", err);
@@ -229,7 +228,8 @@ const TroocEcommerce = () => {
                         <ClockIcon size={12} className="mr-1" />
                         <span>{formatTime(product.created_at)}</span>
                         <span className="mx-1">•</span>
-                        <span>Hà Nội</span>
+                        {/* Hiển thị tên cửa hàng nếu có */}
+                        <span>{product.shop_id?.name || "Hà Nội"}</span>
                     </div>
                 </div>
             </div>
@@ -564,7 +564,7 @@ const TroocEcommerce = () => {
 
             {/* Cart Button (now more visible) */}
             <button
-                className="fixed bottom-8 right-8 bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 z-40 flex items-center justify-center"
+                className="fixed bottom-[6rem] right-6 bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 z-40 flex items-center justify-center"
                 onClick={() => {
                     setShowCartModal(true);
                 }}

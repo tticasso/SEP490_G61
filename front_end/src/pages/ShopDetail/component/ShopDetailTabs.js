@@ -1,12 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Truck, Package, MessageCircle, MapPin, Phone, Mail, Calendar, Award } from 'lucide-react';
-import dienthoai from '../../../assets/dienthoai.jpg'
+import dienthoai from '../../../assets/dienthoai.jpg';
+import ApiService from '../../../services/ApiService';
 
 const ShopDetailTabs = ({ shopDetails }) => {
   const [activeTab, setActiveTab] = useState('store');
+  const [shopReviews, setShopReviews] = useState([]);
+  const [shopActivities, setShopActivities] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [reviewStats, setReviewStats] = useState({
+    totalReviews: 0,
+    averageRating: 0
+  });
 
-  // Sample reviews data
-  const reviews = [
+  useEffect(() => {
+    // Fetch shop reviews if available and shop details is provided
+    const fetchShopReviews = async () => {
+      if (!shopDetails || !shopDetails._id) return;
+      
+      setLoading(true);
+      try {
+        const shopId = shopDetails._id;
+        const shopUserId = shopDetails.user_id;
+        
+        if (shopUserId) {
+          // Gọi API để lấy đánh giá của seller này
+          const reviewsData = await ApiService.get(`/product-review/seller/${shopUserId}`, false);
+          
+          if (reviewsData && reviewsData.reviews) {
+            setShopReviews(reviewsData.reviews);
+            
+            // Cập nhật thống kê đánh giá
+            setReviewStats({
+              totalReviews: reviewsData.stats?.totalReviews || reviewsData.reviews.length,
+              averageRating: reviewsData.stats?.averageRating || 
+                (reviewsData.reviews.reduce((sum, review) => sum + review.rating, 0) / reviewsData.reviews.length)
+            });
+          } else {
+            // Nếu không có thuộc tính reviews thì có thể API trả về mảng trực tiếp
+            setShopReviews(Array.isArray(reviewsData) ? reviewsData : []);
+            
+            // Tính toán thống kê trung bình
+            if (Array.isArray(reviewsData) && reviewsData.length > 0) {
+              const avgRating = reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length;
+              setReviewStats({
+                totalReviews: reviewsData.length,
+                averageRating: avgRating
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching shop reviews:", error);
+        // Fall back to sample data
+        setShopReviews(sampleReviews);
+        setReviewStats({
+          totalReviews: sampleReviews.length,
+          averageRating: 4.8
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchShopReviews();
+  }, [shopDetails]);
+
+  // Sample reviews data as fallback
+  const sampleReviews = [
     {
       id: 1,
       username: 'Hungreo',
@@ -66,6 +127,54 @@ const ShopDetailTabs = ({ shopDetails }) => {
     );
   };
 
+  // Helper function to format dates
+  const formatDate = (dateString) => {
+    if (!dateString) return "Không rõ";
+    try {
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      return new Date(dateString).toLocaleDateString('vi-VN', options);
+    } catch (error) {
+      return "Không rõ";
+    }
+  };
+
+  // Hàm tính khoảng thời gian từ ngày cụ thể đến hiện tại
+  const getTimeAgo = (dateString) => {
+    if (!dateString) return "Không rõ";
+    
+    try {
+      const now = new Date();
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "Không rõ";
+      }
+      
+      const diffMs = now - date;
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHour = Math.floor(diffMin / 60);
+      const diffDays = Math.floor(diffHour / 24);
+      
+      if (diffSec < 60) {
+        return "Vừa xong";
+      } else if (diffMin < 60) {
+        return `${diffMin} phút trước`;
+      } else if (diffHour < 24) {
+        return `${diffHour} giờ trước`;
+      } else if (diffDays < 30) {
+        return `${diffDays} ngày trước`;
+      } else {
+        const diffMonths = Math.floor(diffDays / 30);
+        return `${diffMonths} tháng trước`;
+      }
+    } catch (error) {
+      console.error("Time ago calculation error:", error);
+      return "Không rõ";
+    }
+  };
+
   // Render tab content based on active tab
   const renderTabContent = () => {
     switch (activeTab) {
@@ -77,19 +186,28 @@ const ShopDetailTabs = ({ shopDetails }) => {
                 <h3 className="text-lg font-bold mb-4">Giới thiệu</h3>
                 <div className="bg-white p-5 rounded-lg shadow">
                   <p className="text-sm text-gray-700 mb-4">
-                    Giới thiệu về Vinh An Mobile !<br />
-                    Ra đời vào năm 2004, Vinh An Mobile đã sớm có một vị trí vững chắc trên thị trường bán lẻ di động xách tay, hàng công nghệ, linh kiện - phụ kiện điện thoại di động, sửa chữa điện thoại trong nước, trở thành địa chỉ...
+                    {shopDetails.description || 
+                      `Giới thiệu về ${shopDetails.name || 'Shop'}!
+                      Ra đời vào năm ${new Date(shopDetails.created_at || Date.now()).getFullYear()}, 
+                      ${shopDetails.name || 'Shop'} đã sớm có một vị trí vững chắc trên thị trường bán lẻ, 
+                      trở thành địa chỉ tin cậy cho người tiêu dùng...`
+                    }
                   </p>
                   <a href="#" className="text-blue-500 text-sm hover:underline">Xem thêm</a>
                   
                   <div className="mt-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <MapPin size={16} className="text-gray-500" />
-                      <span className="text-sm">12D Đường Tống Văn Trân, Phường 5, Quận 11, Hồ Chí Minh, Việt Nam</span>
+                      <span className="text-sm">{shopDetails.address || 'Chưa cập nhật địa chỉ'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Phone size={16} className="text-gray-500" />
-                      <span className="text-sm">09085***** <button className="text-blue-500 hover:underline">Hiện số</button></span>
+                      <span className="text-sm">
+                        {shopDetails.phone ? 
+                          `${shopDetails.phone.substring(0, 6)}***** ` : 
+                          'Chưa cập nhật số điện thoại '}
+                        <button className="text-blue-500 hover:underline">Hiện số</button>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -146,9 +264,9 @@ const ShopDetailTabs = ({ shopDetails }) => {
                     </div>
                     <div className="p-3">
                       <div className="flex items-center mb-2">
-                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4mdufqxZiFh_R5UBFHbygA7H9x4eUSf-IKA&s" alt="Vinh An Mobile" className="w-8 h-8 rounded-full mr-2" />
+                        <img src={shopDetails.logo || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4mdufqxZiFh_R5UBFHbygA7H9x4eUSf-IKA&s"} alt={shopDetails.name} className="w-8 h-8 rounded-full mr-2" />
                         <div>
-                          <p className="font-medium text-sm">Vinh An Mobile</p>
+                          <p className="font-medium text-sm">{shopDetails.name}</p>
                           <p className="text-xs text-gray-500">5 tháng trước</p>
                         </div>
                       </div>
@@ -164,9 +282,9 @@ const ShopDetailTabs = ({ shopDetails }) => {
                     </div>
                     <div className="p-3">
                       <div className="flex items-center mb-2">
-                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4mdufqxZiFh_R5UBFHbygA7H9x4eUSf-IKA&s" alt="Vinh An Mobile" className="w-8 h-8 rounded-full mr-2" />
+                        <img src={shopDetails.logo || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4mdufqxZiFh_R5UBFHbygA7H9x4eUSf-IKA&s"} alt={shopDetails.name} className="w-8 h-8 rounded-full mr-2" />
                         <div>
-                          <p className="font-medium text-sm">Vinh An Mobile</p>
+                          <p className="font-medium text-sm">{shopDetails.name}</p>
                           <p className="text-xs text-gray-500">6 tháng trước</p>
                         </div>
                       </div>
@@ -196,10 +314,10 @@ const ShopDetailTabs = ({ shopDetails }) => {
             <div className="space-y-6">
               <div className="bg-white p-5 rounded-lg shadow">
                 <div className="flex items-start">
-                  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4mdufqxZiFh_R5UBFHbygA7H9x4eUSf-IKA&s" alt="Vinh An Mobile" className="w-10 h-10 rounded-full mr-3" />
+                  <img src={shopDetails.logo || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4mdufqxZiFh_R5UBFHbygA7H9x4eUSf-IKA&s"} alt={shopDetails.name} className="w-10 h-10 rounded-full mr-3" />
                   <div className="flex-1">
                     <div className="flex items-center">
-                      <p className="font-medium">Vinh An Mobile</p>
+                      <p className="font-medium">{shopDetails.name}</p>
                       <span className="mx-2 text-xs text-gray-400">•</span>
                       <span className="text-xs text-gray-500">5 tháng trước</span>
                     </div>
@@ -232,10 +350,10 @@ const ShopDetailTabs = ({ shopDetails }) => {
               
               <div className="bg-white p-5 rounded-lg shadow">
                 <div className="flex items-start">
-                  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4mdufqxZiFh_R5UBFHbygA7H9x4eUSf-IKA&s" alt="Vinh An Mobile" className="w-10 h-10 rounded-full mr-3" />
+                  <img src={shopDetails.logo || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4mdufqxZiFh_R5UBFHbygA7H9x4eUSf-IKA&s"} alt={shopDetails.name} className="w-10 h-10 rounded-full mr-3" />
                   <div className="flex-1">
                     <div className="flex items-center">
-                      <p className="font-medium">Vinh An Mobile</p>
+                      <p className="font-medium">{shopDetails.name}</p>
                       <span className="mx-2 text-xs text-gray-400">•</span>
                       <span className="text-xs text-gray-500">6 tháng trước</span>
                     </div>
@@ -273,8 +391,10 @@ const ShopDetailTabs = ({ shopDetails }) => {
           <div className="py-6">
             <div className="bg-white p-5 rounded-lg shadow mb-6">
               <div className="flex items-center mb-4">
-                <div className="text-3xl font-bold mr-2">4.8</div>
-                {renderStars(4.8)}
+                <div className="text-3xl font-bold mr-2">
+                  {reviewStats.averageRating.toFixed(1)}
+                </div>
+                {renderStars(reviewStats.averageRating)}
               </div>
               
               <div className="flex flex-wrap gap-2 mb-4">
@@ -301,10 +421,10 @@ const ShopDetailTabs = ({ shopDetails }) => {
               <div className="border-t border-gray-200 pt-4">
                 <div className="flex border-b border-gray-200">
                   <button className="py-2 px-4 font-medium border-b-2 border-orange-500 text-orange-500">
-                    TẤT CẢ (43)
+                    TẤT CẢ ({reviewStats.totalReviews})
                   </button>
                   <button className="py-2 px-4 font-medium text-gray-500">
-                    TỪ NGƯỜI MUA (43)
+                    TỪ NGƯỜI MUA ({reviewStats.totalReviews})
                   </button>
                   <button className="py-2 px-4 font-medium text-gray-500">
                     TỪ NGƯỜI BÁN (0)
@@ -314,64 +434,82 @@ const ShopDetailTabs = ({ shopDetails }) => {
             </div>
             
             <div className="space-y-4">
-              {reviews.map(review => (
-                <div key={review.id} className="bg-white p-4 rounded-lg shadow">
-                  <div className="flex items-start">
-                    <div className="mr-3">
-                      {review.avatar ? (
-                        <div className="w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold">
-                          {review.avatar}
-                        </div>
-                      ) : (
-                        <img 
-                          src={`https://ui-avatars.com/api/?name=${review.username}&background=random`} 
-                          alt={review.username} 
-                          className="w-8 h-8 rounded-full"
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center">
-                        <h4 className="font-medium">{review.username}</h4>
-                        <span className="mx-2 text-gray-300">|</span>
-                        <span className="text-gray-500 text-sm">{review.date}</span>
-                      </div>
-                      
-                      <div className="mt-1">
-                        {renderStars(review.rating)}
-                      </div>
-                      
-                      {review.product && (
-                        <div className="mt-3 flex items-start border-t border-gray-100 pt-3">
-                          <img 
-                            src={review.productImage} 
-                            alt={review.product} 
-                            className="w-16 h-16 object-cover rounded mr-3"
-                          />
-                          <div>
-                            <p className="text-sm">{review.product}</p>
-                            <p className="text-red-500 font-medium">{review.price}</p>
+              {shopReviews.length > 0 ? (
+                // Hiển thị đánh giá từ API
+                shopReviews.map(review => (
+                  <div key={review._id || review.id} className="bg-white p-4 rounded-lg shadow">
+                    <div className="flex items-start">
+                      <div className="mr-3">
+                        {review.avatar ? (
+                          <div className="w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold">
+                            {review.avatar}
                           </div>
+                        ) : (
+                          <img 
+                            src={`https://ui-avatars.com/api/?name=${review.user_id?.lastName || review.username || 'User'}&background=random`} 
+                            alt={review.user_id?.lastName || review.username || 'User'} 
+                            className="w-8 h-8 rounded-full"
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center">
+                          <h4 className="font-medium">
+                            {review.user_id ? 
+                              `${review.user_id.firstName || ''} ${review.user_id.lastName || ''}` : 
+                              review.username || 'Khách hàng'}
+                          </h4>
+                          <span className="mx-2 text-gray-300">|</span>
+                          <span className="text-gray-500 text-sm">
+                            {review.date || getTimeAgo(review.created_at)}
+                          </span>
                         </div>
-                      )}
-                      
-                      {review.comment && (
-                        <p className="mt-2 text-sm text-gray-700">{review.comment}</p>
-                      )}
-                      
-                      {review.tags && review.tags.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {review.tags.map((tag, index) => (
-                            <span key={index} className="bg-gray-100 text-xs px-2 py-1 rounded">
-                              {tag}
-                            </span>
-                          ))}
+                        
+                        <div className="mt-1">
+                          {renderStars(review.rating)}
                         </div>
-                      )}
+                        
+                        {(review.product_id || review.product) && (
+                          <div className="mt-3 flex items-start border-t border-gray-100 pt-3">
+                            <img 
+                              src={review.productImage || (review.product_id?.thumbnail || dienthoai)} 
+                              alt={review.product || (review.product_id?.name || 'Sản phẩm')} 
+                              className="w-16 h-16 object-cover rounded mr-3"
+                            />
+                            <div>
+                              <p className="text-sm">{review.product || (review.product_id?.name || 'Sản phẩm')}</p>
+                              <p className="text-red-500 font-medium">
+                                {review.price || (review.product_id?.price ? 
+                                  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(review.product_id.price).replace('₫', 'đ') : 
+                                  '')}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {(review.comment || review.content) && (
+                          <p className="mt-2 text-sm text-gray-700">{review.comment || review.content}</p>
+                        )}
+                        
+                        {review.tags && review.tags.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {review.tags.map((tag, index) => (
+                              <span key={index} className="bg-gray-100 text-xs px-2 py-1 rounded">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                // Hiển thị thông báo khi không có đánh giá
+                <div className="bg-white p-8 rounded-lg shadow text-center">
+                  <p className="text-gray-500">Chưa có đánh giá nào cho shop này</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         );
@@ -407,7 +545,14 @@ const ShopDetailTabs = ({ shopDetails }) => {
       
       {/* Tab Content */}
       <div className="container mx-auto px-4">
-        {renderTabContent()}
+        {loading ? (
+          <div className="py-10 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            <p className="mt-2 text-gray-600">Đang tải dữ liệu...</p>
+          </div>
+        ) : (
+          renderTabContent()
+        )}
       </div>
     </div>
   );

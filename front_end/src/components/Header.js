@@ -15,12 +15,13 @@ import {
     MapPin,
     Lock,
     UserCircle,
-    Store // Thêm icon Store cho cửa hàng
+    Store
 } from 'lucide-react';
 import CartModal from '../pages/cart/CartModal';
 import logo from '../assets/logo.png';
 import AuthService from '../services/AuthService';
-// import { useAuth } from '../pages/Login/context/AuthContext'; // Không sử dụng AuthContext
+// Import MessageEventBus từ Message.js
+import { MessageEventBus } from '../pages/UserProfile/components/Message';
 
 const ProductCategoriesSidebar = ({ isOpen, onClose, buttonRef }) => {
     const sidebarRef = useRef(null);
@@ -93,6 +94,8 @@ const Header = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isCategoriesSidebarOpen, setIsCategoriesSidebarOpen] = useState(false);
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+    // State cho số lượng tin nhắn chưa đọc
+    const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
     // Use AuthService directly instead of AuthContext
     const [isLoggedIn, setIsLoggedIn] = useState(AuthService.isLoggedIn());
@@ -101,6 +104,19 @@ const Header = () => {
     const categoriesButtonRef = useRef(null);
     const userDropdownRef = useRef(null);
     const userButtonRef = useRef(null);
+
+    // Lắng nghe sự kiện thay đổi số lượng tin nhắn chưa đọc
+    useEffect(() => {
+        // Đăng ký lắng nghe sự kiện thay đổi số lượng tin nhắn chưa đọc
+        const unsubscribe = MessageEventBus.subscribe('unreadCountChanged', (count) => {
+            setUnreadMessageCount(count);
+        });
+        
+        // Cleanup khi component unmount
+        return () => {
+            unsubscribe();
+        };
+    }, []);
 
     // Lắng nghe sự kiện localStorage thay đổi
     useEffect(() => {
@@ -270,11 +286,17 @@ const Header = () => {
                                 // Nếu đã đăng nhập, hiển thị nút dropdown tài khoản
                                 <button
                                     ref={userButtonRef}
-                                    className="flex flex-col items-center text-gray-600 hover:text-purple-600 text-xs"
+                                    className="flex flex-col items-center text-gray-600 hover:text-purple-600 text-xs relative"
                                     onClick={toggleUserDropdown}
                                 >
                                     <User size={24} />
                                     <span>Tài khoản</span>
+                                    {/* Hiển thị badge khi có tin nhắn chưa đọc */}
+                                    {unreadMessageCount > 0 && (
+                                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                            {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                                        </div>
+                                    )}
                                 </button>
                             ) : (
                                 // Nếu chưa đăng nhập, hiển thị nút chuyển đến trang login
@@ -317,10 +339,16 @@ const Header = () => {
 
                                     <a
                                         href="/user-profile/messages"
-                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center relative"
                                     >
                                         <MessageSquare size={16} className="mr-2" />
                                         Tin nhắn
+                                        {/* Hiển thị badge trong dropdown khi có tin nhắn chưa đọc */}
+                                        {unreadMessageCount > 0 && (
+                                            <div className="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                                {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                                            </div>
+                                        )}
                                     </a>
 
                                     <a
@@ -329,6 +357,14 @@ const Header = () => {
                                     >
                                         <MapPin size={16} className="mr-2" />
                                         Địa chỉ nhận hàng
+                                    </a>
+
+                                    <a
+                                        href="/user-profile/followed-shops"
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                    >
+                                        <Store size={16} className="mr-2" />
+                                        Cửa hàng đã theo dõi
                                     </a>
 
                                     <a

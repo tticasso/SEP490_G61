@@ -4,6 +4,7 @@ import { SearchIcon, UserIcon, HeartIcon, ShoppingCartIcon, ClockIcon, LocationI
 import dongho from '../../assets/ProductDetail.png';
 import ShopOwner from '../../assets/ShopOwner.png';
 import ApiService from '../../services/ApiService';
+import AuthService from '../../services/AuthService';
 // Import Swiper React components
 import { Swiper, SwiperSlide } from 'swiper/react';
 
@@ -21,6 +22,13 @@ const ProductDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [seller, setSeller] = useState(null);
+    const [shopData, setShopData] = useState(null);
+    const [isFollowingShop, setIsFollowingShop] = useState(false);
+    const [followLoading, setFollowLoading] = useState(false);
+
+    // Check if user is logged in
+    const isLoggedIn = AuthService.isLoggedIn();
+    const currentUser = AuthService.getCurrentUser();
 
     // Get product ID from URL
     useEffect(() => {
@@ -46,13 +54,37 @@ const ProductDetail = () => {
                 
                 setProduct(productData);
                 
-                // Fetch seller info if product has creator information
-                if (productData.created_by) {
+                // Fetch shop info if product has shop_id
+                if (productData.shop_id) {
                     try {
-                        const sellerData = await ApiService.get(`/user/find/${productData.created_by}`, false);
-                        setSeller(sellerData);
-                    } catch (sellerError) {
-                        console.error("Error fetching seller data:", sellerError);
+                        // Xử lý trường hợp shop_id có thể là object hoặc string
+                        const shopId = typeof productData.shop_id === 'object' ? 
+                                      productData.shop_id._id || productData.shop_id.id : 
+                                      productData.shop_id;
+                        
+                        // Fetch shop data using the appropriate API endpoint
+                        const shopData = await ApiService.get(`/shops/public/${shopId}`, false);
+                        setShopData(shopData);
+                        
+                        // If the shop has a user_id, fetch that user's data
+                        if (shopData.user_id) {
+                            const userData = await ApiService.get(`/user/${shopData.user_id}`, false);
+                            setSeller(userData);
+                        }
+
+                        // Kiểm tra xem người dùng có follow shop này không (nếu đã đăng nhập)
+                        if (isLoggedIn) {
+                            try {
+                                const followStatus = await ApiService.get(`/shop-follow/status/${shopId}`, true);
+                                setIsFollowingShop(followStatus.isFollowing);
+                            } catch (followError) {
+                                console.error("Error fetching follow status:", followError);
+                                // Mặc định là chưa follow nếu có lỗi
+                                setIsFollowingShop(false);
+                            }
+                        }
+                    } catch (shopError) {
+                        console.error("Error fetching shop data:", shopError);
                         // Don't throw error here, continue with product display
                     }
                 }
@@ -130,7 +162,48 @@ const ProductDetail = () => {
         };
 
         fetchProductData();
-    }, []);
+    }, [isLoggedIn]);
+
+    // Hàm xử lý follow/unfollow shop
+    const handleFollowShop = async () => {
+        try {
+            // Kiểm tra đăng nhập
+            if (!isLoggedIn) {
+                window.location.href = "/login";
+                return;
+            }
+
+            setFollowLoading(true);
+            
+            if (isFollowingShop) {
+                // Nếu đang follow thì unfollow
+                await ApiService.delete(`/shop-follow/unfollow/${getShopId()}`, true);
+                setIsFollowingShop(false);
+                
+                // Giảm số lượng người theo dõi trong UI
+                setShopData(prev => ({
+                    ...prev,
+                    follower: (prev.follower || 0) - 1
+                }));
+            } else {
+                // Nếu chưa follow thì follow
+                await ApiService.post('/shop-follow/follow', { shop_id: getShopId() }, true);
+                setIsFollowingShop(true);
+                
+                // Tăng số lượng người theo dõi trong UI
+                setShopData(prev => ({
+                    ...prev,
+                    follower: (prev.follower || 0) + 1
+                }));
+            }
+            
+            setFollowLoading(false);
+        } catch (error) {
+            console.error("Error handling shop follow:", error);
+            alert("Không thể thực hiện thao tác theo dõi. Vui lòng thử lại sau.");
+            setFollowLoading(false);
+        }
+    };
 
     // Format price in Vietnamese format
     const formatPrice = (price) => {
@@ -190,6 +263,32 @@ const ProductDetail = () => {
     // Safe rendering function to prevent undefined errors
     const safeRender = (value, fallback = "") => {
         return value !== undefined && value !== null ? value : fallback;
+    };
+
+    // Function to handle chat with shop
+    const handleStartChat = async () => {
+        try {
+            if (!isLoggedIn) {
+                window.location.href = "/login";
+                return;
+            }
+            
+            // Get shop ID
+            const shopId = getShopId();
+            if (shopId === 'unknown') {
+                alert("Không thể xác định cửa hàng để chat");
+                return;
+            }
+            
+            // Create conversation with shop
+            await ApiService.post('/conversation/create', { shop_id: shopId }, true);
+            
+            // Redirect to messages page
+            window.location.href = '/user-profile/messages';
+        } catch (error) {
+            console.error("Error starting chat with shop:", error);
+            alert("Không thể bắt đầu cuộc trò chuyện. Vui lòng thử lại sau.");
+        }
     };
 
     // Function to render the active tab content
@@ -338,6 +437,17 @@ const ProductDetail = () => {
         return obj._id || obj.id || 'unknown';
     };
 
+    // Get shop ID for linking to shop details
+    const getShopId = () => {
+        if (shopData) return getSafeId(shopData);
+        if (product.shop_id) {
+            return typeof product.shop_id === 'object' ? 
+                getSafeId(product.shop_id) : 
+                product.shop_id;
+        }
+        return 'unknown';
+    };
+
     return (
         <div className="bg-[#F1F5F9]">
             <div className="max-w-7xl mx-auto bg-[#F1F5F9] py-8">
@@ -409,26 +519,26 @@ const ProductDetail = () => {
                             <div className="flex items-center justify-between border rounded-lg p-3 mb-4">
                                 <div className="flex items-center">
                                     <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden mr-3">
-                                        <a href={`/shop-detail?id=${getSafeId(seller)}`}>
-                                            <img src={ShopOwner} alt="Seller avatar" className="w-full h-full object-cover" />
+                                        <a href={`/shop-detail?id=${getShopId()}`}>
+                                            <img src={shopData?.logo || ShopOwner} alt="Seller avatar" className="w-full h-full object-cover" />
                                         </a>
                                     </div>
                                     <div>
                                         <div className="flex items-center">
-                                            <a href={`/shop-detail?id=${getSafeId(seller)}`} className="font-medium text-sm">
-                                                {seller ? `${seller.firstName || ''} ${seller.lastName || ''}` : 'Shop name'}
+                                            <a href={`/shop-detail?id=${getShopId()}`} className="font-medium text-sm">
+                                                {shopData ? shopData.name : (seller ? `${seller.firstName || ''} ${seller.lastName || ''}` : 'Shop name')}
                                             </a>
                                             <Check size={14} className="ml-1 text-blue-500" />
                                         </div>
                                         <p className="text-xs text-gray-500">
-                                            {seller?.createdAt ? `Thành viên từ ${new Date(seller.createdAt).getFullYear()}` : 'Thành viên'}
+                                            {shopData?.created_at ? `Thành viên từ ${new Date(shopData.created_at).getFullYear()}` : 'Thành viên'}
                                         </p>
                                         <p className="text-xs text-gray-500">* Giao dịch đã được xác minh</p>
                                     </div>
                                 </div>
                                 <div className="text-right border-l-[2px] pl-4">    
                                     <div className="flex items-center justify-end">
-                                        <span className="text-lg font-bold">{safeRender(product.rating, '5')}</span>
+                                        <span className="text-lg font-bold">{safeRender(shopData?.rating || product.rating, '5')}</span>
                                         <span className="text-yellow-500 ml-1">★</span>
                                     </div>
                                     <p className="text-xs text-gray-500">{safeRender(product.sold, '0')} đánh giá</p>
@@ -443,21 +553,43 @@ const ProductDetail = () => {
                                 <button className="border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-lg transition-colors border-blue-600">
                                     <ShoppingCart size={18} className="text-gray-600" />
                                 </button>
-                                <button onClick={() => window.location.href = '/user-profile/messages'} className="border border-gray-300 hover:bg-gray-50 flex-1 py-2 rounded-lg text-gray-600 border-blue-600 font-medium transition-colors">
+                                <button 
+                                    onClick={handleStartChat}
+                                    className="border border-gray-300 hover:bg-gray-50 flex-1 py-2 rounded-lg text-gray-600 border-blue-600 font-medium transition-colors"
+                                >
                                    <p className='flex items-center justify-center gap-2 text-blue-600'><MessageSquareText size={18}/>Chat</p>
                                 </button>
                             </div>
 
-                            {/* Location and time */}
-                            <div className="mt-4 text-sm text-gray-500">
-                                <div className="flex items-center mb-1">
-                                    <MapPin size={14} className="mr-1" />
-                                    <span>{safeRender(product.location, 'Vị trí không rõ')}</span>
+                            {/* Location, time and follow button */}
+                            <div className="mt-4 flex items-center justify-between">
+                                <div className="text-sm text-gray-500">
+                                    <div className="flex items-center mb-1">
+                                        <MapPin size={14} className="mr-1" />
+                                        <span>{safeRender(shopData?.address || product.location, 'Vị trí không rõ')}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <Clock size={14} className="mr-1" />
+                                        <span>{product.created_at ? getTimeAgo(product.created_at) : 'Vừa đăng'}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center">
-                                    <Clock size={14} className="mr-1" />
-                                    <span>{product.created_at ? getTimeAgo(product.created_at) : 'Vừa đăng'}</span>
-                                </div>
+                                
+                                {/* Follow Shop Button */}
+                                <button 
+                                    onClick={handleFollowShop}
+                                    className={`px-4 py-2 rounded-lg ${
+                                        isFollowingShop 
+                                            ? "bg-red-100 text-red-500 hover:bg-red-200" 
+                                            : "bg-blue-100 text-blue-500 hover:bg-blue-200"
+                                    } ${followLoading ? "opacity-50 cursor-not-allowed" : ""} flex items-center text-sm`}
+                                    disabled={followLoading}
+                                >
+                                    {followLoading ? (
+                                        <span className="inline-block h-4 w-4 border-2 border-current border-r-transparent rounded-full animate-spin mr-2"></span>
+                                    ) : null}
+                                    <Heart size={16} className={`mr-1 ${isFollowingShop ? "fill-red-500" : ""}`} />
+                                    {isFollowingShop ? "Đang theo dõi" : "Theo dõi shop"}
+                                </button>
                             </div>
                         </div>
                     </div>

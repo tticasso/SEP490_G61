@@ -7,46 +7,208 @@ import { useNavigate } from 'react-router-dom';
 
 const CheckoutPage = () => {
     const [selectedAddress, setSelectedAddress] = useState(null);
-    const [paymentMethod, setPaymentMethod] = useState(null);
-    const [deliveryMethod, setDeliveryMethod] = useState('standard');
+    const [paymentMethod, setPaymentMethod] = useState(null); // Thêm dòng này
+    const [deliveryMethod, setDeliveryMethod] = useState('standard'); // Thêm dòng này
+    const [paymentMethods, setPaymentMethods] = useState([]);
+    const [deliveryMethods, setDeliveryMethods] = useState([]);
+    const [paymentLoading, setPaymentLoading] = useState(true);
+    const [shippingLoading, setShippingLoading] = useState(true);
+    const [paymentError, setPaymentError] = useState(null);
+    const [shippingError, setShippingError] = useState(null);
     const [addresses, setAddresses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showAddAddressPopup, setShowAddAddressPopup] = useState(false);
+    const [cartItems, setCartItems] = useState([]);
+    const [cartTotal, setCartTotal] = useState(0);
     const navigate = useNavigate();
 
     // Lấy thông tin người dùng từ AuthService
     const currentUser = AuthService.getCurrentUser();
     const userId = currentUser?._id || currentUser?.id || currentUser?.userId || "";
 
-    // Dữ liệu mẫu khi API không hoạt động
-    const mockAddresses = [
-        // {
-        //     _id: "mock-address-1",
-        //     user_id: userId,
-        //     address_line1: "123 Đường Lê Lợi",
-        //     address_line2: "Phường Bến Nghé",
-        //     city: "Hồ Chí Minh",
-        //     country: "Việt Nam",
-        //     phone: "0901234567",
-        //     status: true
-        // },
-        // {
-        //     _id: "mock-address-2",
-        //     user_id: userId,
-        //     address_line1: "45 Đường Nguyễn Huệ",
-        //     address_line2: "Phường Bến Thành",
-        //     city: "Hồ Chí Minh",
-        //     country: "Việt Nam",
-        //     phone: "0907654321",
-        //     status: true
-        // }
-    ];
+
+    const fetchCartData = async () => {
+        try {
+            setLoading(true);
+            const response = await ApiService.get(`/cart/user/${userId}`);
+            if (response && response.items) {
+                setCartItems(response.items);
+
+                // Tính tổng tiền của giỏ hàng
+                const subtotal = response.items.reduce((total, item) => {
+                    const price = item.product_id && typeof item.product_id === 'object'
+                        ? (item.product_id.discounted_price || item.product_id.price || 0)
+                        : 0;
+                    return total + price * item.quantity;
+                }, 0);
+
+                setCartTotal(subtotal);
+            } else {
+                setCartItems([]);
+                setCartTotal(0);
+            }
+            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching cart data:', error);
+            setError('Không thể tải dữ liệu giỏ hàng. Vui lòng thử lại sau.');
+            setLoading(false);
+        }
+    };
+
+    const fetchPaymentMethods = async () => {
+        try {
+            setPaymentLoading(true);
+            const response = await ApiService.get('/payment/list');
+
+            if (Array.isArray(response)) {
+                // Lọc phương thức thanh toán đang hoạt động
+                const activeMethods = response.filter(method => method.is_active && !method.is_delete);
+
+                // Định dạng dữ liệu để sử dụng trong UI
+                const formattedMethods = activeMethods.map(method => ({
+                    id: method._id,
+                    name: method.name,
+                    icon: <Truck /> // Mặc định icon, có thể thay đổi theo loại thanh toán nếu cần
+                }));
+
+                setPaymentMethods(formattedMethods);
+
+                // Tự động chọn phương thức thanh toán đầu tiên nếu có
+                if (formattedMethods.length > 0 && !paymentMethod) {
+                    setPaymentMethod(formattedMethods[0].id);
+                }
+
+                setPaymentError(null);
+            } else {
+                console.warn("API payment/list trả về dữ liệu không phải mảng:", response);
+                setPaymentMethods([
+                    { id: 1, name: 'Thanh toán khi nhận hàng', icon: <Truck /> },
+                    { id: 2, name: 'Thanh toán Momo', icon: <Truck /> },
+                    { id: 3, name: 'Thanh toán VNPay', icon: <Truck /> }
+                ]);
+                setPaymentError("Không thể lấy danh sách phương thức thanh toán, sử dụng dữ liệu mặc định");
+            }
+        } catch (error) {
+            console.error("Lỗi khi lấy phương thức thanh toán:", error);
+            // Fallback đến dữ liệu mặc định khi API lỗi
+            setPaymentMethods([
+                { id: 1, name: 'Thanh toán khi nhận hàng', icon: <Truck /> },
+                { id: 2, name: 'Thanh toán Momo', icon: <Truck /> },
+                { id: 3, name: 'Thanh toán VNPay', icon: <Truck /> }
+            ]);
+            setPaymentError("Không thể lấy danh sách phương thức thanh toán: " + error.message);
+        } finally {
+            setPaymentLoading(false);
+        }
+    };
+
+    const fetchShippingMethods = async () => {
+        try {
+            setShippingLoading(true);
+            const response = await ApiService.get('/shipping/list');
+
+            if (Array.isArray(response) && response.length > 0) {
+                // Định dạng dữ liệu để sử dụng trong UI
+                const formattedMethods = response.map(method => ({
+                    id: method._id,
+                    name: method.name,
+                    price: method.price,
+                    time: method.description || getDefaultTimeDescription(method.name)
+                }));
+
+                setDeliveryMethods(formattedMethods);
+
+                // Tự động chọn phương thức vận chuyển đầu tiên nếu chưa chọn
+                if (formattedMethods.length > 0 && !deliveryMethod) {
+                    setDeliveryMethod(formattedMethods[0].id);
+                }
+
+                setShippingError(null);
+            } else {
+                console.warn("API shipping/list trả về dữ liệu không phải mảng hoặc rỗng:", response);
+                // Fallback đến dữ liệu mặc định
+                setDeliveryMethods([
+                    {
+                        id: 'standard',
+                        name: 'Giao hàng tiêu chuẩn',
+                        price: 15000,
+                        time: '3-5 Ngày'
+                    },
+                    {
+                        id: 'fast',
+                        name: 'Giao hàng nhanh',
+                        price: 25000,
+                        time: '1-2 Ngày'
+                    },
+                    {
+                        id: 'same-day',
+                        name: 'Giao hàng trong ngày',
+                        price: 45000,
+                        time: 'Nhận hàng trong ngày'
+                    },
+                    {
+                        id: 'international',
+                        name: 'Giao hàng quốc tế',
+                        price: 98000,
+                        time: '7-14 Ngày'
+                    }
+                ]);
+                setShippingError("Không thể lấy danh sách phương thức vận chuyển, sử dụng dữ liệu mặc định");
+            }
+        } catch (error) {
+            console.error("Lỗi khi lấy phương thức vận chuyển:", error);
+            // Fallback đến dữ liệu mặc định khi API lỗi
+            setDeliveryMethods([
+                {
+                    id: 'standard',
+                    name: 'Giao hàng tiêu chuẩn',
+                    price: 15000,
+                    time: '3-5 Ngày'
+                },
+                {
+                    id: 'fast',
+                    name: 'Giao hàng nhanh',
+                    price: 25000,
+                    time: '1-2 Ngày'
+                },
+                {
+                    id: 'same-day',
+                    name: 'Giao hàng trong ngày',
+                    price: 45000,
+                    time: 'Nhận hàng trong ngày'
+                },
+                {
+                    id: 'international',
+                    name: 'Giao hàng quốc tế',
+                    price: 98000,
+                    time: '7-14 Ngày'
+                }
+            ]);
+            setShippingError("Không thể lấy danh sách phương thức vận chuyển: " + error.message);
+        } finally {
+            setShippingLoading(false);
+        }
+    };
+
+    const getDefaultTimeDescription = (methodName) => {
+        const methodNameLower = methodName.toLowerCase();
+        if (methodNameLower.includes('standard') || methodNameLower.includes('tiêu chuẩn')) {
+            return '3-5 Ngày';
+        } else if (methodNameLower.includes('fast') || methodNameLower.includes('nhanh')) {
+            return '1-2 Ngày';
+        } else if (methodNameLower.includes('same day') || methodNameLower.includes('trong ngày')) {
+            return 'Nhận hàng trong ngày';
+        } else if (methodNameLower.includes('international') || methodNameLower.includes('quốc tế')) {
+            return '7-14 Ngày';
+        }
+        return '2-7 Ngày';
+    };
 
     // Xử lý phản hồi API
     const processApiResponse = (response) => {
         console.log("Processing API response:", response);
-        
+
         if (Array.isArray(response)) {
             console.log("Response is an array, setting directly:", response);
             setAddresses(response);
@@ -87,120 +249,56 @@ const CheckoutPage = () => {
     const fetchAddresses = async () => {
         try {
             setLoading(true);
-            
-            // Kiểm tra môi trường phát triển - ưu tiên ghi đè biến isDevelopment để dễ debug
-            const isDevelopment = false; // Set false để luôn gọi API, true để sử dụng dữ liệu mẫu
-            
-            if (isDevelopment) {
-                console.log("Đang chạy ở chế độ DEV - Sử dụng dữ liệu mẫu");
-                
-                // Delay giả lập API để tạo trải nghiệm thực tế
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Sử dụng dữ liệu mẫu
-                setAddresses(mockAddresses);
-                if (mockAddresses.length > 0) {
-                    setSelectedAddress(mockAddresses[0]._id);
-                }
-                setError(null);
-                setLoading(false);
-                return;
-            }
-            
-            // Kiểm tra userId
+
             if (!userId) {
                 throw new Error("User ID không tồn tại");
             }
-            
-            console.log("Đang gọi API với userId:", userId);
-            
-            // Kiểm tra các endpoints khác nhau mà backend có thể đã đăng ký
-            const possibleEndpoints = [
-                `/address/list`, // Lấy tất cả địa chỉ rồi lọc phía client
-                `/user-address/list`, // Lấy tất cả địa chỉ rồi lọc phía client  
-                `/user-address/user/${userId}`,
-                `/address/user/${userId}`
-            ];
-            
-            let foundData = false;
-            let lastError = null;
-            
-            // Thử từng endpoint cho đến khi tìm thấy dữ liệu
-            for (const endpoint of possibleEndpoints) {
-                try {
-                    console.log(`Đang thử endpoint: ${endpoint}`);
-                    const response = await ApiService.get(endpoint);
-                    
-                    // Nếu là endpoint list, lọc theo userId
-                    if (endpoint.includes('/list')) {
-                        const allAddresses = Array.isArray(response) ? response : 
-                                        (response.data && Array.isArray(response.data)) ? response.data : [];
-                        
-                        console.log("All addresses before filtering:", allAddresses);
-                        
-                        // Lọc địa chỉ theo userId - chuyển đổi cả hai thành chuỗi để so sánh chắc chắn
-                        const filteredAddresses = allAddresses.filter(addr => 
-                            String(addr.user_id) === String(userId)
-                        );
-                        
-                        console.log("Filtered addresses for userId", userId, ":", filteredAddresses);
-                        
-                        if (filteredAddresses.length > 0) {
-                            setAddresses(filteredAddresses);
-                            setSelectedAddress(filteredAddresses[0]._id);
-                            foundData = true;
-                            setError(null);
-                            console.log(`Endpoint ${endpoint} hoạt động và tìm thấy ${filteredAddresses.length} địa chỉ!`);
-                            break;
-                        } else {
-                            console.log(`Endpoint ${endpoint} hoạt động nhưng không tìm thấy địa chỉ cho userId ${userId}`);
-                        }
-                    } else {
-                        // Nếu là endpoint user, sử dụng dữ liệu trực tiếp
-                        console.log("Direct response from user endpoint:", response);
-                        processApiResponse(response);
-                        foundData = true;
-                        setError(null);
-                        console.log(`Endpoint ${endpoint} hoạt động!`);
-                        break;
+
+            // Sử dụng API địa chỉ chính thức
+            try {
+                // Gọi API lấy địa chỉ của user
+                const addresses = await ApiService.get(`/user-address/user/${userId}`);
+                console.log("Địa chỉ người dùng:", addresses);
+
+                if (Array.isArray(addresses)) {
+                    setAddresses(addresses);
+                    if (addresses.length > 0) {
+                        setSelectedAddress(addresses[0]._id);
                     }
-                } catch (apiError) {
-                    console.log(`Endpoint ${endpoint} không hoạt động:`, apiError.message);
-                    lastError = apiError;
+                    setError(null);
+                } else {
+                    console.warn("API trả về dữ liệu không phải mảng:", addresses);
+                    setAddresses([]);
+                    setError("Không thể lấy danh sách địa chỉ");
+                }
+            } catch (apiError) {
+                console.error("Lỗi khi gọi API user-address:", apiError);
+
+                // Thử với endpoint thay thế
+                try {
+                    const addresses = await ApiService.get(`/address/user/${userId}`);
+                    console.log("Địa chỉ người dùng (endpoint thay thế):", addresses);
+
+                    if (Array.isArray(addresses)) {
+                        setAddresses(addresses);
+                        if (addresses.length > 0) {
+                            setSelectedAddress(addresses[0]._id);
+                        }
+                        setError(null);
+                    } else {
+                        console.warn("API thay thế trả về dữ liệu không phải mảng:", addresses);
+                        setAddresses([]);
+                        setError("Không thể lấy danh sách địa chỉ");
+                    }
+                } catch (secondApiError) {
+                    console.error("Lỗi khi gọi API address thay thế:", secondApiError);
+                    setAddresses([]);
+                    setError("Không thể lấy danh sách địa chỉ. Vui lòng thêm địa chỉ mới.");
                 }
             }
-            
-            // Nếu không tìm thấy dữ liệu từ bất kỳ endpoint nào
-            if (!foundData) {
-                console.log("Không tìm thấy dữ liệu từ API, sử dụng dữ liệu mẫu");
-                setAddresses(mockAddresses);
-                if (mockAddresses.length > 0) {
-                    setSelectedAddress(mockAddresses[0]._id);
-                }
-                
-                // Thông báo lỗi nhưng vẫn hiển thị dữ liệu mẫu
-                setError("Không tìm thấy địa chỉ. " + (lastError?.message || "API không tồn tại"));
-            }
-            
         } catch (err) {
             console.error("Error fetching addresses:", err);
-            let errorMessage = "Không thể tải danh sách địa chỉ";
-            
-            if (err.message) {
-                if (err.message.includes("401")) {
-                    errorMessage += ": Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại";
-                } else if (err.message.includes("404")) {
-                    errorMessage += ": API không tồn tại hoặc đường dẫn không đúng";
-                } else if (err.message.includes("500")) {
-                    errorMessage += ": Lỗi máy chủ, vui lòng thử lại sau";
-                } else if (err.message.includes("User ID")) {
-                    errorMessage += ": Vui lòng đăng nhập để xem địa chỉ của bạn";
-                } else {
-                    errorMessage += `: ${err.message}`;
-                }
-            }
-            
-            setError(errorMessage);
+            setError(err.message || "Không thể tải danh sách địa chỉ");
             setAddresses([]);
         } finally {
             setLoading(false);
@@ -209,18 +307,17 @@ const CheckoutPage = () => {
 
     // Khởi tạo state ban đầu
     useEffect(() => {
-        // In ra thông tin user hiện tại để debug
-        console.log("Current user object:", currentUser);
-        console.log("User ID being used:", userId);
-        
         if (userId) {
+            fetchCartData();
             fetchAddresses();
+            fetchPaymentMethods();
+            fetchShippingMethods();
         } else {
             setLoading(false);
             setError("Vui lòng đăng nhập để tiếp tục thanh toán.");
         }
     }, [userId]);
-    
+
     // Kiểm tra kết nối API chung
     useEffect(() => {
         const checkServerStatus = async () => {
@@ -230,7 +327,7 @@ const CheckoutPage = () => {
                     method: 'GET'
                 });
                 console.log("Server status:", response.status);
-                
+
                 if (response.status === 404) {
                     console.log("API auth/check không tồn tại, nhưng server đang chạy");
                     await checkAvailableEndpoints();
@@ -240,7 +337,7 @@ const CheckoutPage = () => {
                 setError("Không thể kết nối đến server. Vui lòng kiểm tra xem server đã được khởi động chưa.");
             }
         };
-        
+
         // Kiểm tra các endpoint có sẵn
         const checkAvailableEndpoints = async () => {
             try {
@@ -249,7 +346,7 @@ const CheckoutPage = () => {
                     '/user-address/list',
                     '/address/list'
                 ];
-                
+
                 for (const endpoint of endpoints) {
                     try {
                         const resp = await fetch(`http://localhost:9999/api${endpoint}`, {
@@ -260,7 +357,7 @@ const CheckoutPage = () => {
                             }
                         });
                         console.log(`API endpoint ${endpoint} status:`, resp.status);
-                        
+
                         if (resp.status !== 404) {
                             console.log(`Endpoint ${endpoint} có thể được sử dụng`);
                         }
@@ -272,7 +369,7 @@ const CheckoutPage = () => {
                 console.error("Lỗi khi kiểm tra endpoints:", err);
             }
         };
-        
+
         checkServerStatus();
     }, []);
 
@@ -288,6 +385,7 @@ const CheckoutPage = () => {
     // Lưu địa chỉ mới
     const handleSaveAddress = async (newAddressData) => {
         try {
+            // Format dữ liệu cho API
             const formattedAddress = {
                 user_id: userId,
                 address_line1: newAddressData.address,
@@ -297,60 +395,35 @@ const CheckoutPage = () => {
                 phone: newAddressData.phone,
                 status: true
             };
-        
-            console.log("Đang gửi dữ liệu:", formattedAddress);
-            
-            // Kiểm tra môi trường phát triển
-            const isDevelopment = false; // Ghi đè để luôn gọi API
-            
-            if (isDevelopment) {
-                console.log("Đang chạy ở chế độ DEV - Thêm địa chỉ vào dữ liệu mẫu");
-                
-                // Delay giả lập API
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Thêm địa chỉ mới vào state
-                const newAddress = {
-                    _id: `mock-address-${Date.now()}`,
-                    ...formattedAddress,
-                    status: true
-                };
-                
-                setAddresses(prevAddresses => [...prevAddresses, newAddress]);
-                setSelectedAddress(newAddress._id);
-                setShowAddAddressPopup(false);
-                return;
-            }
-            
+
+            console.log("Đang gửi dữ liệu địa chỉ mới:", formattedAddress);
+
             let savedAddress = null;
-            
+
             try {
-                // Thử với endpoint mới trước
-                savedAddress = await ApiService.post('/address/create', formattedAddress);
-                console.log("Address created successfully with new endpoint:", savedAddress);
-            } catch (apiError) {
-                console.log("Thử lại với endpoint thay thế", apiError);
-                // Thử lại với endpoint cũ nếu endpoint mới không hoạt động
+                // Thử với API user-address trước
                 savedAddress = await ApiService.post('/user-address/create', formattedAddress);
-                console.log("Address created successfully with old endpoint:", savedAddress);
+                console.log("Đã tạo địa chỉ thành công với API user-address:", savedAddress);
+            } catch (apiError) {
+                console.log("Thử lại với API address thay thế", apiError);
+                // Thử lại với API address nếu API user-address không hoạt động
+                savedAddress = await ApiService.post('/address/create', formattedAddress);
+                console.log("Đã tạo địa chỉ thành công với API address:", savedAddress);
             }
-            
-            // Tạo địa chỉ tạm thời dựa trên dữ liệu đã gửi để cập nhật UI ngay lập tức
-            const tempAddress = {
-                _id: savedAddress?._id || `temp-address-${Date.now()}`,
-                ...formattedAddress
-            };
-            
-            // Cập nhật state UI trước để phản hồi ngay cho người dùng
-            setAddresses(prevAddresses => [...prevAddresses, tempAddress]);
-            setSelectedAddress(tempAddress._id);
-            
-            // Sau đó tải lại dữ liệu từ server sau một khoảng thời gian nhỏ
-            setTimeout(() => {
-                fetchAddresses(); // Refresh data after adding
-            }, 1000);
-            
-            setShowAddAddressPopup(false);
+
+            // Cập nhật state UI
+            if (savedAddress && savedAddress._id) {
+                // Thêm địa chỉ mới vào state
+                setAddresses(prevAddresses => [...prevAddresses, savedAddress]);
+                // Chọn địa chỉ mới làm địa chỉ hiện tại
+                setSelectedAddress(savedAddress._id);
+                // Đóng popup
+                setShowAddAddressPopup(false);
+            } else {
+                // Tải lại danh sách địa chỉ
+                fetchAddresses();
+                setShowAddAddressPopup(false);
+            }
         } catch (err) {
             console.error("Error saving address:", err);
             alert("Không thể lưu địa chỉ. Vui lòng kiểm tra lại thông tin và thử lại.");
@@ -359,41 +432,17 @@ const CheckoutPage = () => {
 
     // Chuyển đến trang chỉnh sửa địa chỉ
     const handleEditAddress = (addressId) => {
-        navigate(`/account/addresses?edit=${addressId}`);
+        navigate(`/account/addresses/edit/${addressId}`);
     };
 
     // Xóa địa chỉ
     const handleDeleteAddress = async (addressId) => {
         if (window.confirm("Bạn có chắc muốn xóa địa chỉ này không?")) {
             try {
-                // Kiểm tra môi trường phát triển
-                const isDevelopment = false; // Set false để luôn gọi API
-                
-                if (isDevelopment) {
-                    console.log("Đang chạy ở chế độ DEV - Xóa địa chỉ mẫu");
-                    
-                    // Delay giả lập API
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    
-                    // Xóa địa chỉ khỏi state
-                    setAddresses(prevAddresses => prevAddresses.filter(addr => addr._id !== addressId));
-                    
-                    // Nếu xóa địa chỉ đang được chọn, cập nhật lại selectedAddress
-                    if (selectedAddress === addressId) {
-                        const remainingAddresses = addresses.filter(addr => addr._id !== addressId);
-                        if (remainingAddresses.length > 0) {
-                            setSelectedAddress(remainingAddresses[0]._id);
-                        } else {
-                            setSelectedAddress(null);
-                        }
-                    }
-                    return;
-                }
-                
                 // Cập nhật UI trước để phản hồi ngay cho người dùng
                 const remainingAddresses = addresses.filter(addr => addr._id !== addressId);
                 setAddresses(remainingAddresses);
-                
+
                 // Nếu xóa địa chỉ đang được chọn, cập nhật lại selectedAddress
                 if (selectedAddress === addressId) {
                     if (remainingAddresses.length > 0) {
@@ -402,18 +451,17 @@ const CheckoutPage = () => {
                         setSelectedAddress(null);
                     }
                 }
-                
+
                 try {
-                    // Thử với endpoint mới trước
-                    await ApiService.delete(`/address/delete/${addressId}`);
-                    console.log("Address deleted successfully with new endpoint");
-                } catch (apiError) {
-                    console.log("Thử lại với endpoint thay thế", apiError);
-                    // Thử lại với endpoint cũ nếu endpoint mới không hoạt động
+                    // Thử với API user-address trước
                     await ApiService.delete(`/user-address/delete/${addressId}`);
-                    console.log("Address deleted successfully with old endpoint");
+                    console.log("Đã xóa địa chỉ thành công với API user-address");
+                } catch (apiError) {
+                    console.log("Thử lại với API address thay thế", apiError);
+                    // Thử lại với API address nếu API user-address không hoạt động
+                    await ApiService.delete(`/address/delete/${addressId}`);
+                    console.log("Đã xóa địa chỉ thành công với API address");
                 }
-                
             } catch (err) {
                 console.error("Error deleting address:", err);
                 alert("Không thể xóa địa chỉ. Vui lòng thử lại sau.");
@@ -426,18 +474,18 @@ const CheckoutPage = () => {
     // Lấy tên người dùng từ user hiện tại
     const getUserName = () => {
         if (!currentUser) return "Không có tên";
-        
+
         // Ưu tiên lấy tên từ currentUser
         const fullName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim();
-        
+
         // Nếu không có tên trong currentUser, kiểm tra xem có trường name không
         if (fullName) return fullName;
         if (currentUser.name) return currentUser.name;
-        
+
         // Nếu không có tên, lấy email hoặc username (nếu có)
         if (currentUser.email) return currentUser.email.split('@')[0]; // Lấy phần username từ email
         if (currentUser.username) return currentUser.username;
-        
+
         return "Không có tên";
     };
 
@@ -445,7 +493,7 @@ const CheckoutPage = () => {
     const formatAddressForDisplay = (addressItem) => {
         // Lấy tên người dùng
         const name = getUserName();
-        
+
         return {
             id: addressItem._id,
             name: name,
@@ -459,53 +507,63 @@ const CheckoutPage = () => {
         fetchAddresses();
     };
 
-    const paymentMethods = [
-        { id: 1, name: 'Thanh toán khi nhận hàng', icon: <Truck /> },
-        { id: 2, name: 'Thanh toán Momo', icon: <Truck /> },
-        { id: 3, name: 'Thanh toán VNPay', icon: <Truck /> }
-    ];
-
-    const deliveryMethods = [
-        {
-            id: 'standard',
-            name: 'Giao hàng tiêu chuẩn',
-            price: 15000,
-            time: '3-5 Ngày'
-        },
-        {
-            id: 'fast',
-            name: 'Giao hàng nhanh',
-            price: 25000,
-            time: '1-2 Ngày'
-        },
-        {
-            id: 'same-day',
-            name: 'Giao hàng trong ngày',
-            price: 45000,
-            time: 'Nhận hàng trong ngày'
-        },
-        {
-            id: 'international',
-            name: 'Giao hàng quốc tế',
-            price: 98000,
-            time: '7-14 Ngày'
-        }
-    ];
-
-    const cartItems = [
-        {
-            id: 1,
-            name: 'Khẩu trang 5d xám, Khẩu trang 5d xịn xò, 100 chiếc giá sale',
-            price: 180000,
-            quantity: 1,
-            image: '/path/to/mask-image.jpg'
-        }
-    ];
 
     const calculateTotal = () => {
-        const subtotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-        const deliveryPrice = deliveryMethods.find(method => method.id === deliveryMethod)?.price || 0;
+        const subtotal = cartTotal;
+        const selectedShippingMethod = deliveryMethods.find(method => method.id === deliveryMethod);
+        const deliveryPrice = selectedShippingMethod ? selectedShippingMethod.price : 0;
         return subtotal + deliveryPrice;
+    };
+
+    const handlePlaceOrder = async () => {
+        if (!selectedAddress || !paymentMethod || cartItems.length === 0) {
+            alert("Vui lòng chọn đầy đủ địa chỉ, phương thức thanh toán và có sản phẩm trong giỏ hàng");
+            return;
+        }
+
+        try {
+            // Hiển thị loading
+            setLoading(true);
+
+            // Chuẩn bị dữ liệu đơn hàng
+            const orderItems = cartItems.map(item => ({
+                product_id: typeof item.product_id === 'object' ? item.product_id._id : item.product_id,
+                quantity: item.quantity,
+                cart_id: item.cart_id,
+                discount_id: item.discount_id
+            }));
+
+            // Tạo payload cho API
+            const orderPayload = {
+                customer_id: userId,
+                shipping_id: deliveryMethod, // Đã là ID của phương thức vận chuyển từ API
+                payment_id: paymentMethod, // Đã là ID của phương thức thanh toán từ API
+                user_address_id: selectedAddress, // ID của địa chỉ đã chọn
+                orderItems: orderItems,
+                order_payment_id: `PAY-${Date.now()}`, // Tạo ID thanh toán tạm thời
+                discount_id: null, // Có thể thêm mã giảm giá nếu có
+                coupon_id: null // Có thể thêm coupon nếu có
+            };
+
+            // Gọi API tạo đơn hàng
+            const response = await ApiService.post('/order/create', orderPayload);
+
+            // Xử lý khi đặt hàng thành công
+            if (response && response.order) {
+                // Xóa giỏ hàng sau khi đặt hàng thành công
+                if (cartItems.length > 0 && cartItems[0].cart_id) {
+                    await ApiService.delete(`/cart/clear/${cartItems[0].cart_id}`);
+                }
+
+                // Chuyển hướng đến trang xác nhận đơn hàng
+                window.location.href = `/order-confirmation?orderId=${response.order._id}`;
+            }
+        } catch (error) {
+            console.error("Error creating order:", error);
+            alert(`Đã xảy ra lỗi khi đặt hàng: ${error.message || 'Vui lòng thử lại sau'}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -526,7 +584,7 @@ const CheckoutPage = () => {
                                 </button>
                             )}
                         </div>
-                        
+
                         {loading ? (
                             <div className="text-center py-4">Đang tải địa chỉ...</div>
                         ) : error && addresses.length === 0 ? (
@@ -572,21 +630,21 @@ const CheckoutPage = () => {
                                             <div className="flex justify-between">
                                                 <span className="font-medium">{displayAddress.name} - {displayAddress.phone}</span>
                                                 <div className="flex space-x-2">
-                                                    <Edit2 
-                                                        size={16} 
-                                                        className="text-blue-500 cursor-pointer" 
+                                                    <Edit2
+                                                        size={16}
+                                                        className="text-blue-500 cursor-pointer"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleEditAddress(addressItem._id);
-                                                        }} 
+                                                        }}
                                                     />
-                                                    <Trash2 
-                                                        size={16} 
-                                                        className="text-red-500 cursor-pointer" 
+                                                    <Trash2
+                                                        size={16}
+                                                        className="text-red-500 cursor-pointer"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleDeleteAddress(addressItem._id);
-                                                        }} 
+                                                        }}
                                                     />
                                                 </div>
                                             </div>
@@ -596,9 +654,9 @@ const CheckoutPage = () => {
                                 );
                             })
                         )}
-                        
+
                         {!loading && (
-                            <button 
+                            <button
                                 className="w-full border p-4 rounded text-purple-600 font-medium mt-2"
                                 onClick={handleAddAddress}
                             >
@@ -610,6 +668,12 @@ const CheckoutPage = () => {
                     {/* Payment Method Section */}
                     <div className="mb-6">
                         <h2 className="text-xl font-bold mb-4">Phương thức thanh toán</h2>
+                        {paymentLoading ? (
+                            <div className="text-center py-4">Đang tải phương thức thanh toán...</div>
+                        ) : paymentError ? (
+                            <div className="text-orange-500 mb-2">{paymentError}</div>
+                        ) : null}
+
                         {paymentMethods.map((method) => (
                             <div
                                 key={method.id}
@@ -632,6 +696,12 @@ const CheckoutPage = () => {
                     {/* Delivery Method Section */}
                     <div>
                         <h2 className="text-xl font-bold mb-4">Phương thức giao hàng</h2>
+                        {shippingLoading ? (
+                            <div className="text-center py-4">Đang tải phương thức vận chuyển...</div>
+                        ) : shippingError ? (
+                            <div className="text-orange-500 mb-2">{shippingError}</div>
+                        ) : null}
+
                         {deliveryMethods.map((method) => (
                             <div
                                 key={method.id}
@@ -660,22 +730,30 @@ const CheckoutPage = () => {
                 {/* Right Column - Order Summary */}
                 <div>
                     <div className="bg-white shadow-md rounded-lg p-6">
-                        <div className="flex items-center mb-4">
-                            <img
-                                src={khautrang5d}
-                                alt="Product"
-                                className="w-20 h-20 object-cover mr-4 rounded"
-                            />
-                            <div>
-                                <h3 className="font-medium">Khẩu trang 5d xám, Khẩu trang 5d xịn xò, 100 chiếc giá sale</h3>
-                                <p className="text-gray-600">180.000đ</p>
-                            </div>
-                        </div>
+                        {cartItems.length > 0 ? (
+                            cartItems.map((item) => (
+                                <div className="flex items-center mb-4" key={item._id}>
+                                    <img
+                                        src={item.product_id?.thumbnail}
+                                        alt={item.product_id?.name || "Sản phẩm"}
+                                        className="w-20 h-20 object-cover mr-4 rounded"
+                                    />
+                                    <div>
+                                        <h3 className="font-medium">{item.product_id?.name || "Sản phẩm"}</h3>
+                                        <p className="text-gray-600">
+                                            {((item.product_id?.discounted_price || item.product_id?.price) || 0).toLocaleString()}đ x {item.quantity}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center p-4 text-gray-500">Giỏ hàng trống</div>
+                        )}
                         <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
                         <div className="pt-4">
                             <div className="flex justify-between mt-4">
                                 <span>Tổng đơn hàng</span>
-                                <span>180.000đ</span>
+                                <span>{cartTotal.toLocaleString()}đ</span>
                             </div>
                             <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
                             <div className="flex justify-between mt-4">
@@ -684,9 +762,9 @@ const CheckoutPage = () => {
                             </div>
                             <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
                             <div className="flex justify-between mt-4">
-                                <span>Phi giao hàng</span>
+                                <span>Phí giao hàng</span>
                                 <span>
-                                    {deliveryMethods.find(method => method.id === deliveryMethod)?.price.toLocaleString()}đ
+                                    {(deliveryMethods.find(method => method.id === deliveryMethod)?.price || 0).toLocaleString()}đ
                                 </span>
                             </div>
                             <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
@@ -696,19 +774,21 @@ const CheckoutPage = () => {
                             </div>
                         </div>
 
-                        <button 
-                            className={`w-full py-3 rounded-lg mt-4 ${
-                                !selectedAddress || !paymentMethod
-                                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                    : 'bg-purple-600 text-white hover:bg-purple-700'
-                            }`}
-                            disabled={!selectedAddress || !paymentMethod}
+                        <button
+                            className={`w-full py-3 rounded-lg mt-4 ${!selectedAddress || !paymentMethod || cartItems.length === 0
+                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                                }`}
+                            disabled={!selectedAddress || !paymentMethod || cartItems.length === 0}
+                            onClick={handlePlaceOrder}
                         >
-                            {!selectedAddress 
-                                ? 'Vui lòng chọn địa chỉ giao hàng' 
-                                : !paymentMethod 
+                            {!selectedAddress
+                                ? 'Vui lòng chọn địa chỉ giao hàng'
+                                : !paymentMethod
                                     ? 'Vui lòng chọn phương thức thanh toán'
-                                    : 'Thanh toán'}
+                                    : cartItems.length === 0
+                                        ? 'Giỏ hàng trống'
+                                        : 'Thanh toán'}
                         </button>
                         <p className="text-center text-sm text-gray-600 mt-2">
                             Bạn muốn dùng thêm mã giảm giá hoặc thay đổi số lượng sản phẩm hãy{' '}
@@ -740,18 +820,18 @@ const AddAddressPopup = ({ onClose, onSave }) => {
         address: '',
         address_line2: ''
     });
-    
+
     const [provinces, setProvinces] = useState([]);
     const [districts, setDistricts] = useState([]);
     const [wards, setWards] = useState([]);
-    
+
     // Tải dữ liệu tỉnh/thành phố khi component được mount
     useEffect(() => {
         const fetchProvinces = async () => {
             try {
                 const response = await fetch('https://esgoo.net/api-tinhthanh/1/0.htm');
                 const data = await response.json();
-                
+
                 if (data.error === 0) {
                     setProvinces(data.data);
                 } else {
@@ -761,16 +841,16 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                 console.error('Lỗi khi gọi API tỉnh/thành phố:', error);
             }
         };
-        
+
         fetchProvinces();
     }, []);
-    
+
     // Lấy dữ liệu quận/huyện khi chọn tỉnh/thành phố
     const fetchDistricts = async (provinceId) => {
         try {
             const response = await fetch(`https://esgoo.net/api-tinhthanh/2/${provinceId}.htm`);
             const data = await response.json();
-            
+
             if (data.error === 0) {
                 setDistricts(data.data);
                 setWards([]); // Reset danh sách phường/xã
@@ -788,13 +868,13 @@ const AddAddressPopup = ({ onClose, onSave }) => {
             console.error('Lỗi khi gọi API quận/huyện:', error);
         }
     };
-    
+
     // Lấy dữ liệu phường/xã khi chọn quận/huyện
     const fetchWards = async (districtId) => {
         try {
             const response = await fetch(`https://esgoo.net/api-tinhthanh/3/${districtId}.htm`);
             const data = await response.json();
-            
+
             if (data.error === 0) {
                 setWards(data.data);
                 setFormData(prev => ({
@@ -814,17 +894,17 @@ const AddAddressPopup = ({ onClose, onSave }) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
     };
-    
+
     const handleProvinceChange = (e) => {
         const provinceId = e.target.value;
         const selectedProvince = provinces.find(p => p.id === provinceId);
-        
+
         setFormData({
             ...formData,
             provinceId,
             provinceName: selectedProvince ? selectedProvince.full_name : ''
         });
-        
+
         if (provinceId !== '0') {
             fetchDistricts(provinceId);
         } else {
@@ -832,28 +912,28 @@ const AddAddressPopup = ({ onClose, onSave }) => {
             setWards([]);
         }
     };
-    
+
     const handleDistrictChange = (e) => {
         const districtId = e.target.value;
         const selectedDistrict = districts.find(d => d.id === districtId);
-        
+
         setFormData({
             ...formData,
             districtId,
             districtName: selectedDistrict ? selectedDistrict.full_name : ''
         });
-        
+
         if (districtId !== '0') {
             fetchWards(districtId);
         } else {
             setWards([]);
         }
     };
-    
+
     const handleWardChange = (e) => {
         const wardId = e.target.value;
         const selectedWard = wards.find(w => w.id === wardId);
-        
+
         setFormData({
             ...formData,
             wardId,
@@ -863,16 +943,16 @@ const AddAddressPopup = ({ onClose, onSave }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
+
         // Kiểm tra xem đã chọn đầy đủ địa chỉ chưa
         if (formData.provinceId === '0' || formData.districtId === '0' || formData.wardId === '0') {
             alert('Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã');
             return;
         }
-        
+
         // Tạo chuỗi địa chỉ đầy đủ
         const fullAddress = `${formData.address}, ${formData.wardName}, ${formData.districtName}, ${formData.provinceName}`;
-        
+
         onSave({
             phone: formData.phone,
             address: fullAddress,
@@ -900,7 +980,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             required
                         />
                     </div>
-                    
+
                     <div>
                         <label htmlFor="country" className="block text-sm text-gray-600 mb-1">Quốc gia</label>
                         <select
@@ -913,7 +993,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             <option value="Việt Nam">Việt Nam</option>
                         </select>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 gap-4">
                         <div>
                             <label htmlFor="provinceId" className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố</label>
@@ -931,7 +1011,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                                 ))}
                             </select>
                         </div>
-                        
+
                         <div>
                             <label htmlFor="districtId" className="block text-sm text-gray-600 mb-1">Quận / Huyện</label>
                             <select
@@ -949,7 +1029,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                                 ))}
                             </select>
                         </div>
-                        
+
                         <div>
                             <label htmlFor="wardId" className="block text-sm text-gray-600 mb-1">Phường / Xã</label>
                             <select
@@ -968,7 +1048,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             </select>
                         </div>
                     </div>
-                    
+
                     <div>
                         <label htmlFor="address" className="block text-sm text-gray-600 mb-1">Địa chỉ cụ thể</label>
                         <input
@@ -982,7 +1062,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             required
                         />
                     </div>
-                    
+
                     <div>
                         <label htmlFor="address_line2" className="block text-sm text-gray-600 mb-1">Địa chỉ bổ sung (không bắt buộc)</label>
                         <input
@@ -995,7 +1075,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             className="border p-2 rounded-md w-full"
                         />
                     </div>
-                    
+
                     <div className="flex justify-end space-x-3 mt-6">
                         <button
                             type="button"

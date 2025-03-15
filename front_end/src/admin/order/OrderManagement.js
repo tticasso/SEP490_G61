@@ -52,9 +52,25 @@ const OrderManagement = () => {
     try {
       setLoading(true);
       let endpoint = '/order/list';
-
+  
       const response = await ApiService.get(endpoint);
+      console.log("====== ORDER LIST DEBUG ======");
       console.log("Orders response:", response);
+      
+      // Kiểm tra thông tin khách hàng trong đơn hàng đầu tiên (nếu có)
+      if (response && response.length > 0) {
+        console.log("First order:", response[0]);
+        console.log("Customer data in first order:", response[0].customer_id);
+        
+        // Xem xét cấu trúc của tất cả các đơn hàng để tìm vấn đề
+        const customerDataTypes = response.map(order => ({
+          orderId: order.id,
+          customerIdType: typeof order.customer_id,
+          hasFirstName: order.customer_id ? Boolean(order.customer_id.firstName) : false
+        }));
+        console.log("Customer data analysis:", customerDataTypes);
+      }
+      
       setOrders(response);
       setTotalItems(response.length);
       setLoading(false);
@@ -105,12 +121,12 @@ const OrderManagement = () => {
     // Apply search
     if (searchTerm) {
       result = result.filter(order =>
-        order._id.toString().includes(searchTerm) ||
-        (order.customer_id && 
-         ((order.customer_id.firstName && order.customer_id.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (order.customer_id.lastName && order.customer_id.lastName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (order.customer_id.email && order.customer_id.email.toLowerCase().includes(searchTerm.toLowerCase()))
-         )
+        (order.id && order.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (order.customer_id &&
+          ((order.customer_id.firstName && order.customer_id.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (order.customer_id.lastName && order.customer_id.lastName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (order.customer_id.email && order.customer_id.email.toLowerCase().includes(searchTerm.toLowerCase()))
+          )
         ) ||
         order.total_price.toString().includes(searchTerm)
       );
@@ -382,7 +398,7 @@ const OrderManagement = () => {
               <div className="w-full md:w-auto">
                 <input
                   type="text"
-                  placeholder="Tìm kiếm..."
+                  placeholder="Tìm theo mã đơn hàng (ORD-...) hoặc thông tin khách hàng..."
                   className="border border-gray-300 rounded-md px-3 py-2 w-full"
                   value={searchTerm}
                   onChange={handleSearch}
@@ -432,7 +448,7 @@ const OrderManagement = () => {
                       currentOrders.map((order) => (
                         <tr key={order._id} className="hover:bg-gray-50">
                           <td className="py-4 px-4 text-sm text-gray-900">
-                            #{order._id.substring(0, 8)}
+                            {order.id}
                           </td>
                           <td className="py-4 px-4 text-sm text-gray-900">
                             {order.customer_id?.firstName} {order.customer_id?.lastName || 'Không có tên'}
@@ -513,8 +529,8 @@ const OrderManagement = () => {
                           <button
                             key={pageNumber}
                             className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${currentPage === pageNumber
-                                ? 'bg-pink-500 text-white'
-                                : 'text-gray-700'
+                              ? 'bg-pink-500 text-white'
+                              : 'text-gray-700'
                               }`}
                             onClick={() => goToPage(pageNumber)}
                           >

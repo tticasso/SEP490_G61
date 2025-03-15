@@ -31,6 +31,7 @@ import StoreRequestsPage from './admin/store/StoreRequestsPage';
 import { AuthProvider } from './pages/Login/context/AuthContext';
 import ProtectedRoute, { AdminRoute, SellerRoute } from './route/ProtectedRoute';
 import MyShop from './Seller/MyShop';
+import OrderConfirmation from './pages/orderConfirm/OrderConfirmation';
 
 function App() {
   const location = useLocation();
@@ -58,6 +59,12 @@ function App() {
           <Route path="/user-profile/*" element={
             <ProtectedRoute>
               <UserProfile />
+            </ProtectedRoute>
+          } />
+          // Thêm route cho trang OrderConfirmation (khi đặt hàng thành công)
+          <Route path="/order-confirmation" element={
+            <ProtectedRoute>
+              <OrderConfirmation />
             </ProtectedRoute>
           } />
           <Route path="/cart" element={

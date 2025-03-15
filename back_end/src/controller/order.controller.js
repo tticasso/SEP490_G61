@@ -9,12 +9,16 @@ const Coupon = db.coupon;  // Add Coupon model
 const getAllOrders = async (req, res) => {
     try {
         const orders = await Order.find({ is_delete: false })
-            .populate('customer_id', 'name email')
+            .populate({
+                path: 'customer_id',
+                model: 'users', // Đảm bảo tên model đúng
+                select: 'firstName lastName email phone' // Chọn các trường cần lấy
+            })
             .populate('shipping_id')
             .populate('payment_id')
             .populate('discount_id')
-            .populate('coupon_id')  // Add coupon population
-            .populate('user_address_id');
+            .populate('coupon_id')
+            .populate('user_address_id'); 
         res.status(200).json(orders);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -25,11 +29,15 @@ const getAllOrders = async (req, res) => {
 const getOrderById = async (req, res) => {
     try {
         const order = await Order.findById(req.params.id)
-            .populate('customer_id', 'name email')
+            .populate({
+                path: 'customer_id',
+                model: 'users',
+                select: 'firstName lastName email phone'
+            })
             .populate('shipping_id')
             .populate('payment_id')
             .populate('discount_id')
-            .populate('coupon_id')  // Add coupon population
+            .populate('coupon_id')
             .populate('user_address_id');
 
         if (!order) {
@@ -54,11 +62,15 @@ const getOrdersByUserId = async (req, res) => {
             customer_id: req.params.userId,
             is_delete: false
         })
-            .populate('customer_id', 'name email')
+            .populate({
+                path: 'customer_id',
+                model: 'users',
+                select: 'firstName lastName email phone'
+            })
             .populate('shipping_id')
             .populate('payment_id')
             .populate('discount_id')
-            .populate('coupon_id')  // Add coupon population
+            .populate('coupon_id')
             .populate('user_address_id')
             .sort({ created_at: -1 });
 

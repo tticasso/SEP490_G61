@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProfileContent from './components/ProfileContent'
 import PasswordChange from './components/PasswordChange'
-import Orders from './components/Orders'
 import Message from './components/Message'
 import Sidebar from './Sidebar'
 import ShippingAddresses from './components/ShippingAddresses'
 import FollowedShops from './components/FollowedShops'; // Import component mới
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
+import UserOrders from './components/UserOrders';
+import OrderDetail from './components/OrderDetail';
 
 // Main UserProfile Component
 const UserProfile = () => {
@@ -23,14 +24,14 @@ const UserProfile = () => {
         setLoading(true);
         // Lấy id của người dùng từ AuthService
         const currentUser = AuthService.getCurrentUser();
-        
+
         if (!currentUser) {
           throw new Error("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
         }
-        
+
         // Gọi API để lấy thông tin chi tiết của người dùng
         const userData = await ApiService.get(`/user/find/${currentUser.email}`);
-        
+
         // Xử lý dữ liệu nhận được từ API
         let formattedData = {
           ...userData,
@@ -87,13 +88,13 @@ const UserProfile = () => {
       if (!currentUser) {
         throw new Error("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
       }
-      
+
       // Format ngày sinh theo định dạng yyyy-mm-dd
       const day = updatedProfile.birthDate.day.padStart(2, '0');
       const month = updatedProfile.birthDate.month.padStart(2, '0');
       const year = updatedProfile.birthDate.year;
       const birthDateString = `${year}-${month}-${day}`;
-      
+
       // Chuẩn bị dữ liệu để gửi lên API
       const profileToUpdate = {
         firstName: updatedProfile.firstName,
@@ -102,32 +103,32 @@ const UserProfile = () => {
         gender: updatedProfile.gender,
         // Email thường không cho phép thay đổi nên không đưa vào đây
       };
-      
+
       // Nếu có trường birthDate trong model, thêm vào
       if (updatedProfile.birthDate) {
         profileToUpdate.birthDate = birthDateString;
       }
-      
+
       // Gọi API cập nhật thông tin người dùng
       // Dựa vào routes, dùng endpoint /edit/:id
       const response = await ApiService.put(`/user/edit/${updatedProfile._id}`, profileToUpdate);
-      
+
       if (response) {
         // Cập nhật lại state với dữ liệu mới
         setProfile({
           ...response,
           birthDate: updatedProfile.birthDate
         });
-        
+
         return { success: true };
       } else {
         throw new Error("Không nhận được phản hồi từ server");
       }
     } catch (err) {
       console.error('Error updating profile:', err);
-      return { 
-        success: false, 
-        error: err.message || 'Không thể cập nhật thông tin. Vui lòng thử lại sau.' 
+      return {
+        success: false,
+        error: err.message || 'Không thể cập nhật thông tin. Vui lòng thử lại sau.'
       };
     }
   };
@@ -155,8 +156,8 @@ const UserProfile = () => {
         <div className="flex-1 bg-white border">
           <Routes>
             {/* Đường dẫn chính phải khớp với path trong Sidebar */}
-            <Route 
-              path="/" 
+            <Route
+              path="/"
               element={
                 <ProfileContent
                   profile={profile}
@@ -164,15 +165,18 @@ const UserProfile = () => {
                   handleBirthDateChange={handleBirthDateChange}
                   updateProfile={updateProfile}
                 />
-              } 
+              }
             />
-            <Route path="/orders" element={<Orders />} />
             <Route path="/messages" element={<Message />} />
             <Route path="/addresses" element={<ShippingAddresses />} />
             <Route path="/followed-shops" element={<FollowedShops />} />
             <Route path="/password" element={<PasswordChange />} />
             {/* Bổ sung route mặc định để redirect về profile */}
             <Route path="*" element={<Navigate to="/user-profile" replace />} />
+
+            {/* Thêm routes cho đơn hàng */}
+            <Route path="/orders" element={<UserOrders />} />
+            <Route path="/order-detail/:id" element={<OrderDetail />} />
           </Routes>
         </div>
       </div>

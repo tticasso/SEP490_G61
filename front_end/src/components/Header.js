@@ -178,6 +178,7 @@ const Header = () => {
         setIsLoggedIn(false);
         setCurrentUser(null);
         navigate('/');
+        window.location.reload();
     };
 
     // Xử lý click bên ngoài để đóng dropdown

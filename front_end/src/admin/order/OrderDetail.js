@@ -46,23 +46,39 @@ const OrderDetail = ({ orderId, onBack }) => {
     }
   }, [orderDetails]); // Only re-run when orderDetails changes
 
-  const fetchOrderData = async () => {
-    try {
-      setLoading(true);
-      const response = await ApiService.get(`/order/find/${orderId}`);
-      console.log("Order detail response:", response);
-      
-      setOrderData(response.order);
-      setOrderDetails(response.orderDetails || []);
-      setCurrentStatus(response.order.status_id);
-      
-    } catch (error) {
-      console.error("Error fetching order data:", error);
-      setError('Lỗi khi tải dữ liệu đơn hàng: ' + error);
-    } finally {
-      setLoading(false);
+  // Trong OrderDetail.js của admin
+// Thêm console.log để kiểm tra cấu trúc dữ liệu được trả về
+
+const fetchOrderData = async () => {
+  try {
+    setLoading(true);
+    const response = await ApiService.get(`/order/find/${orderId}`);
+    
+    // Debug logs
+    console.log("===== ORDER DATA STRUCTURE =====");
+    console.log("Full order data:", response);
+    console.log("Customer ID:", response.order.customer_id);
+    
+    // Kiểm tra xem customer_id có phải là object hay chỉ là ID
+    if (response.order.customer_id) {
+      console.log("Customer data type:", typeof response.order.customer_id);
+      if (typeof response.order.customer_id === 'object') {
+        console.log("Customer firstName:", response.order.customer_id.firstName);
+        console.log("Customer lastName:", response.order.customer_id.lastName);
+      }
     }
-  };
+    
+    setOrderData(response.order);
+    setOrderDetails(response.orderDetails || []);
+    setCurrentStatus(response.order.status_id);
+    
+  } catch (error) {
+    console.error("Error fetching order data:", error);
+    setError('Lỗi khi tải dữ liệu đơn hàng: ' + error);
+  } finally {
+    setLoading(false);
+  }
+};
   
   // Fetch customer data
   const fetchCustomerData = async (customerId) => {
@@ -306,7 +322,7 @@ const OrderDetail = ({ orderId, onBack }) => {
             <ChevronLeft size={18} className="mr-1" />
             <span>Quay lại</span>
           </button>
-          <h1 className="text-2xl font-bold text-gray-800">Đơn hàng #{orderData._id.substring(0, 8)}</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Đơn hàng #{orderData.id}</h1>
           <span className={`ml-3 px-3 py-1 text-xs font-medium rounded ${getStatusClass(orderData.status_id)}`}>
             {getStatusText(orderData.status_id)}
           </span>

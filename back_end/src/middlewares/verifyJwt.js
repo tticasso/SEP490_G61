@@ -36,7 +36,7 @@ async function isSeller(req, res, next) {
         if (!roles) {
             throw createHttpError.Forbidden("Forbidden access");
         }
-        if (roles.some(role => role.name === "MOD")) {
+        if (roles.some(role => role.name === "SELLER")) {
             return next(); 
         }
         throw createHttpError.Unauthorized("Require Seller role!");
@@ -79,7 +79,7 @@ async function isAdminOrSeller(req, res, next) {
             req.isAdmin = true;
             return next(); 
         }
-        if (roles.some(role => role.name === "MOD")) {
+        if (roles.some(role => role.name === "SELLER")) {
             req.isSeller = true;
             return next(); 
         }

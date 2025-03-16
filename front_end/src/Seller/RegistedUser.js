@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft } from 'lucide-react';
+import { Search, ArrowLeft, Loader } from 'lucide-react';
 import Sidebar from './Sidebar';
+import ApiService from '../services/ApiService';
+import AuthService from '../services/AuthService';
 
 const RegisteredUsers = () => {
   const navigate = useNavigate();
@@ -10,28 +12,187 @@ const RegisteredUsers = () => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [sortBy, setSortBy] = useState('');
+  const [sortDirection, setSortDirection] = useState('asc');
 
-  // Dữ liệu người dùng đăng ký mẫu
-  const registeredUsers = [
-    {
-      id: 1,
-      name: 'Gichi',
-      registered_time: '22:43 29/6/2024',
-      email: 'lhlam2003@gmail.com',
-      phone: '0917162JQK'
+  // Add new states for API data handling
+  const [followers, setFollowers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Reference to prevent duplicate API calls
+  const fetchInProgress = React.useRef(false);
+
+  // Fetch shop followers data
+  useEffect(() => {
+    // Track if component is mounted
+    let isMounted = true;
+    
+    const fetchShopFollowers = async () => {
+      // Prevent duplicate fetches
+      if (fetchInProgress.current) return;
+      fetchInProgress.current = true;
+      
+      try {
+        setLoading(true);
+        
+        // Verify user is authenticated
+        if (!AuthService.isLoggedIn()) {
+          throw new Error('User not authenticated');
+        }
+        
+        // First, get the user's shop
+        const shop = await ApiService.get('/shops/my-shop');
+        // Check if component is still mounted
+        if (!isMounted) return;
+        
+        if (!shop) {
+          throw new Error('No shop found for this user');
+        }
+        
+        const shopId = shop._id; // Get the shop ID
+        
+        // Fetch followers for this shop
+        const fetchedFollowers = await ApiService.get(`/shop-follow/followers/${shopId}`);
+        // Check if component is still mounted
+        if (!isMounted) return;
+        
+        // Format followers data
+        const formattedFollowers = fetchedFollowers.map(follower => ({
+          id: follower._id,
+          name: `${follower.firstName || ''} ${follower.lastName || ''}`.trim(),
+          email: follower.email,
+          phone: follower.phone || 'N/A',
+          registered_time: new Date(follower.createdAt || follower.created_at || Date.now()).toLocaleString('vi-VN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour12: false
+          })
+        }));
+        
+        setFollowers(formattedFollowers);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching followers data:', err);
+        setError('Không thể tải danh sách người theo dõi. Vui lòng thử lại sau.');
+        
+        // For demo purposes, use sample data if API fails
+        setFollowers([
+          {
+            id: 1,
+            name: 'Nguyễn Văn A',
+            registered_time: '10:15 15/3/2025',
+            email: 'nguyenvana@example.com',
+            phone: '0901234567'
+          },
+          {
+            id: 2,
+            name: 'Trần Thị B',
+            registered_time: '14:30 12/3/2025',
+            email: 'tranthib@example.com',
+            phone: '0912345678'
+          },
+          {
+            id: 3,
+            name: 'Lê Văn C',
+            registered_time: '08:45 10/3/2025',
+            email: 'levanc@example.com',
+            phone: '0923456789'
+          }
+        ]);
+      } finally {
+        // Update loading state only if component is still mounted
+        if (isMounted) {
+          setLoading(false);
+        }
+        fetchInProgress.current = false;
+      }
+    };
+    
+    fetchShopFollowers();
+    
+    // Cleanup function when component unmounts
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Apply sorting and filtering to followers
+  const filteredFollowers = useMemo(() => {
+    let result = [...followers];
+    
+    // Apply search filtering
+    if (searchTerm) {
+      result = result.filter(follower => 
+        follower.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        follower.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        follower.phone.includes(searchTerm)
+      );
     }
-  ];
+    
+    // Apply sorting
+    if (sortBy) {
+      result.sort((a, b) => {
+        let compareA = a[sortBy];
+        let compareB = b[sortBy];
+        
+        // Convert to lowercase if comparing strings
+        if (typeof compareA === 'string' && typeof compareB === 'string') {
+          compareA = compareA.toLowerCase();
+          compareB = compareB.toLowerCase();
+        }
+        
+        if (compareA < compareB) {
+          return sortDirection === 'asc' ? -1 : 1;
+        }
+        if (compareA > compareB) {
+          return sortDirection === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    
+    return result;
+  }, [followers, searchTerm, sortBy, sortDirection]);
 
-  // Xử lý toggle chọn tất cả
+  // Get paginated data
+  const paginatedFollowers = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredFollowers.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredFollowers, currentPage, itemsPerPage]);
+
+  // Calculate total pages
+  const totalPages = Math.ceil(filteredFollowers.length / itemsPerPage);
+
+  // Handle pagination
+  const handlePageChange = (page) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+
+  // Handle sorting change
+  const handleSortChange = (field) => {
+    if (sortBy === field) {
+      // Toggle direction if clicking the same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Toggle select all followers
   const toggleSelectAll = () => {
     if (selectedItems.length > 0) {
       setSelectedItems([]);
     } else {
-      setSelectedItems(registeredUsers.map(user => user.id));
+      setSelectedItems(paginatedFollowers.map(follower => follower.id));
     }
   };
 
-  // Xử lý toggle chọn một người dùng
+  // Toggle select a single follower
   const toggleUserSelection = (userId) => {
     if (selectedItems.includes(userId)) {
       setSelectedItems(selectedItems.filter(id => id !== userId));
@@ -50,27 +211,26 @@ const RegisteredUsers = () => {
         <div className="bg-white min-h-screen">
           {/* Menu tabs */}
           <div className="p-4 border-b flex items-center space-x-6 text-sm">
-            <div className="text-gray-500">Tất cả ( 0 )</div>
-            <div className="text-gray-500">Hiển thị ( 0 )</div>
-            <div className="text-gray-500">Nhập ( 0 )</div>
-            <div className="text-gray-500">Thùng rác ( 0 )</div>
+            <div className="text-gray-500">Tất cả ( {followers.length} )</div>
+            <div className="text-gray-500">Đang theo dõi ( {followers.length} )</div>
           </div>
 
-          {/* Công cụ tìm kiếm và lọc */}
+          {/* Search and filter tools */}
           <div className="p-4 flex justify-between items-center">
-            <div>
-              {/* Có thể thêm các bộ lọc ở đây nếu cần */}
-            </div>
+            <h2 className="text-xl font-semibold">Danh sách người theo dõi cửa hàng</h2>
             <div className="flex items-center space-x-2">
               <div className="relative">
                 <select 
                   className="border rounded-md px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
+                  onChange={(e) => {
+                    handleSortChange(e.target.value);
+                  }}
                 >
                   <option value="">Sắp xếp theo</option>
                   <option value="name">Tên</option>
-                  <option value="date">Ngày đăng ký</option>
+                  <option value="registered_time">Thời gian theo dõi</option>
+                  <option value="email">Email</option>
                 </select>
               </div>
               
@@ -86,104 +246,164 @@ const RegisteredUsers = () => {
             </div>
           </div>
 
-          {/* Bảng dữ liệu */}
-          <div className="px-4">
-            <table className="min-w-full">
-              <thead className="bg-gray-50 border-y">
-                <tr>
-                  <th className="px-6 py-3 text-left">
-                    <input 
-                      type="checkbox" 
-                      className="h-4 w-4"
-                      checked={selectedItems.length === registeredUsers.length && registeredUsers.length > 0}
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    KHÁCH HÀNG
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    THỜI GIAN LÚC
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    EMAIL
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ĐIỆN THOẠI
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {registeredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+          {/* Loading state */}
+          {loading && (
+            <div className="flex justify-center items-center py-10">
+              <Loader className="animate-spin mr-2" />
+              <div className="text-gray-500">Đang tải danh sách người theo dõi...</div>
+            </div>
+          )}
+
+          {/* Error state */}
+          {error && !loading && (
+            <div className="p-8 text-center text-red-500">
+              {error}
+            </div>
+          )}
+
+          {/* Data table */}
+          {!loading && !error && (
+            <div className="px-4">
+              <table className="min-w-full">
+                <thead className="bg-gray-50 border-y">
+                  <tr>
+                    <th className="px-6 py-3 text-left">
                       <input 
                         type="checkbox" 
                         className="h-4 w-4"
-                        checked={selectedItems.includes(user.id)}
-                        onChange={() => toggleUserSelection(user.id)}
+                        checked={selectedItems.length === paginatedFollowers.length && paginatedFollowers.length > 0}
+                        onChange={toggleSelectAll}
                       />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <img 
-                            className="h-10 w-10 rounded-full" 
-                            src="/api/placeholder/40/40" 
-                            alt=""
-                          />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.registered_time}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.phone}
-                    </td>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSortChange('name')}
+                    >
+                      NGƯỜI THEO DÕI {sortBy === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSortChange('registered_time')}
+                    >
+                      THỜI GIAN THEO DÕI {sortBy === 'registered_time' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSortChange('email')}
+                    >
+                      EMAIL {sortBy === 'email' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSortChange('phone')}
+                    >
+                      ĐIỆN THOẠI {sortBy === 'phone' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {paginatedFollowers.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                        Không có người theo dõi nào
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedFollowers.map((follower) => (
+                      <tr key={follower.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input 
+                            type="checkbox" 
+                            className="h-4 w-4"
+                            checked={selectedItems.includes(follower.id)}
+                            onChange={() => toggleUserSelection(follower.id)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <img 
+                                className="h-10 w-10 rounded-full" 
+                                src="/api/placeholder/40/40" 
+                                alt=""
+                              />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{follower.name}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {follower.registered_time}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {follower.email}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {follower.phone}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          {/* Phân trang */}
-          <div className="px-4 py-3 flex justify-between items-center border-t border-gray-200">
-            <div className="flex items-center">
-              <button className="mr-2 p-1 rounded-full border w-8 h-8 flex items-center justify-center">
-                <ArrowLeft size={16} />
-              </button>
-              <button className="mr-2 p-1 rounded-full bg-blue-600 text-white w-8 h-8 flex items-center justify-center">
-                1
-              </button>
-              <button className="p-1 rounded-full border w-8 h-8 flex items-center justify-center">
-                <ArrowLeft size={16} className="rotate-180" />
-              </button>
+          {/* Pagination */}
+          {!loading && !error && (
+            <div className="px-4 py-3 flex justify-between items-center border-t border-gray-200">
+              <div className="flex items-center">
+                <button 
+                  className={`mr-2 p-1 rounded-full border w-8 h-8 flex items-center justify-center ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'cursor-pointer'}`}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ArrowLeft size={16} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button 
+                    key={page}
+                    className={`mr-2 p-1 rounded-full w-8 h-8 flex items-center justify-center ${
+                      currentPage === page 
+                        ? 'bg-blue-600 text-white' 
+                        : 'border'
+                    }`}
+                    onClick={() => handlePageChange(page)}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button 
+                  className={`p-1 rounded-full border w-8 h-8 flex items-center justify-center ${currentPage === totalPages || totalPages === 0 ? 'text-gray-300 cursor-not-allowed' : 'cursor-pointer'}`}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                >
+                  <ArrowLeft size={16} className="rotate-180" />
+                </button>
+              </div>
+              
+              <div className="flex items-center text-sm">
+                <span>Trang {currentPage} của {totalPages || 1}</span>
+                <span className="mx-4">-</span>
+                <span>Hiển thị</span>
+                <select 
+                  className="mx-2 border rounded p-1" 
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1); // Reset to first page when changing items per page
+                  }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                </select>
+                <span>/</span>
+                <span className="ml-2">{followers.length} người theo dõi</span>
+              </div>
             </div>
-            
-            <div className="flex items-center text-sm">
-              <span>Trang 1 của 0</span>
-              <span className="mx-4">-</span>
-              <span>Hiển thị</span>
-              <select 
-                className="mx-2 border rounded p-1" 
-                value={itemsPerPage}
-                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-              </select>
-              <span>/</span>
-              <span className="ml-2">0 Sản phẩm</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

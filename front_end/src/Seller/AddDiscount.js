@@ -1,468 +1,616 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Calendar, 
-  ChevronDown,
-  Search,
-  Plus
-} from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
+import { toast } from 'react-toastify';
+import ApiService from '../services/ApiService';
+import AuthService from '../services/AuthService';
 import Sidebar from './Sidebar';
 
 const AddDiscount = () => {
   const navigate = useNavigate();
-  
-  // Form state
-  const [promotionName, setPromotionName] = useState('san pham demo');
-  const [discountType, setDiscountType] = useState('Giảm giá cố định');
-  const [isDiscountTypeDropdownOpen, setIsDiscountTypeDropdownOpen] = useState(false);
-  const [discountValue, setDiscountValue] = useState('');
-  
-  // Thời gian state
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isStartDatePickerOpen, setIsStartDatePickerOpen] = useState(false);
-  const [isEndDatePickerOpen, setIsEndDatePickerOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState({ hour: '05', period: 'PM' });
 
-  const discountTypes = [
-    'Giảm giá cố định',
-    'Phần trăm'
-  ];
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [allProducts, setAllProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [errors, setErrors] = useState({});
 
-  // Fake data for date picker
-  const currentMonth = 'July 2024';
-  const daysInMonth = [
-    { day: 30, month: 'prev' }, 
-    { day: 1 }, { day: 2 }, { day: 3 }, { day: 4 }, { day: 5 }, { day: 6 },
-    { day: 7 }, { day: 8 }, { day: 9 }, { day: 10 }, { day: 11 }, { day: 12, active: true }, { day: 13 },
-    { day: 14 }, { day: 15 }, { day: 16 }, { day: 17 }, { day: 18 }, { day: 19 }, { day: 20 },
-    { day: 21 }, { day: 22 }, { day: 23 }, { day: 24 }, { day: 25 }, { day: 26, selected: true }, { day: 27 },
-    { day: 28 }, { day: 29 }, { day: 30 }, { day: 31 }, { day: 1, month: 'next' }, { day: 2, month: 'next' }, { day: 3, month: 'next' },
-    { day: 4, month: 'next' }, { day: 5, month: 'next' }, { day: 6, month: 'next' }, { day: 7, month: 'next' }, { day: 8, month: 'next' }, { day: 9, month: 'next' }, { day: 10, month: 'next' },
-  ];
+  const [formData, setFormData] = useState({
+    code: '',
+    description: '',
+    value: '',
+    type: 'percentage',
+    min_order_value: 0,
+    max_discount_value: '',
+    start_date: formatDateForInput(new Date()),
+    end_date: formatDateForInput(new Date(new Date().setMonth(new Date().getMonth() + 1))),
+    is_active: true,
+    max_uses: 0,
+    max_uses_per_user: 1,
+    product_id: '',
+    category_id: ''
+  });
 
-  const hours = ['05', '06', '07', '08', '09', '10', '11'];
-  
-  const handleSave = () => {
-    // Logic để lưu khuyến mãi
-    alert('Đã lưu thành công khuyến mãi: ' + promotionName);
-    navigate('/seller-dashboard/discount-product');
-  };
+  const userId = AuthService.getCurrentUser()?.id;
 
-  const handleCancel = () => {
-    navigate('/seller-dashboard/discount-product');
-  };
-  
-  const handleDateSelect = (day, isEnd = false) => {
-    const date = `07/${day}/2024`;
-    const time = `${selectedTime.hour}:00 ${selectedTime.period}`;
-    const formattedDate = `${date}, ${time}`;
-    
-    if (isEnd) {
-      setEndDate(formattedDate);
-      setIsEndDatePickerOpen(false);
-    } else {
-      setStartDate(formattedDate);
-      setIsStartDatePickerOpen(false);
-    }
-    
-    setSelectedDate(day);
-  };
-  
-  const handleTimeSelect = (hour, period, isEnd = false) => {
-    setSelectedTime({ hour, period });
-    
-    if (selectedDate) {
-      const date = `07/${selectedDate}/2024`;
-      const time = `${hour}:00 ${period}`;
-      const formattedDate = `${date}, ${time}`;
-      
-      if (isEnd) {
-        setEndDate(formattedDate);
+  // Helper function to format date for input type="date"
+  function formatDateForInput(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().split('T')[0];
+  }
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch products and categories in parallel
+        const [productsResponse, categoriesResponse] = await Promise.all([
+          ApiService.get('/product'),
+          ApiService.get('/categories')
+        ]);
+
+        // Đảm bảo dữ liệu đúng định dạng từ các API
+        const productsList = productsResponse.products || productsResponse || [];
+        const categoriesList = categoriesResponse.categories || categoriesResponse || [];
+
+        setAllProducts(productsList);
+        setFilteredProducts([]);
+        setCategories(categoriesList);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast.error('Không thể tải dữ liệu, vui lòng thử lại sau');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Khi thay đổi danh mục, lọc lại danh sách sản phẩm
+  useEffect(() => {
+    if (formData.category_id) {
+      if (formData.category_id === "") {
+        // If "all categories" selected, reset products
+        setFilteredProducts([]);
+        setFormData(prev => ({ ...prev, product_id: "" }));
       } else {
-        setStartDate(formattedDate);
+        // Filter products by selected category
+        const selectedCategory = formData.category_id;
+
+        // Improved filtering logic to handle different data structures
+        const productsInCategory = allProducts.filter(product => {
+          // Check if category_id is an array
+          if (Array.isArray(product.category_id)) {
+            // It could be an array of strings
+            if (typeof product.category_id[0] === 'string') {
+              return product.category_id.includes(selectedCategory);
+            }
+            // It could be an array of objects with _id property
+            else if (typeof product.category_id[0] === 'object') {
+              return product.category_id.some(cat =>
+                (cat._id === selectedCategory) || (cat.id === selectedCategory)
+              );
+            }
+          }
+          // It could be a single string
+          else if (typeof product.category_id === 'string') {
+            return product.category_id === selectedCategory;
+          }
+          // It could be a single object with _id
+          else if (typeof product.category_id === 'object' && product.category_id !== null) {
+            return (product.category_id._id === selectedCategory) ||
+              (product.category_id.id === selectedCategory);
+          }
+
+          return false;
+        });
+
+        setFilteredProducts(productsInCategory);
+        setFormData(prev => ({ ...prev, product_id: "" }));
+      }
+    } else {
+      setFilteredProducts([]);
+    }
+  }, [formData.category_id, allProducts]);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+
+    // Clear error when field is updated
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Code validation
+    if (!formData.code.trim()) {
+      newErrors.code = 'Mã giảm giá không được để trống';
+    } else if (formData.code.length < 3) {
+      newErrors.code = 'Mã giảm giá phải có ít nhất 3 ký tự';
+    }
+
+    // Description validation
+    if (!formData.description.trim()) {
+      newErrors.description = 'Mô tả không được để trống';
+    }
+
+    // Value validation
+    if (!formData.value || formData.value <= 0) {
+      newErrors.value = 'Giá trị giảm giá phải lớn hơn 0';
+    } else if (formData.type === 'percentage' && formData.value > 100) {
+      newErrors.value = 'Giá trị phần trăm không được vượt quá 100%';
+    }
+
+    // Date validation
+    if (!formData.start_date) {
+      newErrors.start_date = 'Ngày bắt đầu không được để trống';
+    }
+
+    if (!formData.end_date) {
+      newErrors.end_date = 'Ngày kết thúc không được để trống';
+    } else if (new Date(formData.end_date) < new Date(formData.start_date)) {
+      newErrors.end_date = 'Ngày kết thúc phải sau ngày bắt đầu';
+    }
+
+    // Max uses per user validation
+    if (formData.max_uses_per_user < 0) {
+      newErrors.max_uses_per_user = 'Số lần sử dụng trên mỗi người dùng không được âm';
+    }
+
+    // Category and product validation
+    if (formData.category_id && formData.product_id) {
+      const product = allProducts.find(p => p._id === formData.product_id || p.id === formData.product_id);
+
+      if (product) {
+        let categoryMatches = false;
+
+        // Check if category_id is an array
+        if (Array.isArray(product.category_id)) {
+          // Array of strings
+          if (product.category_id.length > 0 && typeof product.category_id[0] === 'string') {
+            categoryMatches = product.category_id.includes(formData.category_id);
+          }
+          // Array of objects with _id property
+          else if (product.category_id.length > 0 && typeof product.category_id[0] === 'object') {
+            categoryMatches = product.category_id.some(cat =>
+              (cat._id === formData.category_id) ||
+              (cat.id === formData.category_id) ||
+              (cat._id?.toString() === formData.category_id?.toString()) ||
+              (cat.id?.toString() === formData.category_id?.toString())
+            );
+          }
+        }
+        // Single string
+        else if (typeof product.category_id === 'string') {
+          categoryMatches = product.category_id === formData.category_id;
+        }
+        // Single object with _id
+        else if (typeof product.category_id === 'object' && product.category_id !== null) {
+          categoryMatches =
+            (product.category_id._id === formData.category_id) ||
+            (product.category_id.id === formData.category_id) ||
+            (product.category_id._id?.toString() === formData.category_id?.toString()) ||
+            (product.category_id.id?.toString() === formData.category_id?.toString());
+        }
+
+        if (!categoryMatches) {
+          newErrors.product_id = 'Sản phẩm không thuộc danh mục đã chọn';
+        }
       }
     }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      toast.error('Vui lòng kiểm tra lại thông tin');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const payload = {
+        ...formData,
+        created_by: userId,
+        updated_by: userId
+      };
+
+      // Convert empty strings to null for optional fields
+      if (!payload.product_id) payload.product_id = null;
+      if (!payload.category_id) payload.category_id = null;
+      if (!payload.max_discount_value) payload.max_discount_value = null;
+
+      await ApiService.post('/coupon/create', payload);
+      toast.success('Tạo mã giảm giá thành công');
+
+      // Redirect to AllDiscount page
+      navigate('/seller-dashboard/discounts');
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      toast.error(error?.message || 'Đã xảy ra lỗi, vui lòng thử lại');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-gray-100 overflow-hidden">
+        <Sidebar onNavigate={(path) => navigate(path)} />
+        <div className="flex-1 overflow-auto">
+          <div className="p-6 flex justify-center items-center h-96">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+              <p className="mt-2 text-gray-600">Đang tải...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
-      {/* Sidebar */}
       <Sidebar onNavigate={(path) => navigate(path)} />
-
-      {/* Main content */}
       <div className="flex-1 overflow-auto">
-        <div className="p-6 bg-gray-100 min-h-screen">
-          {/* Header with back button and action buttons */}
-          <div className="flex justify-between items-center mb-6">
-            <button 
-              className="flex items-center text-gray-600" 
-              onClick={handleCancel}
+        <div className="p-6">
+          <div className="flex items-center mb-6">
+            <button
+              onClick={() => navigate('/seller-dashboard/discount-product')}
+              className="mr-4 p-2 rounded-full hover:bg-gray-100"
             >
-              <ArrowLeft className="mr-2" />
-              Quay lại
+              <ArrowLeft size={20} />
             </button>
-            <div className="flex space-x-4">
-              <button 
-                className="px-4 py-2 bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300"
-                onClick={handleCancel}
-              >
-                Hủy
-              </button>
-              <button 
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                onClick={handleSave}
-              >
-                Lưu
-              </button>
-            </div>
+            <h1 className="text-2xl font-semibold text-gray-800">
+              Thêm mã giảm giá mới
+            </h1>
           </div>
 
-          {/* Form Content */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-2xl font-semibold mb-6">Cơ bản</h2>
-
-            {/* Promotion Name */}
-            <div className="mb-6">
-              <label className="block text-gray-700 mb-2">
-                Tên khuyến mãi <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                className="w-full p-3 border rounded-md bg-blue-50"
-                value={promotionName}
-                onChange={(e) => setPromotionName(e.target.value)}
-              />
-            </div>
-
-            {/* Discount Type and Value */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-gray-700 mb-2">
-                  Loại giảm giá
-                </label>
-                <div className="relative">
-                  <div 
-                    className="w-full p-3 border rounded-md flex justify-between items-center cursor-pointer"
-                    onClick={() => setIsDiscountTypeDropdownOpen(!isDiscountTypeDropdownOpen)}
-                  >
-                    <span>{discountType}</span>
-                    <ChevronDown size={20} className="text-gray-500" />
-                  </div>
-                  
-                  {isDiscountTypeDropdownOpen && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg">
-                      {discountTypes.map((type, index) => (
-                        <div 
-                          key={index}
-                          className={`p-3 cursor-pointer hover:bg-gray-100 ${
-                            type === discountType ? 'bg-blue-600 text-white' : ''
-                          }`}
-                          onClick={() => {
-                            setDiscountType(type);
-                            setIsDiscountTypeDropdownOpen(false);
-                          }}
-                        >
-                          {type}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">
-                  Giảm
-                </label>
-                <div className="flex">
+          <div className="bg-white rounded-lg shadow p-6">
+            <form onSubmit={handleSubmit}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Coupon Code */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mã giảm giá <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
-                    className="flex-1 p-3 border rounded-l-md"
-                    placeholder={discountType === 'Phần trăm' ? '24' : '99.99'}
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(e.target.value)}
+                    name="code"
+                    value={formData.code}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 ${errors.code ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    placeholder="Ví dụ: SUMMER2025"
                   />
-                  <div className="bg-gray-100 p-3 border-t border-r border-b rounded-r-md min-w-16 text-center">
-                    {discountType === 'Phần trăm' ? (
-                      <div className="flex items-center">
-                        <span className="mr-3">= $0.00</span>
-                        <span>%</span>
-                      </div>
-                    ) : (
-                      <span>VND</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Date Range */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-gray-700 mb-2">
-                  Thời gian bắt đầu
-                </label>
-                <div className="relative">
-                  <div className="flex">
-                    <input
-                      type="text"
-                      className="flex-1 p-3 border rounded-l-md"
-                      placeholder="mm/dd/yyyy, --:-- --"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      readOnly
-                    />
-                    <button 
-                      className="bg-white p-3 border-t border-r border-b rounded-r-md"
-                      onClick={() => {
-                        setIsStartDatePickerOpen(!isStartDatePickerOpen);
-                        setIsEndDatePickerOpen(false);
-                      }}
-                    >
-                      <Calendar size={20} className="text-gray-500" />
-                    </button>
-                  </div>
-                  
-                  {/* Date Picker for Start Date */}
-                  {isStartDatePickerOpen && (
-                    <div className="absolute left-0 z-20 mt-1 bg-white border rounded-md shadow-lg flex">
-                      {/* Calendar */}
-                      <div className="p-4 border-r">
-                        <div className="flex justify-between items-center mb-4">
-                          <div className="flex items-center">
-                            <span>{currentMonth}</span>
-                            <ChevronDown size={16} className="ml-1" />
-                          </div>
-                          <div className="flex">
-                            <button className="p-1 mx-1">
-                              <ChevronDown size={16} className="rotate-90" />
-                            </button>
-                            <button className="p-1 mx-1">
-                              <ChevronDown size={16} className="rotate-270" />
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {/* Days of Week */}
-                        <div className="grid grid-cols-7 gap-2 mb-2">
-                          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                            <div key={index} className="text-center text-sm">
-                              {day}
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {/* Calendar Days */}
-                        <div className="grid grid-cols-7 gap-2">
-                          {daysInMonth.map((day, index) => (
-                            <div 
-                              key={index} 
-                              className={`
-                                w-8 h-8 flex items-center justify-center rounded-full cursor-pointer
-                                ${day.month === 'prev' || day.month === 'next' ? 'text-gray-400' : ''}
-                                ${day.active ? 'bg-blue-600 text-white' : ''}
-                                ${day.selected ? 'bg-blue-200' : ''}
-                                ${!day.active && !day.selected ? 'hover:bg-gray-100' : ''}
-                              `}
-                              onClick={() => handleDateSelect(day.day)}
-                            >
-                              {day.day}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* Time Selector */}
-                      <div className="p-4 flex">
-                        {/* Hours */}
-                        <div className="w-16 border-r pr-3">
-                          <div className="flex flex-col items-center">
-                            {hours.map((hour, index) => (
-                              <div 
-                                key={index} 
-                                className={`
-                                  w-full py-2 text-center cursor-pointer
-                                  ${selectedTime.hour === hour ? 'bg-blue-600 text-white rounded' : 'hover:bg-gray-100'}
-                                `}
-                                onClick={() => handleTimeSelect(hour, selectedTime.period)}
-                              >
-                                {hour}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        {/* AM/PM */}
-                        <div className="w-16 px-3">
-                          <div className="flex flex-col items-center">
-                            <div 
-                              className={`w-full py-2 text-center cursor-pointer ${selectedTime.period === 'PM' ? 'bg-blue-600 text-white rounded' : 'hover:bg-gray-100'}`}
-                              onClick={() => handleTimeSelect(selectedTime.hour, 'PM')}
-                            >
-                              PM
-                            </div>
-                            <div 
-                              className={`w-full py-2 text-center cursor-pointer ${selectedTime.period === 'AM' ? 'bg-blue-600 text-white rounded' : 'hover:bg-gray-100'}`}
-                              onClick={() => handleTimeSelect(selectedTime.hour, 'AM')}
-                            >
-                              AM
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  {errors.code && (
+                    <p className="mt-1 text-sm text-red-500 flex items-center">
+                      <AlertCircle size={14} className="mr-1" />
+                      {errors.code}
+                    </p>
                   )}
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-gray-700 mb-2">
-                  Thời gian kết thúc
-                </label>
-                <div className="relative">
-                  <div className="flex">
+                {/* Coupon Type */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Loại giảm giá <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="type"
+                    value={formData.type}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  >
+                    <option value="percentage">Phần trăm (%)</option>
+                    <option value="fixed">Số tiền cố định (VND)</option>
+                  </select>
+                </div>
+
+                {/* Coupon Value */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Giá trị giảm giá <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
                     <input
-                      type="text"
-                      className="flex-1 p-3 border rounded-l-md"
-                      placeholder="mm/dd/yyyy, --:-- --"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      readOnly
+                      type="number"
+                      name="value"
+                      value={formData.value}
+                      onChange={handleChange}
+                      min="0"
+                      step={formData.type === 'percentage' ? '0.1' : '1000'}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 ${errors.value ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      placeholder={formData.type === 'percentage' ? 'Ví dụ: 10' : 'Ví dụ: 50000'}
                     />
-                    <button 
-                      className="bg-white p-3 border-t border-r border-b rounded-r-md"
-                      onClick={() => {
-                        setIsEndDatePickerOpen(!isEndDatePickerOpen);
-                        setIsStartDatePickerOpen(false);
-                      }}
-                    >
-                      <Calendar size={20} className="text-gray-500" />
-                    </button>
+                    <span className="absolute right-3 top-2 text-gray-500">
+                      {formData.type === 'percentage' ? '%' : 'đ'}
+                    </span>
                   </div>
-                  
-                  {/* Date Picker for End Date */}
-                  {isEndDatePickerOpen && (
-                    <div className="absolute right-0 z-20 mt-1 bg-white border rounded-md shadow-lg flex">
-                      {/* Calendar */}
-                      <div className="p-4 border-r">
-                        <div className="flex justify-between items-center mb-4">
-                          <div className="flex items-center">
-                            <span>{currentMonth}</span>
-                            <ChevronDown size={16} className="ml-1" />
-                          </div>
-                          <div className="flex">
-                            <button className="p-1 mx-1">
-                              <ChevronDown size={16} className="rotate-90" />
-                            </button>
-                            <button className="p-1 mx-1">
-                              <ChevronDown size={16} className="rotate-270" />
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {/* Days of Week */}
-                        <div className="grid grid-cols-7 gap-2 mb-2">
-                          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                            <div key={index} className="text-center text-sm">
-                              {day}
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {/* Calendar Days */}
-                        <div className="grid grid-cols-7 gap-2">
-                          {daysInMonth.map((day, index) => (
-                            <div 
-                              key={index} 
-                              className={`
-                                w-8 h-8 flex items-center justify-center rounded-full cursor-pointer
-                                ${day.month === 'prev' || day.month === 'next' ? 'text-gray-400' : ''}
-                                ${day.active ? 'bg-blue-600 text-white' : ''}
-                                ${day.selected ? 'bg-blue-200' : ''}
-                                ${!day.active && !day.selected ? 'hover:bg-gray-100' : ''}
-                              `}
-                              onClick={() => handleDateSelect(day.day, true)}
-                            >
-                              {day.day}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* Time Selector */}
-                      <div className="p-4 flex">
-                        {/* Hours */}
-                        <div className="w-16 border-r pr-3">
-                          <div className="flex flex-col items-center">
-                            {hours.map((hour, index) => (
-                              <div 
-                                key={index} 
-                                className={`
-                                  w-full py-2 text-center cursor-pointer
-                                  ${selectedTime.hour === hour ? 'bg-blue-600 text-white rounded' : 'hover:bg-gray-100'}
-                                `}
-                                onClick={() => handleTimeSelect(hour, selectedTime.period, true)}
-                              >
-                                {hour}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        {/* AM/PM */}
-                        <div className="w-16 px-3">
-                          <div className="flex flex-col items-center">
-                            <div 
-                              className={`w-full py-2 text-center cursor-pointer ${selectedTime.period === 'PM' ? 'bg-blue-600 text-white rounded' : 'hover:bg-gray-100'}`}
-                              onClick={() => handleTimeSelect(selectedTime.hour, 'PM', true)}
-                            >
-                              PM
-                            </div>
-                            <div 
-                              className={`w-full py-2 text-center cursor-pointer ${selectedTime.period === 'AM' ? 'bg-blue-600 text-white rounded' : 'hover:bg-gray-100'}`}
-                              onClick={() => handleTimeSelect(selectedTime.hour, 'AM', true)}
-                            >
-                              AM
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  {errors.value && (
+                    <p className="mt-1 text-sm text-red-500 flex items-center">
+                      <AlertCircle size={14} className="mr-1" />
+                      {errors.value}
+                    </p>
                   )}
                 </div>
+
+                {/* Max Discount Value (for percentage type) */}
+                {formData.type === 'percentage' && (
+                  <div className="col-span-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Giảm tối đa (VND)
+                    </label>
+                    <input
+                      type="number"
+                      name="max_discount_value"
+                      value={formData.max_discount_value}
+                      onChange={handleChange}
+                      min="0"
+                      step="1000"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      placeholder="Để trống nếu không giới hạn"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Giới hạn số tiền giảm tối đa khi sử dụng mã giảm giá theo %
+                    </p>
+                  </div>
+                )}
+
+                {/* Min Order Value */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Giá trị đơn hàng tối thiểu (VND)
+                  </label>
+                  <input
+                    type="number"
+                    name="min_order_value"
+                    value={formData.min_order_value}
+                    onChange={handleChange}
+                    min="0"
+                    step="1000"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="Ví dụ: 100000"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Đơn hàng phải đạt giá trị này mới có thể áp dụng mã giảm giá
+                  </p>
+                </div>
+
+                {/* Start Date */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ngày bắt đầu <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="start_date"
+                    value={formData.start_date}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 ${errors.start_date ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                  />
+                  {errors.start_date && (
+                    <p className="mt-1 text-sm text-red-500 flex items-center">
+                      <AlertCircle size={14} className="mr-1" />
+                      {errors.start_date}
+                    </p>
+                  )}
+                </div>
+
+                {/* End Date */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ngày kết thúc <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="end_date"
+                    value={formData.end_date}
+                    onChange={handleChange}
+                    min={formData.start_date}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 ${errors.end_date ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                  />
+                  {errors.end_date && (
+                    <p className="mt-1 text-sm text-red-500 flex items-center">
+                      <AlertCircle size={14} className="mr-1" />
+                      {errors.end_date}
+                    </p>
+                  )}
+                </div>
+
+                {/* Max Uses */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Số lần sử dụng tối đa
+                  </label>
+                  <input
+                    type="number"
+                    name="max_uses"
+                    value={formData.max_uses}
+                    onChange={handleChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="Nhập 0 cho không giới hạn"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Tổng số lần mã giảm giá có thể được sử dụng. Nhập 0 cho không giới hạn.
+                  </p>
+                </div>
+
+                {/* Max Uses Per User */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Số lần sử dụng tối đa mỗi người dùng
+                  </label>
+                  <input
+                    type="number"
+                    name="max_uses_per_user"
+                    value={formData.max_uses_per_user}
+                    onChange={handleChange}
+                    min="0"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 ${errors.max_uses_per_user ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    placeholder="Mặc định: 1"
+                  />
+                  {errors.max_uses_per_user && (
+                    <p className="mt-1 text-sm text-red-500 flex items-center">
+                      <AlertCircle size={14} className="mr-1" />
+                      {errors.max_uses_per_user}
+                    </p>
+                  )}
+                </div>
+
+                {/* Category Specific - First select category */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Áp dụng cho danh mục cụ thể
+                  </label>
+                  <select
+                    name="category_id"
+                    value={formData.category_id || ''}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  >
+                    <option value="">Tất cả danh mục</option>
+                    {categories.map((category) => (
+                      <option key={category._id} value={category._id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Product Specific - Only enabled if category is selected */}
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Áp dụng cho sản phẩm cụ thể
+                  </label>
+                  <select
+                    name="product_id"
+                    value={formData.product_id || ''}
+                    onChange={handleChange}
+                    disabled={!formData.category_id || formData.category_id === ''}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 ${!formData.category_id || formData.category_id === '' ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'
+                      } ${errors.product_id ? 'border-red-500' : ''}`}
+                  >
+                    <option value="">
+                      {!formData.category_id || formData.category_id === ''
+                        ? 'Vui lòng chọn danh mục trước'
+                        : 'Tất cả sản phẩm trong danh mục'}
+                    </option>
+                    {filteredProducts.map((product) => (
+                      <option key={product._id} value={product._id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.product_id && (
+                    <p className="mt-1 text-sm text-red-500 flex items-center">
+                      <AlertCircle size={14} className="mr-1" />
+                      {errors.product_id}
+                    </p>
+                  )}
+                  {(!formData.category_id || formData.category_id === '') && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Vui lòng chọn danh mục trước để xem danh sách sản phẩm
+                    </p>
+                  )}
+                </div>
+
+                {/* Description */}
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mô tả <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    rows="3"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 ${errors.description ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    placeholder="Mô tả chi tiết về mã giảm giá và điều kiện áp dụng"
+                  ></textarea>
+                  {errors.description && (
+                    <p className="mt-1 text-sm text-red-500 flex items-center">
+                      <AlertCircle size={14} className="mr-1" />
+                      {errors.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* Active Status */}
+                <div className="col-span-2">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      name="is_active"
+                      checked={formData.is_active}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-400 border-gray-300 rounded"
+                    />
+                    <label htmlFor="is_active" className="ml-2 block text-sm text-gray-700">
+                      Kích hoạt mã giảm giá
+                    </label>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Apply to Products Section */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-6">Áp Dụng Cho</h2>
-            <p className="text-gray-600 mb-6">Chọn những sản phẩm áp dụng giảm giá này.</p>
+              <div className="mt-8 flex justify-end">
+                <button
+                  onClick={() => navigate('/seller-dashboard/discounts')}
+                  className="mr-4 p-2 rounded-full hover:bg-gray-100"
+                >
+                  <ArrowLeft size={20} />
+                </button>
 
-            {/* Search Products */}
-            <div className="flex mb-6">
-              <div className="relative flex-1 mr-4">
-                <input
-                  type="text"
-                  className="w-full p-3 border rounded-md pl-10"
-                  placeholder="Search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <button
+                  type="button"
+                  onClick={() => navigate('/seller-dashboard/discounts')}
+                  className="mr-3 px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center"
+                >
+                  {submitting ? (
+                    <>
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent mr-2"></span>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={18} className="mr-2" />
+                      Tạo mã giảm giá
+                    </>
+                  )}
+                </button>
               </div>
-              <button className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">
-                Browse
-              </button>
-            </div>
-
-            {/* Selected Products will show here */}
-            <div className="border border-dashed rounded-md p-6 text-center text-gray-500">
-              No products selected. Click "Browse" to add products.
-            </div>
+            </form>
           </div>
         </div>
       </div>

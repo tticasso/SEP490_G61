@@ -30,4 +30,6 @@ orderRouter.delete("/delete/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], or
 // Lấy thống kê đơn hàng (chỉ admin có quyền)
 orderRouter.get("/statistics", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], orderController.getOrderStatistics)
 
+orderRouter.get("/shop/:shopId", [VerifyJwt.verifyToken, VerifyJwt.isSeller], orderController.getOrdersByShopId)
+
 module.exports = orderRouter

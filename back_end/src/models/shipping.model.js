@@ -35,6 +35,14 @@ const shippingSchema = new Schema({
     updated_by: {
         type: Schema.Types.ObjectId,
         ref: 'User'
+    },
+    estimate_time: {
+        type: Number,
+        required: true
+    },
+    is_active: {
+        type: Boolean,
+        default: true
     }
 });
 

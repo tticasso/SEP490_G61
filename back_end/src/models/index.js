@@ -19,6 +19,7 @@ const ProductVariant = require('./product-variant.model')
 const ShopFollow = require('./shop-follow.model')
 const Conversation = require('./conversation.model')
 const Message = require('./message.model')
+const UserStatus = require('./user-status.model')
 // Cau hinh mongoose dang global
 mongoose.Promise = global.Promise
 // Dinh nghia doi tuong DB
@@ -48,6 +49,7 @@ db.productvariant = ProductVariant
 db.shopFollow = ShopFollow
 db.conversation = Conversation
 db.message = Message
+db.userStatus = UserStatus
 // Thuoc tinh tham chieu toi action ket noi CSDL
 db.connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, {

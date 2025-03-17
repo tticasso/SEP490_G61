@@ -28,7 +28,8 @@ const { AuthRouter,
     ShopRouter,
     DocumentRouter,
     ShopFollowRouter,
-    ConversationRouter
+    ConversationRouter,
+    UserStatusRouter
 } = require('./src/routes');
 
 const session = require('express-session');
@@ -102,6 +103,7 @@ app.use('/api/order', OrderRouter);
 app.use('/api/shipping', ShippingRouter);
 app.use('/api/payment', PaymentRouter);
 app.use('/api/documents', DocumentRouter);
+app.use('/api/user-status', UserStatusRouter)
 // Thêm route mới
 app.use('/api/conversation', ConversationRouter);
 // Kiểm soát các lỗi trong Express web server
@@ -132,6 +134,10 @@ const io = socketIO(server, {
 
 
 // Socket.IO - Xử lý kết nối từ client
+// Thêm UserStatus model cho trạng thái online
+const UserStatus = require('./src/models/user-status.model');
+
+// Cập nhật phần Socket.IO trong server.js
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
     
@@ -150,6 +156,9 @@ io.on('connection', (socket) => {
       
       // Join user to their room
       socket.join(`user-${socket.userId}`);
+      
+      // Cập nhật trạng thái thành online
+      updateUserOnlineStatus(socket.userId, true);
       
       // Handle conversation joining
       socket.on('join-conversation', (conversationId) => {
@@ -199,6 +208,7 @@ io.on('connection', (socket) => {
       socket.on('typing', ({ conversationId, isTyping }) => {
         socket.to(`conversation-${conversationId}`).emit('user-typing', {
           userId: socket.userId,
+          conversationId,
           isTyping
         });
       });
@@ -206,13 +216,57 @@ io.on('connection', (socket) => {
       // Handle disconnect
       socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
+        // Cập nhật trạng thái thành offline
+        updateUserOnlineStatus(socket.userId, false);
       });
       
     } catch (error) {
       console.error('Token verification failed:', error);
       socket.disconnect();
     }
-  });
+});
+
+// Hàm cập nhật trạng thái người dùng
+async function updateUserOnlineStatus(userId, isOnline) {
+  try {
+      let userStatus = await UserStatus.findOne({ user_id: userId });
+      
+      if (!userStatus) {
+          userStatus = new UserStatus({
+              user_id: userId,
+              is_online: isOnline,
+              last_active: new Date()
+          });
+      } else {
+          userStatus.is_online = isOnline;
+          userStatus.last_active = new Date();
+      }
+      
+      await userStatus.save();
+      
+      // Calculate status including "recently" logic
+      const now = new Date();
+      const diffMinutes = Math.floor((now - userStatus.last_active) / (1000 * 60));
+      
+      let status;
+      if (isOnline) {
+          status = 'online';
+      } else if (diffMinutes < 5) {
+          status = 'recently'; // Recently active (less than 5 minutes)
+      } else {
+          status = 'offline';
+      }
+      
+      // Broadcast status with proper value
+      io.emit('user-status-changed', {
+          userId: userId,
+          status: status
+      });
+      
+  } catch (error) {
+      console.error('Error updating user status:', error);
+  }
+}
   
   // Thay đổi app.listen thành server.listen
   server.listen(process.env.PORT || 9999, process.env.HOST_NAME || 'localhost', () => {

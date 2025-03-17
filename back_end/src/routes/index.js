@@ -17,6 +17,7 @@ const ShopRouter = require('./shops.routes')
 const DocumentRouter = require('./document.routes')
 const ShopFollowRouter = require('./shop-follow.routes')
 const ConversationRouter = require('./conversation.routes')
+const UserStatusRouter = require('./user-status.routes')
 
 module.exports = {
     AuthRouter,
@@ -37,5 +38,6 @@ module.exports = {
     ShopRouter,
     DocumentRouter,
     ShopFollowRouter,
-    ConversationRouter
+    ConversationRouter,
+    UserStatusRouter
 }

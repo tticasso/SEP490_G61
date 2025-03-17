@@ -37,23 +37,26 @@ const Message = () => {
   const [typing, setTyping] = useState({});
   const [unreadCounts, setUnreadCounts] = useState({});
   const [totalUnread, setTotalUnread] = useState(0);
+  // Thêm state để lưu thông tin người tham gia và trạng thái
+  const [participants, setParticipants] = useState({});
+  const [onlineStatuses, setOnlineStatuses] = useState({});
   // const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
-  
+
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const currentUser = AuthService.getCurrentUser();
-  
+
   // Kết nối Socket.IO khi component mount
   useEffect(() => {
     // Lấy token xác thực
     const token = AuthService.getToken();
     if (!token) return;
-    
+
     // Kết nối Socket.IO
     socketRef.current = io('http://localhost:9999', {
       auth: { token }
     });
-    
+
     // Xử lý khi nhận được tin nhắn mới
     socketRef.current.on('new-message', (message) => {
       // Kiểm tra nếu tin nhắn mới thuộc cuộc trò chuyện đang xem
@@ -65,7 +68,7 @@ const Message = () => {
           timestamp: new Date(message.created_at).toLocaleString(),
           isRead: message.is_read
         }]);
-        
+
         // Chỉ cuộn xuống cuối nếu tin nhắn là do người dùng hiện tại gửi
         // if (message.sender_id === currentUser.id) {
         //   setShouldScrollToBottom(true);
@@ -78,40 +81,40 @@ const Message = () => {
             ...prev,
             [message.conversation_id]: (prev[message.conversation_id] || 0) + 1
           };
-          
+
           // Cập nhật tổng số tin nhắn chưa đọc
           const newTotal = Object.values(newCounts).reduce((sum, count) => sum + count, 0);
           setTotalUnread(newTotal);
-          
+
           // Thông báo cho Header về tin nhắn mới
           MessageEventBus.publish('unreadCountChanged', newTotal);
-          
+
           return newCounts;
         });
       }
-      
+
       // Cập nhật danh sách cuộc trò chuyện
-      setConversations(prev => 
-        prev.map(conv => 
-          conv.id === message.conversation_id 
-            ? { 
-                ...conv, 
-                lastMessage: message.content, 
-                timestamp: new Date(message.created_at).toLocaleString(),
-                unread: message.sender_id !== currentUser.id && conv.id !== selectedConversation
-              }
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === message.conversation_id
+            ? {
+              ...conv,
+              lastMessage: message.content,
+              timestamp: new Date(message.created_at).toLocaleString(),
+              unread: message.sender_id !== currentUser.id && conv.id !== selectedConversation
+            }
             : conv
         )
       );
     });
-    
+
     // Xử lý khi người khác đang gõ
     socketRef.current.on('user-typing', ({ userId, conversationId, isTyping }) => {
       if (conversationId === selectedConversation && userId !== currentUser.id) {
         setTyping(prev => ({ ...prev, [conversationId]: isTyping }));
       }
     });
-    
+
     // Cleanup khi component unmount
     return () => {
       if (socketRef.current) {
@@ -119,7 +122,7 @@ const Message = () => {
       }
     };
   }, [selectedConversation, currentUser.id]);
-  
+
   // Xử lý cuộn xuống tin nhắn mới nhất
   // useEffect(() => {
   //   if (shouldScrollToBottom && messagesEndRef.current) {
@@ -127,108 +130,171 @@ const Message = () => {
   //     setShouldScrollToBottom(false);
   //   }
   // }, [shouldScrollToBottom, messages]);
-  
+
   // Tải danh sách cuộc trò chuyện
   useEffect(() => {
     fetchConversations();
-    
+
     // Thêm sự kiện lắng nghe khi component được focus lại
     const handleFocus = () => {
       fetchConversations();
     };
-    
+
     window.addEventListener('focus', handleFocus);
     return () => {
       window.removeEventListener('focus', handleFocus);
     };
   }, []);
+
+  useEffect(() => {
+    if (socketRef.current) {
+      // Make sure we're listening to the correct event
+      socketRef.current.on('user-status-changed', ({ userId, status }) => {
+        console.log('User status changed:', userId, status);
+        setOnlineStatuses(prev => ({
+          ...prev,
+          [userId]: status
+        }));
+      });
+    }
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off('user-status-changed');
+      }
+    };
+  }, []);
+
+  // Lấy thông tin người tham gia khi chọn conversation
+  useEffect(() => {
+    if (selectedConversation) {
+      const conversation = conversations.find(c => c.id === selectedConversation);
+      if (conversation) {
+        fetchParticipantDetails(conversation);
+      }
+    }
+  }, [selectedConversation]);
+
+  // Hàm lấy thông tin chi tiết người tham gia
+  const fetchParticipantDetails = async (conversation) => {
+    try {
+      // Find id of the other participant
+      const otherParticipantId = conversation.participantId;
+      if (!otherParticipantId) return;
   
+      console.log("Fetching details for participant:", otherParticipantId);
+  
+      const response = await ApiService.get(`/user-status/participant/${otherParticipantId}`, true);
+      
+      // Debug the API response
+      console.log("Participant API response:", response);
+  
+      // Store participant info
+      setParticipants(prev => ({
+        ...prev,
+        [otherParticipantId]: response
+      }));
+  
+      // Update online status
+      setOnlineStatuses(prev => ({
+        ...prev,
+        [otherParticipantId]: response.status
+      }));
+  
+    } catch (error) {
+      console.error('Error fetching participant details:', error);
+    }
+  };
+
   // Tải tin nhắn khi chọn cuộc trò chuyện
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages(selectedConversation);
-      
-      // Đánh dấu tin nhắn trong cuộc trò chuyện này là đã đọc
-      if (unreadCounts[selectedConversation]) {
-        // Cập nhật số lượng chưa đọc
-        setUnreadCounts(prev => {
-          const newCounts = {...prev};
-          delete newCounts[selectedConversation];
-          
-          // Cập nhật tổng số tin nhắn chưa đọc
-          const newTotal = Object.values(newCounts).reduce((sum, count) => sum + count, 0);
-          setTotalUnread(newTotal);
-          
-          // Thông báo cho Header về thay đổi số lượng chưa đọc
-          MessageEventBus.publish('unreadCountChanged', newTotal);
-          
-          return newCounts;
-        });
-        
-        // Cập nhật trạng thái chưa đọc trong danh sách cuộc trò chuyện
-        setConversations(prev => 
-          prev.map(conv => 
-            conv.id === selectedConversation 
-              ? { ...conv, unread: false }
-              : conv
-          )
-        );
+
+      // Refresh participant status when selecting a conversation
+      const conversation = conversations.find(c => c.id === selectedConversation);
+      if (conversation && conversation.participantId) {
+        ApiService.get(`/user-status/${conversation.participantId}`, true)
+          .then(response => {
+            setOnlineStatuses(prev => ({
+              ...prev,
+              [conversation.participantId]: response.status
+            }));
+          })
+          .catch(error => {
+            console.error('Error fetching participant status:', error);
+          });
       }
-      
-      // Tham gia vào phòng cuộc trò chuyện qua Socket.IO
+
+      // Join the conversation room via Socket.IO
       if (socketRef.current) {
         socketRef.current.emit('join-conversation', selectedConversation);
       }
     }
   }, [selectedConversation]);
-  
+
   // Hàm lấy danh sách cuộc trò chuyện
   const fetchConversations = async () => {
     try {
       setLoading(true);
       const response = await ApiService.get('/conversation/user', true);
-      
-      // Format dữ liệu và tính toán số lượng chưa đọc
+
+      // Format data and calculate unread counts
       let totalUnreadMessages = 0;
       const newUnreadCounts = {};
-      
+
       const formattedConversations = response.map(conv => {
-        // Tìm người tham gia khác
+        // Find the other participant - this is the key fix
         const otherParticipant = conv.participants.find(
-          p => p._id !== currentUser.id
+          p => p._id.toString() !== currentUser.id.toString()
         );
-        
-        // Kiểm tra số tin nhắn chưa đọc (giả định có thông tin này từ API)
-        // Trong thực tế, bạn cần API trả về số lượng tin nhắn chưa đọc cho mỗi cuộc trò chuyện
+
+        // Save participant ID of the other user
+        const participantId = otherParticipant?._id;
+
+        // Check unread messages
         const unreadCount = conv.unread_count || 0;
-        
+
         if (unreadCount > 0) {
           newUnreadCounts[conv._id] = unreadCount;
           totalUnreadMessages += unreadCount;
         }
-        
+
+        // Always use participant name for P2P conversations
+        let displayName;
+        if (conv.shop_id) {
+          // If it's a shop conversation
+          displayName = conv.shop_id.name;
+        } else if (otherParticipant) {
+          // For regular user-to-user conversations
+          displayName = `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim();
+        } else {
+          displayName = "Người dùng không xác định";
+        }
+
         return {
           id: conv._id,
-          name: conv.shop_id ? conv.shop_id.name : `${otherParticipant?.firstName || ''} ${otherParticipant?.lastName || ''}`,
+          name: displayName,
           lastMessage: conv.last_message || 'Bắt đầu trò chuyện',
           image: conv.shop_id?.logo || donghoAvatar,
           timestamp: new Date(conv.last_message_time).toLocaleString(),
-          unread: unreadCount > 0
+          unread: unreadCount > 0,
+          participantId: participantId
         };
       });
-      
+
       setConversations(formattedConversations);
       setUnreadCounts(newUnreadCounts);
       setTotalUnread(totalUnreadMessages);
-      
-      // Thông báo cho Header về số lượng tin nhắn chưa đọc
+
+      // Notify Header about unread message count
       MessageEventBus.publish('unreadCountChanged', totalUnreadMessages);
-      
+
       // Auto-select first conversation if none is selected
       if (formattedConversations.length > 0 && !selectedConversation) {
         setSelectedConversation(formattedConversations[0].id);
       }
-      
+
       setLoading(false);
     } catch (error) {
       console.error('Error fetching conversations:', error);
@@ -236,13 +302,13 @@ const Message = () => {
       setLoading(false);
     }
   };
-  
+
   // Hàm lấy tin nhắn của cuộc trò chuyện đã chọn
   const fetchMessages = async (conversationId) => {
     try {
       setLoading(true);
       const response = await ApiService.get(`/conversation/${conversationId}/messages`, true);
-      
+
       // Format dữ liệu
       const formattedMessages = response.map(msg => ({
         id: msg._id,
@@ -251,10 +317,10 @@ const Message = () => {
         timestamp: new Date(msg.created_at).toLocaleString(),
         isRead: msg.is_read
       }));
-      
+
       setMessages(formattedMessages);
       setLoading(false);
-      
+
       // Đánh dấu là đã đọc trên server
       try {
         await ApiService.put(`/conversation/${conversationId}/read`, {}, true);
@@ -267,7 +333,7 @@ const Message = () => {
       setLoading(false);
     }
   };
-  
+
   // Hàm xử lý khi đang gõ
   const handleTyping = () => {
     if (socketRef.current && selectedConversation) {
@@ -275,7 +341,7 @@ const Message = () => {
         conversationId: selectedConversation,
         isTyping: true
       });
-      
+
       // Clear typing status after 3 seconds
       setTimeout(() => {
         socketRef.current.emit('typing', {
@@ -285,21 +351,21 @@ const Message = () => {
       }, 3000);
     }
   };
-  
+
   // Hàm gửi tin nhắn
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation) return;
-    
+
     try {
       // Lưu nội dung tin nhắn để sau khi xử lý xong input trống
       const messageContent = newMessage;
-      
+
       // Clear input ngay lập tức để UX tốt hơn
       setNewMessage('');
-      
+
       // ID tạm thời cho tin nhắn
       const tempId = Date.now().toString();
-      
+
       // Thêm tin nhắn vào UI ngay lập tức (optimistic update)
       // setMessages(prev => [...prev, {
       //   id: tempId,
@@ -308,18 +374,18 @@ const Message = () => {
       //   timestamp: new Date().toLocaleString(),
       //   isRead: false
       // }]);
-      
+
       // Cập nhật danh sách cuộc trò chuyện
-      setConversations(prev => 
-        prev.map(conv => 
-          conv.id === selectedConversation 
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === selectedConversation
             ? { ...conv, lastMessage: messageContent, timestamp: new Date().toLocaleString() }
             : conv
         )
       );
-      
-      
-      
+
+
+
       if (socketRef.current && socketRef.current.connected) {
         // Gửi tin nhắn qua Socket.IO
         socketRef.current.emit('send-message', {
@@ -333,13 +399,13 @@ const Message = () => {
           conversationId: selectedConversation,
           content: messageContent
         }, true);
-        
+
         // Nếu dùng API, thay ID tạm thời bằng ID thực từ server
         if (response && response._id) {
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.id === tempId 
-                ? {...msg, id: response._id}
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === tempId
+                ? { ...msg, id: response._id }
                 : msg
             )
           );
@@ -364,7 +430,7 @@ const Message = () => {
           <h2 className="text-lg font-semibold">Nhắn tin</h2>
           <button>-</button>
         </div>
-        
+
         {loading && conversations.length === 0 ? (
           <div className="p-4 text-center text-gray-500">Đang tải...</div>
         ) : error ? (
@@ -373,16 +439,15 @@ const Message = () => {
           <div className="p-4 text-center text-gray-500">Không có cuộc trò chuyện nào</div>
         ) : (
           conversations.map((conv) => (
-            <div 
-              key={conv.id} 
-              className={`p-4 flex items-center hover:bg-gray-100 cursor-pointer ${
-                selectedConversation === conv.id ? 'bg-gray-100' : ''
-              }`}
+            <div
+              key={conv.id}
+              className={`p-4 flex items-center hover:bg-gray-100 cursor-pointer ${selectedConversation === conv.id ? 'bg-gray-100' : ''
+                }`}
               onClick={() => setSelectedConversation(conv.id)}
             >
               <div className="relative">
-                <img 
-                  src={conv.image} 
+                <img
+                  src={conv.image}
                   className='w-12 h-12 rounded-full mr-3 object-cover'
                   alt={conv.name}
                 />
@@ -394,7 +459,25 @@ const Message = () => {
                 )}
               </div>
               <div className="flex-grow">
-                <h3 className="font-semibold">{conv.name}</h3>
+              {participants[selectedConversationData.participantId] ? (
+      <h3 className="font-semibold">
+        {(() => {
+          const participant = participants[selectedConversationData.participantId];
+          console.log("Rendering participant:", participant);
+          
+          // For sellers, show shop name and personal name
+          if (participant.isSeller && participant.shop) {
+            return `${participant.shop.name} (${participant.firstName} ${participant.lastName})`;
+          } 
+          // For regular users, show their name
+          else {
+            return `${participant.firstName} ${participant.lastName}`;
+          }
+        })()}
+      </h3>
+    ) : (
+      <h3 className="font-semibold">{selectedConversationData.name}</h3>
+    )}
                 <p className="text-gray-500 text-sm">{conv.lastMessage}</p>
               </div>
               {conv.unread && (
@@ -410,21 +493,55 @@ const Message = () => {
         <div className="w-3/4 flex flex-col">
           {/* Chat Header */}
           <div className="bg-white p-4 flex items-center border-b">
-            <div className="">
-              <img 
-                src={selectedConversationData.image} 
-                className='w-12 h-12 rounded-full mr-3 object-cover'
-                alt={selectedConversationData.name}
-              />
-            </div>
-            <div>
-              <h3 className="font-semibold">{selectedConversationData.name}</h3>
-              <p className="text-gray-500 text-sm flex items-center gap-1">
-                <div className='w-3 h-3 rounded-full bg-green-600'></div>
-                Đang hoạt động
-              </p>
-            </div>
-          </div>
+  <div className="">
+    <img
+      src={selectedConversationData.image}
+      className='w-12 h-12 rounded-full mr-3 object-cover'
+      alt={selectedConversationData.name}
+    />
+  </div>
+  <div>
+    {participants[selectedConversationData.participantId] ? (
+      <h3 className="font-semibold">
+        {(() => {
+          const participant = participants[selectedConversationData.participantId];
+          console.log("Rendering participant:", participant);
+          
+          // For sellers, show shop name and personal name
+          if (participant.isSeller && participant.shop) {
+            return `${participant.shop.name} (${participant.firstName} ${participant.lastName})`;
+          } 
+          // For regular users, show their name
+          else {
+            return `${participant.firstName} ${participant.lastName}`;
+          }
+        })()}
+      </h3>
+    ) : (
+      <h3 className="font-semibold">{selectedConversationData.name}</h3>
+    )}
+    <p className="text-gray-500 text-sm flex items-center gap-1">
+      {participants[selectedConversationData.participantId] && (
+        <>
+          <div className={`w-3 h-3 rounded-full ${
+            onlineStatuses[selectedConversationData.participantId] === 'online'
+              ? 'bg-green-600'
+              : onlineStatuses[selectedConversationData.participantId] === 'recently'
+                ? 'bg-yellow-500'
+                : 'bg-gray-400'
+          }`}></div>
+          <span>
+            {onlineStatuses[selectedConversationData.participantId] === 'online'
+              ? 'Đang hoạt động'
+              : onlineStatuses[selectedConversationData.participantId] === 'recently'
+                ? 'Vừa hoạt động gần đây'
+                : 'Không hoạt động'}
+          </span>
+        </>
+      )}
+    </p>
+  </div>
+</div>
 
           {/* Messages */}
           <div className="flex-grow overflow-y-auto p-4 space-y-4">
@@ -437,17 +554,16 @@ const Message = () => {
             ) : (
               <>
                 {messages.map((msg) => (
-                  <div 
-                    key={msg.id} 
-                    className={`flex ${
-                      msg.sender === 'me' ? 'justify-end' : 'justify-start'
-                    }`}
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'
+                      }`}
                   >
-                    <div 
+                    <div
                       className={`
                         max-w-[70%] p-3 rounded-lg 
-                        ${msg.sender === 'me' 
-                          ? 'bg-purple-600 text-white' 
+                        ${msg.sender === 'me'
+                          ? 'bg-purple-600 text-white'
                           : 'bg-gray-200 text-black'
                         }
                       `}
@@ -457,7 +573,7 @@ const Message = () => {
                     </div>
                   </div>
                 ))}
-                
+
                 {/* Typing indicator */}
                 {typing[selectedConversation] && (
                   <div className="flex justify-start">
@@ -470,7 +586,7 @@ const Message = () => {
                     </div>
                   </div>
                 )}
-                
+
                 {/* This empty div helps with scrolling to bottom */}
                 <div ref={messagesEndRef} />
               </>
@@ -485,8 +601,8 @@ const Message = () => {
             <button className="mr-2">
               <Smile size={24} className="text-gray-500" />
             </button>
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Nhập tin nhắn..."
               className="flex-grow bg-gray-100 p-2 rounded-full mr-2"
               value={newMessage}
@@ -494,7 +610,7 @@ const Message = () => {
               onKeyUp={handleTyping}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
             />
-            <button 
+            <button
               onClick={handleSendMessage}
               className="bg-purple-600 text-white p-2 rounded-full"
             >
@@ -508,7 +624,7 @@ const Message = () => {
             <p className="mb-2">Chọn một cuộc trò chuyện để bắt đầu</p>
             {conversations.length === 0 && !loading && (
               <p>
-                Bạn chưa có cuộc trò chuyện nào. Hãy ghé thăm một cửa hàng 
+                Bạn chưa có cuộc trò chuyện nào. Hãy ghé thăm một cửa hàng
                 và bắt đầu trò chuyện!
               </p>
             )}

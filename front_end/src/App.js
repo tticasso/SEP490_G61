@@ -106,7 +106,7 @@ function App() {
               <DiscountProducts />
             </SellerRoute>
           } />
-          <Route path="/seller-dashboard/discount-product/add-discount" element={
+          <Route path="/seller-dashboard/add-discount" element={
             <SellerRoute>
               <AddDiscount />
             </SellerRoute>

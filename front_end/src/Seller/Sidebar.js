@@ -72,7 +72,7 @@ const Sidebar = ({ onNavigate }) => {
       expandable: true,
       subItems: [
         { label: 'Tất cả khuyến mại', path: '/seller-dashboard/discounts' },
-        { label: 'Tạo mã giảm giá', path: '/seller-dashboard/create-discount-code' }
+        { label: 'Tạo mã giảm giá', path: '/seller-dashboard/add-discount' }
       ]
     },
     { 

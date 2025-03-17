@@ -293,7 +293,7 @@ const CheckoutPage = () => {
                 } catch (secondApiError) {
                     console.error("Lỗi khi gọi API address thay thế:", secondApiError);
                     setAddresses([]);
-                    setError("Không thể lấy danh sách địa chỉ. Vui lòng thêm địa chỉ mới.");
+                    setError(" Vui lòng thêm địa chỉ mới.");
                 }
             }
         } catch (err) {
@@ -590,14 +590,7 @@ const CheckoutPage = () => {
                         ) : error && addresses.length === 0 ? (
                             <div className="text-red-500 text-center py-4">
                                 {error}
-                                <div className="mt-2">
-                                    <button
-                                        onClick={handleRefreshAddresses}
-                                        className="text-purple-600 hover:underline"
-                                    >
-                                        Thử lại
-                                    </button>
-                                </div>
+                               
                             </div>
                         ) : addresses.length === 0 ? (
                             <div className="text-center py-4 text-gray-500">

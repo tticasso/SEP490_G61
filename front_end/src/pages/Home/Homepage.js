@@ -9,6 +9,7 @@ import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import CartModal from '../cart/CartModal'; // Import CartModal component
 import { useAuth } from '../Login/context/AuthContext';
+import { CartEventBus } from '../cart/CartEventBus';
 
 const TroocEcommerce = () => {
     const [hoveredProduct, setHoveredProduct] = useState(null);
@@ -143,6 +144,9 @@ const TroocEcommerce = () => {
 
             // Use the correct path - matches with your router
             await ApiService.post('/cart/add-item', payload);
+
+            // Thông báo rằng giỏ hàng đã thay đổi
+            CartEventBus.publish('cartUpdated');
 
             // Đóng cart modal nếu đang mở
             if (showCartModal) {

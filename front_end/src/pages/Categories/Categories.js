@@ -4,6 +4,8 @@ import dongho from '../../assets/dongho.png'
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import CartModal from '../cart/CartModal'; // Import CartModal component
+import { useLocation } from 'react-router-dom';
+import { CartEventBus } from '../cart/CartEventBus';
 
 const Categories = () => {
     // State cho dữ liệu từ API
@@ -18,6 +20,9 @@ const Categories = () => {
     // const [selectedRatings, setSelectedRatings] = useState([]);
     const [selectedLocations, setSelectedLocations] = useState([]);
 
+    // Add a new state variable to store the search query
+    const [searchQuery, setSearchQuery] = useState('');
+
     // State cho chế độ xem và sắp xếp
     const [viewMode, setViewMode] = useState('grid');
     const [sortOption, setSortOption] = useState('Đặc sắc');
@@ -29,7 +34,7 @@ const Categories = () => {
     const [quantity, setQuantity] = useState(1);
     const [selectedColor, setSelectedColor] = useState('Đen'); // Default color
     const [selectedSize, setSelectedSize] = useState('M'); // Default size
-    
+
     // State cho giỏ hàng
     const [showCartModal, setShowCartModal] = useState(false);
     const [cartRefreshTrigger, setCartRefreshTrigger] = useState(0);
@@ -39,6 +44,9 @@ const Categories = () => {
     // Get current user information
     const currentUser = AuthService.getCurrentUser();
     const userId = currentUser?._id || currentUser?.id || "";
+
+    //add this near the top of your component
+    const location = useLocation();
 
     // Danh sách các tỉnh thành
     const provinces = [
@@ -61,22 +69,41 @@ const Categories = () => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                
+
                 // Lấy danh mục
                 const categoriesData = await ApiService.get('/categories', false);
                 setCategories(categoriesData);
-                
+
                 // Lấy sản phẩm
                 const productsData = await ApiService.get('/product', false);
-                setProducts(productsData);
-                
-                // Xác định danh mục từ URL nếu có
-                const urlParams = new URLSearchParams(window.location.search);
+
+                // Parse URL parameters
+                const urlParams = new URLSearchParams(location.search);
+                const search = urlParams.get('search');
                 const categoryId = urlParams.get('category');
+
+                // Save search query in state if present
+                if (search) {
+                    setSearchQuery(search);
+
+                    // Filter products based on search query
+                    const searchLower = search.toLowerCase();
+                    const filteredProducts = productsData.filter(product =>
+                        product.name.toLowerCase().includes(searchLower) ||
+                        (product.description && product.description.toLowerCase().includes(searchLower))
+                    );
+                    setProducts(filteredProducts);
+                } else {
+                    setProducts(productsData);
+                    // Clear search query when no search is present
+                    setSearchQuery('');
+                }
+
+                // Set selected category if present in URL
                 if (categoryId) {
                     setSelectedCategory(categoryId);
                 }
-                
+
                 setLoading(false);
             } catch (err) {
                 console.error("Error fetching data:", err);
@@ -86,7 +113,7 @@ const Categories = () => {
         };
 
         fetchData();
-    }, []);
+    }, [location.search]);
 
     // Thêm sản phẩm vào giỏ hàng
     const addToCart = async (product, quantity = 1, fromModal = false) => {
@@ -95,7 +122,7 @@ const Categories = () => {
             window.location.href = "/login";
             return;
         }
-    
+
         try {
             // First find if the user already has a cart
             let cartId;
@@ -107,14 +134,14 @@ const Categories = () => {
                 const newCart = await ApiService.post('/cart/create', { user_id: userId });
                 cartId = newCart._id;
             }
-    
+
             // Now add the item to the cart
             const payload = {
                 cart_id: cartId,
                 product_id: product._id,
                 quantity: fromModal ? quantity : 1
             };
-    
+
             // If options are selected in modal, include them
             if (fromModal && (selectedColor || selectedSize)) {
                 payload.selected_options = {
@@ -122,28 +149,31 @@ const Categories = () => {
                     size: selectedSize
                 };
             }
-    
+
             // Use the correct path - matches with your router
             await ApiService.post('/cart/add-item', payload);
-    
+
+            // Thông báo rằng giỏ hàng đã thay đổi
+            CartEventBus.publish('cartUpdated');
+
             // Đóng cart modal nếu đang mở
             if (showCartModal) {
                 setShowCartModal(false);
             }
-    
+
             // Show success message
             setAddCartMessage(`${product.name} đã được thêm vào giỏ hàng!`);
             setShowMessage(true);
-    
+
             // Hide message after 3 seconds
             setTimeout(() => {
                 setShowMessage(false);
             }, 3000);
-    
+
             // Always trigger a refresh of the cart when adding items,
             // regardless of whether the cart modal is open or not
             setCartRefreshTrigger(prev => prev + 1);
-    
+
             // If adding from modal, close it
             if (fromModal) {
                 setShowProductModal(false);
@@ -153,13 +183,13 @@ const Categories = () => {
             console.error("Error adding item to cart:", error);
             setAddCartMessage("Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại sau.");
             setShowMessage(true);
-    
+
             setTimeout(() => {
                 setShowMessage(false);
             }, 3000);
         }
     };
-    
+
 
     // Lọc sản phẩm dựa trên bộ lọc đã chọn
     const filteredProducts = products.filter(product => {
@@ -167,7 +197,7 @@ const Categories = () => {
         if (selectedCategory && product.category_id) {
             // Kiểm tra nếu category_id là mảng hoặc đối tượng
             if (Array.isArray(product.category_id)) {
-                const categoryMatch = product.category_id.some(catId => 
+                const categoryMatch = product.category_id.some(catId =>
                     catId === selectedCategory || (catId._id && catId._id === selectedCategory)
                 );
                 if (!categoryMatch) return false;
@@ -177,18 +207,18 @@ const Categories = () => {
                 return false;
             }
         }
-        
+
         // Lọc theo khoảng giá
         if (priceRange.min && product.price < parseFloat(priceRange.min)) return false;
         if (priceRange.max && product.price > parseFloat(priceRange.max)) return false;
-        
+
         // Lọc theo đánh giá
         // if (selectedRatings.length > 0) {
         //     const productRating = product.rating || 0;
         //     const matchRating = selectedRatings.some(rating => productRating >= rating);
         //     if (!matchRating) return false;
         // }
-        
+
         // Lọc theo địa điểm
         if (selectedLocations.length > 0) {
             // Giả định mỗi sản phẩm có trường location
@@ -196,7 +226,7 @@ const Categories = () => {
             const productLocation = product.location || 'Hà Nội';
             if (!selectedLocations.includes(productLocation)) return false;
         }
-        
+
         return true;
     });
 
@@ -211,11 +241,11 @@ const Categories = () => {
             // Đầu tiên theo is_hot
             if ((a.is_hot && !b.is_hot) || (a.is_hot === true && b.is_hot !== true)) return -1;
             if ((!a.is_hot && b.is_hot) || (a.is_hot !== true && b.is_hot === true)) return 1;
-            
+
             // Sau đó theo is_feature
             if ((a.is_feature && !b.is_feature) || (a.is_feature === true && b.is_feature !== true)) return -1;
             if ((!a.is_feature && b.is_feature) || (a.is_feature !== true && b.is_feature === true)) return 1;
-            
+
             // Sau đó theo rating
             return (b.rating || 0) - (a.rating || 0);
         }
@@ -289,7 +319,7 @@ const Categories = () => {
     const renderProductCard = (product) => {
         // Quy đổi _id hoặc id để sử dụng nhất quán
         const productId = product._id || product.id;
-        
+
         return (
             <div
                 key={productId}
@@ -389,7 +419,7 @@ const Categories = () => {
                 <div className="text-center">
                     <div className="text-red-500 text-xl mb-4">❌ Đã xảy ra lỗi</div>
                     <p className="text-gray-700">{error}</p>
-                    <button 
+                    <button
                         onClick={() => window.location.reload()}
                         className="mt-4 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
                     >
@@ -403,19 +433,19 @@ const Categories = () => {
     return (
         <div className="max-w-7xl mx-auto px-4 py-8 relative">
             {/* Cart Modal Component */}
-            <CartModal 
-                isOpen={showCartModal} 
+            <CartModal
+                isOpen={showCartModal}
                 onClose={() => setShowCartModal(false)}
                 refreshTrigger={cartRefreshTrigger}
             />
-            
+
             {/* Success/Error Message */}
             {showMessage && (
                 <div className="fixed top-5 right-5 bg-white p-4 rounded-lg shadow-lg z-50 border-l-4 border-green-500">
                     <p>{addCartMessage}</p>
                 </div>
             )}
-            
+
             <div className="flex flex-col md:flex-row">
                 {/* Sidebar Categories */}
                 <div className="md:pr-6 md:border-r md:w-1/4 mb-6 md:mb-0">
@@ -426,8 +456,8 @@ const Categories = () => {
                                 key={category._id}
                                 className={`
                                     text-sm cursor-pointer
-                                    ${selectedCategory === category._id 
-                                        ? 'text-purple-600 font-bold' 
+                                    ${selectedCategory === category._id
+                                        ? 'text-purple-600 font-bold'
                                         : 'text-gray-700 hover:text-purple-600'}
                                 `}
                                 onClick={() => handleCategorySelect(category._id)}
@@ -439,7 +469,7 @@ const Categories = () => {
                     <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
                     <div className="mt-8">
                         <h3 className="text-lg font-bold mb-4">BỘ LỌC</h3>
-                        <div 
+                        <div
                             className="flex items-center text-gray-500 cursor-pointer hover:text-purple-600"
                             onClick={clearFilters}
                         >
@@ -467,13 +497,13 @@ const Categories = () => {
                                 onChange={(e) => handlePriceChange('max', e.target.value)}
                             />
                         </div>
-                        <button 
+                        <button
                             className="w-full mt-2 bg-purple-600 text-white py-2 rounded hover:bg-purple-700"
                             onClick={applyPriceFilter}
                         >
                             Áp dụng
                         </button>
-                    </div>               
+                    </div>
                     <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
                     {/* <div className="mt-4">
                         <h3 className="text-lg font-bold mb-4">NƠI BÁN</h3>
@@ -508,6 +538,25 @@ const Categories = () => {
                         <div className="text-gray-700">
                             <span>{sortedProducts.length} Sản phẩm</span>
                         </div>
+
+                        {searchQuery && (
+                            <div className="mb-4 p-3 bg-purple-100 rounded">
+                                <div className="flex items-center">
+                                    <span className="text-sm font-medium text-purple-700">
+                                        Kết quả tìm kiếm cho: "{searchQuery}"
+                                    </span>
+                                    <button
+                                        className="ml-auto text-xs pl-4 text-purple-500 hover:text-purple-700"
+                                        onClick={() => {
+                                            // Clear search by redirecting to categories without search param
+                                            window.location.href = '/categories';
+                                        }}
+                                    >
+                                        Xóa tìm kiếm
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                         <div className="flex items-center space-x-4">
                             <div className="flex space-x-2">
                                 <button
@@ -548,13 +597,13 @@ const Categories = () => {
                         <div className="mb-4 p-3 bg-gray-100 rounded">
                             <div className="flex flex-wrap gap-2 items-center">
                                 <span className="text-sm font-medium text-gray-700">Bộ lọc đang áp dụng:</span>
-                                
+
                                 {selectedCategory && (
                                     <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs flex items-center">
                                         {categories.find(c => c._id === selectedCategory)?.name}
-                                        <XIcon 
-                                            size={14} 
-                                            className="ml-1 cursor-pointer" 
+                                        <XIcon
+                                            size={14}
+                                            className="ml-1 cursor-pointer"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedCategory(null);
@@ -562,13 +611,13 @@ const Categories = () => {
                                         />
                                     </div>
                                 )}
-                                
+
                                 {(priceRange.min || priceRange.max) && (
                                     <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs flex items-center">
                                         Giá: {priceRange.min ? formatPrice(priceRange.min) : '0đ'} - {priceRange.max ? formatPrice(priceRange.max) : '∞'}
-                                        <XIcon 
-                                            size={14} 
-                                            className="ml-1 cursor-pointer" 
+                                        <XIcon
+                                            size={14}
+                                            className="ml-1 cursor-pointer"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setPriceRange({ min: '', max: '' });
@@ -576,7 +625,7 @@ const Categories = () => {
                                         />
                                     </div>
                                 )}
-                                
+
                                 {/* {selectedRatings.length > 0 && (
                                     <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs flex items-center">
                                         Đánh giá: {selectedRatings.sort().join(', ')} sao trở lên
@@ -590,15 +639,15 @@ const Categories = () => {
                                         />
                                     </div>
                                 )} */}
-                                
+
                                 {selectedLocations.length > 0 && (
                                     <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs flex items-center">
-                                        Địa điểm: {selectedLocations.length > 2 
-                                            ? `${selectedLocations.slice(0, 2).join(', ')} +${selectedLocations.length - 2}` 
+                                        Địa điểm: {selectedLocations.length > 2
+                                            ? `${selectedLocations.slice(0, 2).join(', ')} +${selectedLocations.length - 2}`
                                             : selectedLocations.join(', ')}
-                                        <XIcon 
-                                            size={14} 
-                                            className="ml-1 cursor-pointer" 
+                                        <XIcon
+                                            size={14}
+                                            className="ml-1 cursor-pointer"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedLocations([]);
@@ -606,8 +655,8 @@ const Categories = () => {
                                         />
                                     </div>
                                 )}
-                                
-                                <button 
+
+                                <button
                                     className="text-xs text-red-500 hover:text-red-700 ml-auto"
                                     onClick={clearFilters}
                                 >
@@ -632,7 +681,7 @@ const Categories = () => {
                     ) : (
                         <div className="py-8 text-center">
                             <p className="text-gray-500">Không tìm thấy sản phẩm phù hợp với bộ lọc hiện tại.</p>
-                            <button 
+                            <button
                                 className="mt-4 text-purple-600 hover:text-purple-800"
                                 onClick={clearFilters}
                             >
@@ -760,7 +809,7 @@ const Categories = () => {
                                 >
                                     THÊM VÀO GIỎ HÀNG
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => window.location.href = `/product-detail?id=${selectedProduct._id || selectedProduct.id}`}
                                     className='w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium mt-4'
                                 >

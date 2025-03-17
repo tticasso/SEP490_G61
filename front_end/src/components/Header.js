@@ -20,8 +20,11 @@ import {
 import CartModal from '../pages/cart/CartModal';
 import logo from '../assets/logo.png';
 import AuthService from '../services/AuthService';
+import ApiService from '../services/ApiService';
 // Import MessageEventBus từ Message.js
 import { MessageEventBus } from '../pages/UserProfile/components/Message';
+import { CartEventBus } from '../pages/cart/CartEventBus';
+
 
 const ProductCategoriesSidebar = ({ isOpen, onClose, buttonRef }) => {
     const sidebarRef = useRef(null);
@@ -94,6 +97,7 @@ const Header = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isCategoriesSidebarOpen, setIsCategoriesSidebarOpen] = useState(false);
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+    const [cartTotal, setCartTotal] = useState(0);
     // State cho số lượng tin nhắn chưa đọc
     const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
@@ -111,12 +115,43 @@ const Header = () => {
         const unsubscribe = MessageEventBus.subscribe('unreadCountChanged', (count) => {
             setUnreadMessageCount(count);
         });
-        
+
         // Cleanup khi component unmount
         return () => {
             unsubscribe();
         };
     }, []);
+
+     // Always check both id and _id for compatibility
+     const userId = currentUser?.id || currentUser?._id || "";
+
+    useEffect(() => {
+        if (isLoggedIn) {
+            fetchCartTotal();
+        } else {
+            setCartTotal(0);
+        }
+    }, [isLoggedIn, userId]);
+
+    // Update cart total when cart modal opens or closes
+    useEffect(() => {
+        if (isLoggedIn && isCartOpen) {
+            fetchCartTotal();
+        }
+    }, [isCartOpen]);
+
+    useEffect(() => {
+        // Đăng ký lắng nghe sự kiện khi giỏ hàng cập nhật
+        const unsubscribe = CartEventBus.subscribe('cartUpdated', () => {
+          console.log('Cart updated, refreshing total...');
+          fetchCartTotal();
+        });
+        
+        // Cleanup khi component unmount
+        return () => {
+          unsubscribe();
+        };
+      }, []);
 
     // Lắng nghe sự kiện localStorage thay đổi
     useEffect(() => {
@@ -126,40 +161,71 @@ const Header = () => {
             const user = AuthService.getCurrentUser();
             // Kiểm tra đăng nhập
             const loggedIn = AuthService.isLoggedIn();
-            
+
             // Cập nhật state
             setIsLoggedIn(loggedIn);
             setCurrentUser(user);
-            
+
             console.log('Header detected auth change:', { loggedIn, userRoles: user?.roles });
         };
 
         // Đăng ký lắng nghe sự kiện storage
         window.addEventListener('storage', handleStorageChange);
-        
+
         // Cập nhật trạng thái ban đầu
         handleStorageChange();
-        
+
         // Cleanup khi component unmount
         return () => {
             window.removeEventListener('storage', handleStorageChange);
         };
     }, []);
 
-    // Always check both id and _id for compatibility
-    const userId = currentUser?.id || currentUser?._id || "";
-    
+   
+
+    const formatPrice = (price) => {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(price).replace('₫', 'đ');
+    };
+
+    const fetchCartTotal = async () => {
+        if (!userId) {
+            setCartTotal(0);
+            return;
+        }
+
+        try {
+            const response = await ApiService.get(`/cart/user/${userId}`);
+            if (response && response.items) {
+                const total = response.items.reduce((sum, item) => {
+                    const price = item.product_id && typeof item.product_id === 'object'
+                        ? (item.product_id.discounted_price || item.product_id.price)
+                        : 0;
+                    return sum + price * item.quantity;
+                }, 0);
+                setCartTotal(total);
+            } else {
+                setCartTotal(0);
+            }
+        } catch (error) {
+            console.error('Error fetching cart total:', error);
+            setCartTotal(0);
+        }
+    };
+
     // Kiểm tra xem người dùng có role SELLER không - cải tiến phương pháp phát hiện role
     const isSeller = currentUser?.roles?.some(role => {
         // Kiểm tra nhiều dạng role có thể có
         if (typeof role === 'object' && role !== null) {
             return role.name === "SELLER" || role.name === "ROLE_SELLER";
         }
-        
+
         if (typeof role === 'string') {
             return role === "SELLER" || role === "ROLE_SELLER";
         }
-        
+
         return false;
     });
 
@@ -169,6 +235,14 @@ const Header = () => {
 
     const toggleUserDropdown = () => {
         setIsUserDropdownOpen(!isUserDropdownOpen);
+    };
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+            // Navigate to categories page with search query
+            navigate(`/categories?search=${encodeURIComponent(searchQuery.trim())}`);
+        }
     };
 
     // Xử lý đăng xuất - sử dụng AuthService trực tiếp
@@ -265,7 +339,7 @@ const Header = () => {
                         </div>
 
                         {/* Search Input */}
-                        <div className="flex-grow relative w-2/5">
+                        <form onSubmit={handleSearch} className="flex-grow relative w-2/5">
                             <input
                                 type="text"
                                 placeholder="Tìm kiếm sản phẩm..."
@@ -273,10 +347,13 @@ const Header = () => {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                             />
-                            <button className="absolute right-0 top-0 bottom-0 px-4 bg-purple-600 text-white rounded-r-md hover:bg-purple-700">
+                            <button
+                                type="submit"
+                                className="absolute right-0 top-0 bottom-0 px-4 bg-purple-600 text-white rounded-r-md hover:bg-purple-700"
+                            >
                                 <Search size={20} />
                             </button>
-                        </div>
+                        </form>
                     </div>
 
                     {/* User Actions */}
@@ -410,7 +487,7 @@ const Header = () => {
                             </button>
                             <div className='flex flex-col items-center text-gray-600 hover:text-purple-600 text-xs'>
                                 <p>Giỏ hàng</p>
-                                <span>0 ₫</span>
+                                <span>{formatPrice(cartTotal)}</span>
                             </div>
                         </div>
 

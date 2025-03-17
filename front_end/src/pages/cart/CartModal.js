@@ -3,13 +3,13 @@ import { CircleX } from 'lucide-react';
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import CartItem from './CartItems';
-import dongho from '../../assets/dongho.png';
+import { CartEventBus } from './CartEventBus';
 
 const CartModal = ({ isOpen, onClose, refreshTrigger = 0 }) => {
     const [cartItems, setCartItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    
+
     // Lấy user_id từ thông tin người dùng đã đăng nhập
     const currentUser = AuthService.getCurrentUser();
     const userId = currentUser?._id || currentUser?.id || "";
@@ -47,16 +47,19 @@ const CartModal = ({ isOpen, onClose, refreshTrigger = 0 }) => {
 
     const updateQuantity = async (cartItemId, newQuantity) => {
         if (newQuantity < 1) return;
-        
+
         try {
             // Gọi API cập nhật số lượng
             await ApiService.put('/cart/update-item', {
                 cart_item_id: cartItemId,
                 quantity: newQuantity
             });
-            
+
+            // Thông báo rằng giỏ hàng đã thay đổi
+            CartEventBus.publish('cartUpdated');
+
             // Cập nhật state local
-            setCartItems(cartItems.map(item => 
+            setCartItems(cartItems.map(item =>
                 item._id === cartItemId ? { ...item, quantity: newQuantity } : item
             ));
         } catch (error) {
@@ -69,7 +72,10 @@ const CartModal = ({ isOpen, onClose, refreshTrigger = 0 }) => {
         try {
             // Gọi API xóa sản phẩm
             await ApiService.delete(`/cart/remove-item/${cartItemId}`);
-            
+
+            // Thông báo rằng giỏ hàng đã thay đổi
+            CartEventBus.publish('cartUpdated');
+
             // Cập nhật state local
             setCartItems(cartItems.filter(item => item._id !== cartItemId));
         } catch (error) {
@@ -81,8 +87,8 @@ const CartModal = ({ isOpen, onClose, refreshTrigger = 0 }) => {
     const calculateTotal = () => {
         return cartItems.reduce((total, item) => {
             // Kiểm tra xem product_id có phải là object có price không
-            const price = item.product_id && typeof item.product_id === 'object' 
-                ? (item.product_id.discounted_price || item.product_id.price) 
+            const price = item.product_id && typeof item.product_id === 'object'
+                ? (item.product_id.discounted_price || item.product_id.price)
                 : 0;
             return total + price * item.quantity;
         }, 0);
@@ -91,7 +97,7 @@ const CartModal = ({ isOpen, onClose, refreshTrigger = 0 }) => {
     if (!isOpen) return null;
 
     return (
-        <div 
+        <div
             className="fixed top-0 right-0 w-96 h-full bg-white shadow-lg z-50 
             transition-transform duration-300 ease-in-out transform translate-x-0"
         >
@@ -110,7 +116,7 @@ const CartModal = ({ isOpen, onClose, refreshTrigger = 0 }) => {
                 ) : !userId ? (
                     <div className="text-center py-4">
                         <p className="mb-4">Vui lòng đăng nhập để xem giỏ hàng</p>
-                        <button 
+                        <button
                             onClick={() => window.location.href = "/login"}
                             className="bg-purple-600 text-white px-4 py-2 rounded"
                         >
@@ -121,9 +127,9 @@ const CartModal = ({ isOpen, onClose, refreshTrigger = 0 }) => {
                     <div className="text-center py-4">Giỏ hàng trống</div>
                 ) : (
                     cartItems.map((item) => (
-                        <CartItem 
-                            key={item._id} 
-                            item={item} 
+                        <CartItem
+                            key={item._id}
+                            item={item}
                             onUpdateQuantity={updateQuantity}
                             onRemove={removeItem}
                         />
@@ -146,9 +152,9 @@ const CartModal = ({ isOpen, onClose, refreshTrigger = 0 }) => {
                     </button>
                 </div>
             )}
-            
+
             {/* Nút làm mới thủ công */}
-            <button 
+            <button
                 onClick={fetchCartData}
                 className="absolute bottom-4 left-4 text-sm text-purple-600 hover:text-purple-800"
             >

@@ -7,7 +7,7 @@ const couponRouter = express.Router();
 couponRouter.use(bodyParser.json());
 
 // Lấy tất cả mã giảm giá (phân trang, lọc) - Admin và Seller
-couponRouter.get("/list", [VerifyJwt.verifyToken, VerifyJwt.isAdminOrSeller], couponController.getAllCoupons);
+couponRouter.get("/list", [VerifyJwt.verifyToken], couponController.getAllCoupons);
 
 // Lấy mã giảm giá theo ID - Admin và Seller
 couponRouter.get("/find/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdminOrSeller], couponController.getCouponById);

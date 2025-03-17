@@ -15,6 +15,7 @@ const Cart = () => {
     const [selectedItems, setSelectedItems] = useState({}); // State để lưu trữ các sản phẩm được chọn
     const [showCouponModal, setShowCouponModal] = useState(false);
     const [availableCoupons, setAvailableCoupons] = useState([]);
+    const [loadingCoupons, setLoadingCoupons] = useState(false);
     const currentUser = AuthService.getCurrentUser();
     const userId = currentUser?._id || currentUser?.id || "";
 
@@ -106,45 +107,28 @@ const Cart = () => {
 
     const fetchAvailableCoupons = async () => {
         try {
-            // Lấy danh sách mã giảm giá khả dụng
-            // Thực tế nên có API riêng để lấy các coupon khả dụng cho người dùng hiện tại
-            // Đây là một ví dụ giả định, trong thực tế bạn cần sửa endpoint này
-            const response = await ApiService.get('/coupon/available');
-            setAvailableCoupons(response.coupons || []);
+            setLoadingCoupons(true);
+            // Lấy danh sách mã giảm giá khả dụng từ API
+            const response = await ApiService.get('/coupon/list?active=true&limit=100');
+            
+            if (response && response.coupons && response.coupons.length > 0) {
+                // Lọc các mã giảm giá còn hạn sử dụng
+                const currentDate = new Date();
+                const validCoupons = response.coupons.filter(coupon => {
+                    const startDate = new Date(coupon.start_date);
+                    const endDate = new Date(coupon.end_date);
+                    return startDate <= currentDate && endDate >= currentDate && !coupon.is_delete;
+                });
+                
+                setAvailableCoupons(validCoupons);
+            } else {
+                setAvailableCoupons([]);
+            }
+            setLoadingCoupons(false);
         } catch (error) {
             console.error('Error fetching available coupons:', error);
-            // Tạo một số mã giảm giá mẫu để hiển thị
-            setAvailableCoupons([
-                {
-                    _id: '1',
-                    code: 'WELCOME10',
-                    description: 'Giảm 10% cho đơn hàng đầu tiên',
-                    value: 10,
-                    type: 'percentage',
-                    min_order_value: 100000,
-                    max_discount_value: 50000,
-                    end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 ngày từ bây giờ
-                },
-                {
-                    _id: '2',
-                    code: 'FREESHIP',
-                    description: 'Miễn phí vận chuyển cho đơn hàng từ 500.000đ',
-                    value: 30000,
-                    type: 'fixed',
-                    min_order_value: 500000,
-                    end_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000) // 15 ngày từ bây giờ
-                },
-                {
-                    _id: '3',
-                    code: 'SUMMER25',
-                    description: 'Giảm 25% cho đơn hàng mùa hè',
-                    value: 25,
-                    type: 'percentage',
-                    min_order_value: 300000,
-                    max_discount_value: 100000,
-                    end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 ngày từ bây giờ
-                }
-            ]);
+            setAvailableCoupons([]);
+            setLoadingCoupons(false);
         }
     };
 
@@ -370,6 +354,9 @@ const Cart = () => {
     const CouponModal = () => {
         if (!showCouponModal) return null;
         
+        // Get current cart total for filtering
+        const cartTotal = calculateTotal();
+        
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
@@ -385,42 +372,56 @@ const Cart = () => {
                         </button>
                     </div>
                     
-                    {availableCoupons.length === 0 ? (
+                    {loadingCoupons ? (
+                        <div className="text-center py-8">
+                            <p>Đang tải mã giảm giá...</p>
+                        </div>
+                    ) : availableCoupons.length === 0 ? (
                         <div className="text-center py-8">
                             <p>Không có mã giảm giá khả dụng</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {availableCoupons.map(coupon => (
-                                <div 
-                                    key={coupon._id} 
-                                    className="border border-dashed border-purple-500 rounded-lg p-4 hover:bg-purple-50 transition"
-                                >
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <h4 className="font-bold text-purple-600">{coupon.code}</h4>
-                                            <p className="text-sm">{coupon.description}</p>
-                                            <div className="mt-1 text-xs text-gray-500">
-                                                <p>Đơn tối thiểu: {coupon.min_order_value.toLocaleString()}đ</p>
-                                                <p>Hết hạn: {new Date(coupon.end_date).toLocaleDateString()}</p>
+                            {availableCoupons.map(coupon => {
+                                const isValueValid = cartTotal >= (coupon.min_order_value || 0);
+                                
+                                return (
+                                    <div 
+                                        key={coupon._id} 
+                                        className={`border border-dashed ${isValueValid ? 'border-purple-500' : 'border-gray-400'} rounded-lg p-4 hover:bg-purple-50 transition ${!isValueValid ? 'opacity-70' : ''}`}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h4 className={`font-bold ${isValueValid ? 'text-purple-600' : 'text-gray-600'}`}>{coupon.code}</h4>
+                                                <p className="text-sm">{coupon.description}</p>
+                                                <div className="mt-1 text-xs text-gray-500">
+                                                    <p>Đơn tối thiểu: {coupon.min_order_value?.toLocaleString() || '0'}đ</p>
+                                                    <p>Hết hạn: {new Date(coupon.end_date).toLocaleDateString()}</p>
+                                                </div>
                                             </div>
+                                            <button 
+                                                onClick={() => applyCoupon(coupon.code)}
+                                                className={`${isValueValid ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-400 cursor-not-allowed'} text-white px-4 py-2 rounded-md`}
+                                                disabled={!isValueValid}
+                                            >
+                                                {isValueValid ? 'Áp dụng' : 'Không khả dụng'}
+                                            </button>
                                         </div>
-                                        <button 
-                                            onClick={() => applyCoupon(coupon.code)}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md"
-                                        >
-                                            Áp dụng
-                                        </button>
-                                    </div>
-                                    <div className="mt-2">
-                                        <div className="text-sm font-medium">
-                                            {coupon.type === 'percentage' 
-                                                ? `Giảm ${coupon.value}% tối đa ${coupon.max_discount_value?.toLocaleString() || 'không giới hạn'}đ` 
-                                                : `Giảm ${coupon.value.toLocaleString()}đ`}
+                                        <div className="mt-2">
+                                            <div className="text-sm font-medium">
+                                                {coupon.type === 'percentage' 
+                                                    ? `Giảm ${coupon.value}% tối đa ${coupon.max_discount_value?.toLocaleString() || 'không giới hạn'}đ` 
+                                                    : `Giảm ${coupon.value.toLocaleString()}đ`}
+                                            </div>
+                                            {!isValueValid && (
+                                                <div className="text-xs text-red-500 mt-1">
+                                                    Đơn hàng chưa đạt giá trị tối thiểu
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>

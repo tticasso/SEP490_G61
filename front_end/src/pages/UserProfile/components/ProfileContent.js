@@ -11,10 +11,10 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
     // State cho thông báo lỗi và thành công
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    
+
     // Lưu trữ giá trị ban đầu để có thể hủy thay đổi
     const [initialProfile, setInitialProfile] = useState(null);
-    
+
     // Xử lý khi nhấn nút Chỉnh sửa
     const handleEdit = () => {
         setInitialProfile({...profile}); // Lưu giá trị hiện tại trước khi chỉnh sửa
@@ -23,7 +23,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         setError('');
         setSuccess('');
     };
-    
+
     // Xử lý khi nhấn nút Hủy
     const handleCancel = () => {
         // Khôi phục giá trị ban đầu
@@ -43,7 +43,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         setError('');
         setSuccess('');
     };
-    
+
     // Xử lý khi nhấn nút Lưu
     const handleSave = async (e) => {
         e.preventDefault();
@@ -54,7 +54,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         try {
             // Gọi hàm updateProfile để cập nhật thông tin người dùng
             const result = await updateProfile(profile);
-            
+
             if (result.success) {
                 setSuccess('Cập nhật thông tin thành công!');
                 setIsEditing(false);
@@ -101,6 +101,13 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             )}
 
             <form className="space-y-4" onSubmit={handleSave}>
+                {isEditing && (
+                    <div className="mb-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded">
+                        <p className="text-sm">
+                            <strong>Lưu ý:</strong> Bạn có thể cập nhật họ, tên và số điện thoại, email không thể thay đổi.
+                        </p>
+                    </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Họ</label>
@@ -131,7 +138,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                         value={profile.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        disabled={true} // Email thường không cho phép thay đổi
+                        disabled={true} // Email không được phép thay đổi
                     />
                 </div>
 
@@ -146,72 +153,9 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                     />
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Giới tính</label>
-                    <div className="flex space-x-4">
-                        {['Nam', 'Nữ', 'Khác'].map((gender) => (
-                            <div key={gender} className="flex items-center">
-                                <input
-                                    type="radio"
-                                    id={gender}
-                                    name="gender"
-                                    value={gender}
-                                    checked={profile.gender === gender}
-                                    onChange={() => handleInputChange('gender', gender)}
-                                    className="h-4 w-4 border-gray-300 text-purple-600 focus:ring-purple-500"
-                                    disabled={!isEditing}
-                                />
-                                <label
-                                    htmlFor={gender}
-                                    className="ml-2 block text-sm font-medium text-gray-700"
-                                >
-                                    {gender}
-                                </label>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Ngày tháng năm sinh</label>
-                    <div className="grid grid-cols-3 gap-4">
-                        <select
-                            value={profile.birthDate.day}
-                            onChange={(e) => handleBirthDateChange('day', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            disabled={!isEditing}
-                        >
-                            {[...Array(31)].map((_, i) => (
-                                <option key={i + 1} value={(i + 1).toString()}>{i + 1}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={profile.birthDate.month}
-                            onChange={(e) => handleBirthDateChange('month', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            disabled={!isEditing}
-                        >
-                            {[...Array(12)].map((_, i) => (
-                                <option key={i + 1} value={(i + 1).toString()}>{i + 1}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={profile.birthDate.year}
-                            onChange={(e) => handleBirthDateChange('year', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            disabled={!isEditing}
-                        >
-                            {[...Array(100)].map((_, i) => {
-                                const year = new Date().getFullYear() - i;
-                                return <option key={year} value={year.toString()}>{year}</option>;
-                            })}
-                        </select>
-                    </div>
-                </div>
 
                 <div className="flex justify-end space-x-4 pt-4">
                     {isEditing ? (
-                        // Hiển thị nút Hủy và Lưu khi đang trong trạng thái chỉnh sửa
                         <>
                             <button
                                 type="button"
@@ -230,7 +174,6 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                             </button>
                         </>
                     ) : (
-                        // Hiển thị nút Chỉnh sửa khi không trong trạng thái chỉnh sửa
                         <button
                             type="button"
                             onClick={handleEdit}

@@ -92,24 +92,29 @@ async function getAllUser(req, res, next) {
 
 async function update(req, res, next) {
     try {
-        const { id } = req.params
-        const updateUser = {
-            email: req.body.email,
-            password: req.body.password,
-            type: req.body.type,
-            status: req.body.status
-        }
-        await User.findByIdAndUpdate(
-            id,
-            { $set: updateUser },
-            { new: true }
-        )
-            .then(updateDoc => res.status(200).json(updateDoc))
-            .catch(error => next(error))
+      const { id } = req.params
+      const updateUser = {
+        // Chỉ cập nhật các trường được cung cấp trong request
+        ...(req.body.firstName !== undefined && { firstName: req.body.firstName }),
+        ...(req.body.lastName !== undefined && { lastName: req.body.lastName }),
+        ...(req.body.phone !== undefined && { phone: req.body.phone }),
+        ...(req.body.email !== undefined && { email: req.body.email }),
+        ...(req.body.password !== undefined && { password: req.body.password }),
+        ...(req.body.type !== undefined && { type: req.body.type }),
+        ...(req.body.status !== undefined && { status: req.body.status })
+      }
+      
+      await User.findByIdAndUpdate(
+        id,
+        { $set: updateUser },
+        { new: true }
+      )
+        .then(updateDoc => res.status(200).json(updateDoc))
+        .catch(error => next(error))
     } catch (error) {
-        next(error)
+      next(error)
     }
-}
+  }
 
 async function deleteUser(req, res, next) {
     try {
@@ -155,24 +160,24 @@ async function forgotPassword(req, res, next) {
         await user.save();
 
         // Gửi email chứa mã OTP
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
+            const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
                 user: process.env.SERVICE_EMAIL, // Thay bằng email của bạn
                 pass: process.env.SERVICE_PASSWORD  // Thay bằng mật khẩu email
-            }
-        });
+                }
+            });
 
-        const mailOptions = {
-            from: process.env.SERVICE_EMAIL,
-            to: user.email,
-            subject: 'Quên mật khẩu - Mã xác nhận',
-            text: `Mã xác nhận của bạn là: ${resetToken}. Mã này có hiệu lực trong 10 phút.`
-        };
+            const mailOptions = {
+                from: process.env.SERVICE_EMAIL,
+                to: user.email,
+                subject: 'Quên mật khẩu - Mã xác nhận',
+                text: `Mã xác nhận của bạn là: ${resetToken}. Mã này có hiệu lực trong 10 phút.`
+            };
 
-        await transporter.sendMail(mailOptions);
+            await transporter.sendMail(mailOptions);
 
-        res.status(200).json({ message: 'Mã xác nhận đã được gửi vào email' });
+            res.status(200).json({ message: 'Mã xác nhận đã được gửi vào email' });
     } catch (error) {
         next(error);
     }

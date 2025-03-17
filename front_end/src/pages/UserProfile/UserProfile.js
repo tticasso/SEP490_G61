@@ -89,37 +89,25 @@ const UserProfile = () => {
         throw new Error("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
       }
 
-      // Format ngày sinh theo định dạng yyyy-mm-dd
-      const day = updatedProfile.birthDate.day.padStart(2, '0');
-      const month = updatedProfile.birthDate.month.padStart(2, '0');
-      const year = updatedProfile.birthDate.year;
-      const birthDateString = `${year}-${month}-${day}`;
-
+  
       // Chuẩn bị dữ liệu để gửi lên API
       const profileToUpdate = {
         firstName: updatedProfile.firstName,
         lastName: updatedProfile.lastName,
-        phone: updatedProfile.phone,
-        gender: updatedProfile.gender,
-        // Email thường không cho phép thay đổi nên không đưa vào đây
+        phone: updatedProfile.phone
+        // Không gửi các trường khác
       };
-
-      // Nếu có trường birthDate trong model, thêm vào
-      if (updatedProfile.birthDate) {
-        profileToUpdate.birthDate = birthDateString;
-      }
-
+  
       // Gọi API cập nhật thông tin người dùng
-      // Dựa vào routes, dùng endpoint /edit/:id
       const response = await ApiService.put(`/user/edit/${updatedProfile._id}`, profileToUpdate);
-
+  
       if (response) {
         // Cập nhật lại state với dữ liệu mới
         setProfile({
-          ...response,
-          birthDate: updatedProfile.birthDate
+          ...profile,
+          ...response
         });
-
+  
         return { success: true };
       } else {
         throw new Error("Không nhận được phản hồi từ server");

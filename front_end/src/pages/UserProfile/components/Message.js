@@ -357,7 +357,7 @@ const Message = () => {
   );
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-[90vh] bg-gray-100">
       {/* Conversations List */}
       <div className="w-1/4 bg-white border-r">
         <div className="bg-purple-600 text-white p-4 flex justify-between items-center">

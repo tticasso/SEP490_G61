@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Edit2, Trash2 } from 'lucide-react';
+import { Truck, Edit2, Trash2, X } from 'lucide-react';
 import khautrang5d from '../../assets/khautrang5d.jpg';
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom';
 
 const CheckoutPage = () => {
     const [selectedAddress, setSelectedAddress] = useState(null);
-    const [paymentMethod, setPaymentMethod] = useState(null); // Thêm dòng này
-    const [deliveryMethod, setDeliveryMethod] = useState('standard'); // Thêm dòng này
+    const [paymentMethod, setPaymentMethod] = useState(null);
+    const [deliveryMethod, setDeliveryMethod] = useState('standard');
     const [paymentMethods, setPaymentMethods] = useState([]);
     const [deliveryMethods, setDeliveryMethods] = useState([]);
     const [paymentLoading, setPaymentLoading] = useState(true);
@@ -19,18 +19,82 @@ const CheckoutPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showAddAddressPopup, setShowAddAddressPopup] = useState(false);
+    const [showEditAddressPopup, setShowEditAddressPopup] = useState(false);
+    const [addressToEdit, setAddressToEdit] = useState(null);
     const [cartItems, setCartItems] = useState([]);
     const [cartTotal, setCartTotal] = useState(0);
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [discountAmount, setDiscountAmount] = useState(0);
     const navigate = useNavigate();
 
     // Lấy thông tin người dùng từ AuthService
     const currentUser = AuthService.getCurrentUser();
     const userId = currentUser?._id || currentUser?.id || currentUser?.userId || "";
 
-
     const fetchCartData = async () => {
         try {
             setLoading(true);
+            
+            // Lấy dữ liệu sản phẩm đã chọn từ localStorage
+            const selectedItemsStr = localStorage.getItem('selectedCartItems');
+            
+            if (selectedItemsStr) {
+                const selectedItems = JSON.parse(selectedItemsStr);
+                
+                if (Array.isArray(selectedItems) && selectedItems.length > 0) {
+                    // Có sản phẩm đã chọn trong localStorage
+                    setCartItems(selectedItems);
+                    
+                    // Tính tổng tiền của sản phẩm đã chọn (chưa bao gồm giảm giá)
+                    const subtotal = selectedItems.reduce((total, item) => {
+                        const price = item.product_id && typeof item.product_id === 'object'
+                            ? (item.product_id.discounted_price || item.product_id.price || 0)
+                            : 0;
+                        return total + price * item.quantity;
+                    }, 0);
+                    
+                    setCartTotal(subtotal);
+                } else {
+                    // Không có sản phẩm đã chọn, fetch từ API để phòng trường hợp
+                    await fetchAllCartItems();
+                }
+            } else {
+                // Không có dữ liệu trong localStorage, fetch từ API
+                await fetchAllCartItems();
+            }
+            
+            // Kiểm tra xem có mã giảm giá đã áp dụng không
+            const appliedCouponStr = localStorage.getItem('appliedCoupon');
+            if (appliedCouponStr) {
+                const couponData = JSON.parse(appliedCouponStr);
+                setAppliedCoupon(couponData);
+                
+                // Tính toán số tiền giảm giá
+                if (couponData.type === 'percentage') {
+                    // Giảm giá theo phần trăm
+                    let discount = (cartTotal * couponData.value) / 100;
+                    // Áp dụng giới hạn giảm giá tối đa nếu có
+                    if (couponData.max_discount_value) {
+                        discount = Math.min(discount, couponData.max_discount_value);
+                    }
+                    setDiscountAmount(discount);
+                } else if (couponData.type === 'fixed') {
+                    // Giảm giá cố định
+                    setDiscountAmount(couponData.value);
+                }
+            }
+            
+            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching cart data:', error);
+            setError('Không thể tải dữ liệu giỏ hàng. Vui lòng thử lại sau.');
+            setLoading(false);
+        }
+    };
+    
+    // Hàm fetch tất cả sản phẩm từ giỏ hàng qua API (backup)
+    const fetchAllCartItems = async () => {
+        try {
             const response = await ApiService.get(`/cart/user/${userId}`);
             if (response && response.items) {
                 setCartItems(response.items);
@@ -48,11 +112,10 @@ const CheckoutPage = () => {
                 setCartItems([]);
                 setCartTotal(0);
             }
-            setLoading(false);
         } catch (error) {
-            console.error('Error fetching cart data:', error);
-            setError('Không thể tải dữ liệu giỏ hàng. Vui lòng thử lại sau.');
-            setLoading(false);
+            console.error('Error fetching all cart items:', error);
+            setCartItems([]);
+            setCartTotal(0);
         }
     };
 
@@ -318,6 +381,19 @@ const CheckoutPage = () => {
         }
     }, [userId]);
 
+    // Cập nhật lại giá trị giảm giá khi cartTotal thay đổi
+    useEffect(() => {
+        if (appliedCoupon) {
+            if (appliedCoupon.type === 'percentage') {
+                let discount = (cartTotal * appliedCoupon.value) / 100;
+                if (appliedCoupon.max_discount_value) {
+                    discount = Math.min(discount, appliedCoupon.max_discount_value);
+                }
+                setDiscountAmount(discount);
+            }
+        }
+    }, [cartTotal, appliedCoupon]);
+
     // Kiểm tra kết nối API chung
     useEffect(() => {
         const checkServerStatus = async () => {
@@ -373,6 +449,13 @@ const CheckoutPage = () => {
         checkServerStatus();
     }, []);
 
+    // Xóa mã giảm giá
+    const handleRemoveCoupon = () => {
+        localStorage.removeItem('appliedCoupon');
+        setAppliedCoupon(null);
+        setDiscountAmount(0);
+    };
+
     // Mở popup thêm địa chỉ mới
     const handleAddAddress = () => {
         setShowAddAddressPopup(true);
@@ -380,6 +463,8 @@ const CheckoutPage = () => {
 
     const handleClosePopup = () => {
         setShowAddAddressPopup(false);
+        setShowEditAddressPopup(false);
+        setAddressToEdit(null);
     };
 
     // Lưu địa chỉ mới
@@ -430,11 +515,70 @@ const CheckoutPage = () => {
         }
     };
 
-    // Chuyển đến trang chỉnh sửa địa chỉ
+    // Chỉnh sửa địa chỉ
     const handleEditAddress = (addressId) => {
-        navigate(`/account/addresses/edit/${addressId}`);
+        // Tìm địa chỉ trong danh sách
+        const address = addresses.find(addr => addr._id === addressId);
+        if (address) {
+            setAddressToEdit(address);
+            setShowEditAddressPopup(true);
+        } else {
+            alert("Không tìm thấy thông tin địa chỉ.");
+        }
     };
 
+    // Cập nhật địa chỉ
+const handleUpdateAddress = async (updatedAddressData) => {
+    try {
+        if (!addressToEdit || !addressToEdit._id) {
+            throw new Error("Không có địa chỉ nào được chọn để chỉnh sửa");
+        }
+
+        // Format dữ liệu cho API
+        const formattedAddress = {
+            address_line1: updatedAddressData.address,
+            address_line2: updatedAddressData.address_line2 || "",
+            city: updatedAddressData.province,
+            country: updatedAddressData.country,
+            phone: updatedAddressData.phone,
+            status: true
+        };
+
+        console.log("Đang gửi dữ liệu địa chỉ cập nhật:", formattedAddress);
+
+        let updatedAddress = null;
+
+        try {
+            // Thử với endpoint mới trước - Thay đổi endpoint từ update thành edit
+            updatedAddress = await ApiService.put(`/address/edit/${addressToEdit._id}`, formattedAddress);
+            console.log("Đã cập nhật địa chỉ thành công với API address/edit:", updatedAddress);
+        } catch (apiError) {
+            console.log("Thử lại với API user-address thay thế", apiError);
+            // Thử lại với API user-address nếu API address/edit không hoạt động
+            updatedAddress = await ApiService.put(`/user-address/edit/${addressToEdit._id}`, formattedAddress);
+            console.log("Đã cập nhật địa chỉ thành công với API user-address/edit:", updatedAddress);
+        }
+
+        // Cập nhật state UI
+        if (updatedAddress) {
+            setAddresses(prevAddresses => 
+                prevAddresses.map(addr => 
+                    addr._id === addressToEdit._id ? updatedAddress : addr
+                )
+            );
+        } else {
+            // Tải lại danh sách địa chỉ nếu API không trả về địa chỉ đã cập nhật
+            fetchAddresses();
+        }
+
+        // Đóng popup
+        setShowEditAddressPopup(false);
+        setAddressToEdit(null);
+    } catch (err) {
+        console.error("Error updating address:", err);
+        alert("Không thể cập nhật địa chỉ. Vui lòng thử lại sau.");
+    }
+};
     // Xóa địa chỉ
     const handleDeleteAddress = async (addressId) => {
         if (window.confirm("Bạn có chắc muốn xóa địa chỉ này không?")) {
@@ -502,17 +646,35 @@ const CheckoutPage = () => {
         };
     };
 
+    // Phân tích thông tin từ địa chỉ đơn giản để phục vụ cho việc chỉnh sửa
+    const parseAddressForEdit = (address) => {
+        // Thử phân tích từ address_line1 nếu có định dạng "số nhà, phường, quận, tỉnh"
+        const addressParts = address.address_line1 ? address.address_line1.split(', ') : [];
+        
+        return {
+            phone: address.phone || "",
+            address: addressParts.length > 0 ? addressParts[0] : address.address_line1 || "",
+            address_line2: address.address_line2 || "",
+            province: address.city || "",
+            country: address.country || "Việt Nam"
+        };
+    };
+
     // Reload addresses
     const handleRefreshAddresses = () => {
         fetchAddresses();
     };
 
-
+    // Tính tổng tiền đơn hàng (bao gồm giảm giá từ coupon và phí vận chuyển)
     const calculateTotal = () => {
         const subtotal = cartTotal;
+        // Trừ đi số tiền giảm giá từ coupon
+        const afterDiscount = Math.max(0, subtotal - discountAmount);
+        // Cộng phí vận chuyển
         const selectedShippingMethod = deliveryMethods.find(method => method.id === deliveryMethod);
         const deliveryPrice = selectedShippingMethod ? selectedShippingMethod.price : 0;
-        return subtotal + deliveryPrice;
+        
+        return afterDiscount + deliveryPrice;
     };
 
     const handlePlaceOrder = async () => {
@@ -520,11 +682,11 @@ const CheckoutPage = () => {
             alert("Vui lòng chọn đầy đủ địa chỉ, phương thức thanh toán và có sản phẩm trong giỏ hàng");
             return;
         }
-
+    
         try {
             // Hiển thị loading
             setLoading(true);
-
+    
             // Chuẩn bị dữ liệu đơn hàng
             const orderItems = cartItems.map(item => ({
                 product_id: typeof item.product_id === 'object' ? item.product_id._id : item.product_id,
@@ -532,35 +694,69 @@ const CheckoutPage = () => {
                 cart_id: item.cart_id,
                 discount_id: item.discount_id
             }));
-
+    
             // Tạo payload cho API
             const orderPayload = {
                 customer_id: userId,
-                shipping_id: deliveryMethod, // Đã là ID của phương thức vận chuyển từ API
-                payment_id: paymentMethod, // Đã là ID của phương thức thanh toán từ API
-                user_address_id: selectedAddress, // ID của địa chỉ đã chọn
+                shipping_id: deliveryMethod, 
+                payment_id: paymentMethod, 
+                user_address_id: selectedAddress, 
                 orderItems: orderItems,
-                order_payment_id: `PAY-${Date.now()}`, // Tạo ID thanh toán tạm thời
-                discount_id: null, // Có thể thêm mã giảm giá nếu có
-                coupon_id: null // Có thể thêm coupon nếu có
+                order_payment_id: `PAY-${Date.now()}`, 
+                discount_id: null,
+                coupon_id: appliedCoupon ? appliedCoupon._id : null,
+                discount_amount: discountAmount
             };
-
+    
             // Gọi API tạo đơn hàng
             const response = await ApiService.post('/order/create', orderPayload);
-
+    
             // Xử lý khi đặt hàng thành công
             if (response && response.order) {
+                // Xóa dữ liệu đã lưu trong localStorage
+                localStorage.removeItem('selectedCartItems');
+                localStorage.removeItem('appliedCoupon');
+                
                 // Xóa giỏ hàng sau khi đặt hàng thành công
                 if (cartItems.length > 0 && cartItems[0].cart_id) {
                     await ApiService.delete(`/cart/clear/${cartItems[0].cart_id}`);
                 }
-
+    
                 // Chuyển hướng đến trang xác nhận đơn hàng
                 window.location.href = `/order-confirmation?orderId=${response.order._id}`;
             }
         } catch (error) {
             console.error("Error creating order:", error);
-            alert(`Đã xảy ra lỗi khi đặt hàng: ${error.message || 'Vui lòng thử lại sau'}`);
+            
+            // Kiểm tra lỗi liên quan đến coupon
+            if (error.response && error.response.data && error.response.data.message) {
+                const errorMessage = error.response.data.message;
+                
+                // Xử lý trường hợp coupon không áp dụng được cho sản phẩm trong giỏ hàng
+                if (errorMessage.includes("coupon only applies to specific products")) {
+                    // Lưu lại thông tin coupon để hiển thị trong thông báo
+                    const couponCode = appliedCoupon ? appliedCoupon.code : "đã chọn";
+                    
+                    // Xóa coupon
+                    handleRemoveCoupon();
+                    
+                    // Hiển thị thông báo
+                    alert(`Mã giảm giá ${couponCode} không áp dụng cho sản phẩm trong giỏ hàng của bạn. Mã giảm giá đã được xóa và hệ thống sẽ tự động tiếp tục thanh toán.`);
+                    
+                    // Chờ một chút để state cập nhật sau khi xóa coupon
+                    setTimeout(() => {
+                        // Thử lại việc đặt hàng mà không có coupon
+                        handlePlaceOrder();
+                    }, 500);
+                    
+                    return;
+                } else {
+                    // Hiển thị các lỗi khác
+                    alert(`Đã xảy ra lỗi khi đặt hàng: ${errorMessage}`);
+                }
+            } else {
+                alert(`Đã xảy ra lỗi khi đặt hàng: ${error.message || 'Vui lòng thử lại sau'}`);
+            }
         } finally {
             setLoading(false);
         }
@@ -727,9 +923,10 @@ const CheckoutPage = () => {
                             cartItems.map((item) => (
                                 <div className="flex items-center mb-4" key={item._id}>
                                     <img
-                                        src={item.product_id?.thumbnail}
+                                        src={item.product_id?.image || item.product_id?.thumbnail}
                                         alt={item.product_id?.name || "Sản phẩm"}
                                         className="w-20 h-20 object-cover mr-4 rounded"
+                                        onError={(e) => { e.target.src = khautrang5d }}
                                     />
                                     <div>
                                         <h3 className="font-medium">{item.product_id?.name || "Sản phẩm"}</h3>
@@ -748,19 +945,39 @@ const CheckoutPage = () => {
                                 <span>Tổng đơn hàng</span>
                                 <span>{cartTotal.toLocaleString()}đ</span>
                             </div>
+                            
                             <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
+                            
+                            {/* Hiển thị mã giảm giá được áp dụng và số tiền giảm */}
                             <div className="flex justify-between mt-4">
-                                <span>Voucher giảm giá</span>
-                                <span className="text-red-500">0đ</span>
+                                <div className="flex items-center">
+                                    <span>Mã giảm giá</span>
+                                    {appliedCoupon && (
+                                        <div className="ml-2 bg-purple-100 text-purple-600 px-2 py-1 rounded-full text-xs flex items-center">
+                                            {appliedCoupon.code}
+                                            <button 
+                                                onClick={handleRemoveCoupon}
+                                                className="ml-1 hover:text-red-500"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                <span className="text-red-500">-{discountAmount.toLocaleString()}đ</span>
                             </div>
+                            
                             <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
+                            
                             <div className="flex justify-between mt-4">
                                 <span>Phí giao hàng</span>
                                 <span>
                                     {(deliveryMethods.find(method => method.id === deliveryMethod)?.price || 0).toLocaleString()}đ
                                 </span>
                             </div>
+                            
                             <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
+                            
                             <div className="flex justify-between font-bold text-lg border-t pt-2">
                                 <span>Tổng cộng</span>
                                 <span className="text-purple-600">{calculateTotal().toLocaleString()}đ</span>
@@ -793,13 +1010,25 @@ const CheckoutPage = () => {
 
             {/* Add Address Popup */}
             {showAddAddressPopup && (
-                <AddAddressPopup onClose={handleClosePopup} onSave={handleSaveAddress} />
+                <AddAddressPopup 
+                    onClose={handleClosePopup} 
+                    onSave={handleSaveAddress} 
+                />
+            )}
+
+            {/* Edit Address Popup */}
+            {showEditAddressPopup && addressToEdit && (
+                <EditAddressPopup 
+                    address={addressToEdit} 
+                    onClose={handleClosePopup} 
+                    onSave={handleUpdateAddress} 
+                />
             )}
         </div>
     );
 };
 
-// Component AddAddressPopup
+// Add Address Popup Component
 const AddAddressPopup = ({ onClose, onSave }) => {
     const [formData, setFormData] = useState({
         phone: '',
@@ -813,18 +1042,18 @@ const AddAddressPopup = ({ onClose, onSave }) => {
         address: '',
         address_line2: ''
     });
-
+    
     const [provinces, setProvinces] = useState([]);
     const [districts, setDistricts] = useState([]);
     const [wards, setWards] = useState([]);
-
+    
     // Tải dữ liệu tỉnh/thành phố khi component được mount
     useEffect(() => {
         const fetchProvinces = async () => {
             try {
                 const response = await fetch('https://esgoo.net/api-tinhthanh/1/0.htm');
                 const data = await response.json();
-
+                
                 if (data.error === 0) {
                     setProvinces(data.data);
                 } else {
@@ -834,16 +1063,16 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                 console.error('Lỗi khi gọi API tỉnh/thành phố:', error);
             }
         };
-
+        
         fetchProvinces();
     }, []);
-
+    
     // Lấy dữ liệu quận/huyện khi chọn tỉnh/thành phố
     const fetchDistricts = async (provinceId) => {
         try {
             const response = await fetch(`https://esgoo.net/api-tinhthanh/2/${provinceId}.htm`);
             const data = await response.json();
-
+            
             if (data.error === 0) {
                 setDistricts(data.data);
                 setWards([]); // Reset danh sách phường/xã
@@ -861,13 +1090,13 @@ const AddAddressPopup = ({ onClose, onSave }) => {
             console.error('Lỗi khi gọi API quận/huyện:', error);
         }
     };
-
+    
     // Lấy dữ liệu phường/xã khi chọn quận/huyện
     const fetchWards = async (districtId) => {
         try {
             const response = await fetch(`https://esgoo.net/api-tinhthanh/3/${districtId}.htm`);
             const data = await response.json();
-
+            
             if (data.error === 0) {
                 setWards(data.data);
                 setFormData(prev => ({
@@ -887,17 +1116,17 @@ const AddAddressPopup = ({ onClose, onSave }) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
     };
-
+    
     const handleProvinceChange = (e) => {
         const provinceId = e.target.value;
         const selectedProvince = provinces.find(p => p.id === provinceId);
-
+        
         setFormData({
             ...formData,
             provinceId,
             provinceName: selectedProvince ? selectedProvince.full_name : ''
         });
-
+        
         if (provinceId !== '0') {
             fetchDistricts(provinceId);
         } else {
@@ -905,28 +1134,28 @@ const AddAddressPopup = ({ onClose, onSave }) => {
             setWards([]);
         }
     };
-
+    
     const handleDistrictChange = (e) => {
         const districtId = e.target.value;
         const selectedDistrict = districts.find(d => d.id === districtId);
-
+        
         setFormData({
             ...formData,
             districtId,
             districtName: selectedDistrict ? selectedDistrict.full_name : ''
         });
-
+        
         if (districtId !== '0') {
             fetchWards(districtId);
         } else {
             setWards([]);
         }
     };
-
+    
     const handleWardChange = (e) => {
         const wardId = e.target.value;
         const selectedWard = wards.find(w => w.id === wardId);
-
+        
         setFormData({
             ...formData,
             wardId,
@@ -936,16 +1165,16 @@ const AddAddressPopup = ({ onClose, onSave }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-
+        
         // Kiểm tra xem đã chọn đầy đủ địa chỉ chưa
         if (formData.provinceId === '0' || formData.districtId === '0' || formData.wardId === '0') {
             alert('Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã');
             return;
         }
-
+        
         // Tạo chuỗi địa chỉ đầy đủ
         const fullAddress = `${formData.address}, ${formData.wardName}, ${formData.districtName}, ${formData.provinceName}`;
-
+        
         onSave({
             phone: formData.phone,
             address: fullAddress,
@@ -973,7 +1202,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             required
                         />
                     </div>
-
+                    
                     <div>
                         <label htmlFor="country" className="block text-sm text-gray-600 mb-1">Quốc gia</label>
                         <select
@@ -986,7 +1215,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             <option value="Việt Nam">Việt Nam</option>
                         </select>
                     </div>
-
+                    
                     <div className="grid grid-cols-1 gap-4">
                         <div>
                             <label htmlFor="provinceId" className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố</label>
@@ -1004,7 +1233,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                                 ))}
                             </select>
                         </div>
-
+                        
                         <div>
                             <label htmlFor="districtId" className="block text-sm text-gray-600 mb-1">Quận / Huyện</label>
                             <select
@@ -1022,7 +1251,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                                 ))}
                             </select>
                         </div>
-
+                        
                         <div>
                             <label htmlFor="wardId" className="block text-sm text-gray-600 mb-1">Phường / Xã</label>
                             <select
@@ -1041,7 +1270,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             </select>
                         </div>
                     </div>
-
+                    
                     <div>
                         <label htmlFor="address" className="block text-sm text-gray-600 mb-1">Địa chỉ cụ thể</label>
                         <input
@@ -1055,7 +1284,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             required
                         />
                     </div>
-
+                    
                     <div>
                         <label htmlFor="address_line2" className="block text-sm text-gray-600 mb-1">Địa chỉ bổ sung (không bắt buộc)</label>
                         <input
@@ -1068,7 +1297,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             className="border p-2 rounded-md w-full"
                         />
                     </div>
-
+                    
                     <div className="flex justify-end space-x-3 mt-6">
                         <button
                             type="button"
@@ -1082,6 +1311,408 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                             className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
                         >
                             Thêm
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// Edit Address Popup Component
+const EditAddressPopup = ({ address, onClose, onSave }) => {
+    // Phân tích địa chỉ để lấy các thành phần
+    const parseAddress = (addressObj) => {
+        // Thử phân tích từ address_line1 nếu có định dạng "số nhà, phường, quận, tỉnh"
+        const addressParts = addressObj.address_line1 ? addressObj.address_line1.split(', ') : [];
+        
+        // Mặc định giá trị
+        return {
+            phone: addressObj.phone || '',
+            country: addressObj.country || 'Việt Nam',
+            address: addressParts.length > 0 ? addressParts[0] : addressObj.address_line1 || '',
+            address_line2: addressObj.address_line2 || ''
+        };
+    };
+    
+    const parsedAddress = parseAddress(address);
+    
+    const [formData, setFormData] = useState({
+        phone: parsedAddress.phone,
+        country: parsedAddress.country,
+        provinceId: '0',
+        provinceName: address.city || '',
+        districtId: '0',
+        districtName: '',
+        wardId: '0',
+        wardName: '',
+        address: parsedAddress.address,
+        address_line2: parsedAddress.address_line2
+    });
+    
+    const [provinces, setProvinces] = useState([]);
+    const [districts, setDistricts] = useState([]);
+    const [wards, setWards] = useState([]);
+    const [loading, setLoading] = useState(false);
+    
+    // Tải dữ liệu tỉnh/thành phố khi component được mount
+    useEffect(() => {
+        setLoading(true);
+        const fetchProvinces = async () => {
+            try {
+                const response = await fetch('https://esgoo.net/api-tinhthanh/1/0.htm');
+                const data = await response.json();
+                
+                if (data.error === 0) {
+                    setProvinces(data.data);
+                    
+                    // Nếu có tỉnh/thành phố trong dữ liệu ban đầu, thử tìm provinceId
+                    if (address.city) {
+                        // Tìm province gần đúng với city từ address
+                        const foundProvince = data.data.find(p => 
+                            p.full_name.toLowerCase().includes(address.city.toLowerCase()) ||
+                            address.city.toLowerCase().includes(p.full_name.toLowerCase())
+                        );
+                        
+                        if (foundProvince) {
+                            setFormData(prev => ({
+                                ...prev,
+                                provinceId: foundProvince.id,
+                                provinceName: foundProvince.full_name
+                            }));
+                            
+                            // Tải quận/huyện nếu tìm thấy tỉnh
+                            fetchDistricts(foundProvince.id);
+                        }
+                    }
+                } else {
+                    console.error('Lỗi khi lấy dữ liệu tỉnh/thành phố');
+                }
+                setLoading(false);
+            } catch (error) {
+                console.error('Lỗi khi gọi API tỉnh/thành phố:', error);
+                setLoading(false);
+            }
+        };
+        
+        fetchProvinces();
+    }, [address.city]);
+    
+    // Lấy dữ liệu quận/huyện khi chọn tỉnh/thành phố
+    const fetchDistricts = async (provinceId) => {
+        if (!provinceId || provinceId === '0') {
+            setDistricts([]);
+            return;
+        }
+        
+        setLoading(true);
+        try {
+            const response = await fetch(`https://esgoo.net/api-tinhthanh/2/${provinceId}.htm`);
+            const data = await response.json();
+            
+            if (data.error === 0) {
+                setDistricts(data.data);
+                
+                // Nếu có thông tin phường/quận trong địa chỉ, tìm và khớp với data
+                if (address.address_line1) {
+                    const addressParts = address.address_line1.split(', ');
+                    
+                    // Giả sử quận/huyện là phần thứ 2 từ cuối
+                    if (addressParts.length >= 3) {
+                        const districtNameFromAddress = addressParts[addressParts.length - 2];
+                        
+                        // Tìm district gần đúng với tên từ địa chỉ
+                        const foundDistrict = data.data.find(d => 
+                            d.full_name.toLowerCase().includes(districtNameFromAddress.toLowerCase()) ||
+                            districtNameFromAddress.toLowerCase().includes(d.full_name.toLowerCase())
+                        );
+                        
+                        if (foundDistrict) {
+                            setFormData(prev => ({
+                                ...prev,
+                                districtId: foundDistrict.id,
+                                districtName: foundDistrict.full_name
+                            }));
+                            
+                            // Tải phường/xã nếu tìm thấy quận/huyện
+                            fetchWards(foundDistrict.id);
+                        }
+                    }
+                }
+            } else {
+                console.error('Lỗi khi lấy dữ liệu quận/huyện');
+            }
+            setLoading(false);
+        } catch (error) {
+            console.error('Lỗi khi gọi API quận/huyện:', error);
+            setLoading(false);
+        }
+    };
+    
+    // Lấy dữ liệu phường/xã khi chọn quận/huyện
+    const fetchWards = async (districtId) => {
+        if (!districtId || districtId === '0') {
+            setWards([]);
+            return;
+        }
+        
+        setLoading(true);
+        try {
+            const response = await fetch(`https://esgoo.net/api-tinhthanh/3/${districtId}.htm`);
+            const data = await response.json();
+            
+            if (data.error === 0) {
+                setWards(data.data);
+                
+                // Nếu có thông tin phường/xã trong địa chỉ, tìm và khớp với data
+                if (address.address_line1) {
+                    const addressParts = address.address_line1.split(', ');
+                    
+                    // Giả sử phường/xã là phần thứ 3 từ cuối
+                    if (addressParts.length >= 2) {
+                        const wardNameFromAddress = addressParts[addressParts.length - 3];
+                        
+                        // Tìm ward gần đúng với tên từ địa chỉ
+                        const foundWard = data.data.find(w => 
+                            w.full_name.toLowerCase().includes(wardNameFromAddress.toLowerCase()) ||
+                            wardNameFromAddress.toLowerCase().includes(w.full_name.toLowerCase())
+                        );
+                        
+                        if (foundWard) {
+                            setFormData(prev => ({
+                                ...prev,
+                                wardId: foundWard.id,
+                                wardName: foundWard.full_name
+                            }));
+                        }
+                    }
+                }
+            } else {
+                console.error('Lỗi khi lấy dữ liệu phường/xã');
+            }
+            setLoading(false);
+        } catch (error) {
+            console.error('Lỗi khi gọi API phường/xã:', error);
+            setLoading(false);
+        }
+    };
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+    };
+    
+    const handleProvinceChange = (e) => {
+        const provinceId = e.target.value;
+        const selectedProvince = provinces.find(p => p.id === provinceId);
+        
+        setFormData({
+            ...formData,
+            provinceId,
+            provinceName: selectedProvince ? selectedProvince.full_name : ''
+        });
+        
+        if (provinceId !== '0') {
+            fetchDistricts(provinceId);
+        } else {
+            setDistricts([]);
+            setWards([]);
+        }
+    };
+    
+    const handleDistrictChange = (e) => {
+        const districtId = e.target.value;
+        const selectedDistrict = districts.find(d => d.id === districtId);
+        
+        setFormData({
+            ...formData,
+            districtId,
+            districtName: selectedDistrict ? selectedDistrict.full_name : ''
+        });
+        
+        if (districtId !== '0') {
+            fetchWards(districtId);
+        } else {
+            setWards([]);
+        }
+    };
+    
+    const handleWardChange = (e) => {
+        const wardId = e.target.value;
+        const selectedWard = wards.find(w => w.id === wardId);
+        
+        setFormData({
+            ...formData,
+            wardId,
+            wardName: selectedWard ? selectedWard.full_name : ''
+        });
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        
+        // Kiểm tra xem đã chọn đầy đủ địa chỉ chưa
+        if (formData.provinceId === '0' || formData.districtId === '0' || formData.wardId === '0') {
+            alert('Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã');
+            return;
+        }
+        
+        // Tạo chuỗi địa chỉ đầy đủ
+        const fullAddress = `${formData.address}, ${formData.wardName}, ${formData.districtName}, ${formData.provinceName}`;
+        
+        onSave({
+            phone: formData.phone,
+            address: fullAddress,
+            address_line2: formData.address_line2,
+            province: formData.provinceName,
+            country: formData.country
+        });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white p-6 rounded-md w-full max-w-lg max-h-90vh overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold">Chỉnh sửa địa chỉ</h2>
+                    <button 
+                        onClick={onClose}
+                        className="text-gray-500 hover:text-gray-700"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                {loading && (
+                    <div className="py-2 px-3 bg-blue-50 text-blue-700 rounded mb-4">
+                        Đang tải dữ liệu...
+                    </div>
+                )}
+                
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label htmlFor="phone" className="block text-sm text-gray-600 mb-1">Số điện thoại</label>
+                        <input
+                            id="phone"
+                            type="text"
+                            name="phone"
+                            placeholder="Số điện thoại"
+                            value={formData.phone}
+                            onChange={handleChange}
+                            className="border p-2 rounded-md w-full"
+                            required
+                        />
+                    </div>
+                    
+                    <div>
+                        <label htmlFor="country" className="block text-sm text-gray-600 mb-1">Quốc gia</label>
+                        <select
+                            id="country"
+                            name="country"
+                            value={formData.country}
+                            onChange={handleChange}
+                            className="border p-2 rounded-md w-full"
+                        >
+                            <option value="Việt Nam">Việt Nam</option>
+                        </select>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                        <div>
+                            <label htmlFor="provinceId" className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố</label>
+                            <select
+                                id="provinceId"
+                                name="provinceId"
+                                value={formData.provinceId}
+                                onChange={handleProvinceChange}
+                                className="border p-2 rounded-md w-full"
+                                required
+                            >
+                                <option value="0">Chọn Tỉnh/Thành phố</option>
+                                {provinces.map((province) => (
+                                    <option key={province.id} value={province.id}>{province.full_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label htmlFor="districtId" className="block text-sm text-gray-600 mb-1">Quận / Huyện</label>
+                            <select
+                                id="districtId"
+                                name="districtId"
+                                value={formData.districtId}
+                                onChange={handleDistrictChange}
+                                className="border p-2 rounded-md w-full"
+                                required
+                                disabled={formData.provinceId === '0'}
+                            >
+                                <option value="0">Chọn Quận/Huyện</option>
+                                {districts.map((district) => (
+                                    <option key={district.id} value={district.id}>{district.full_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label htmlFor="wardId" className="block text-sm text-gray-600 mb-1">Phường / Xã</label>
+                            <select
+                                id="wardId"
+                                name="wardId"
+                                value={formData.wardId}
+                                onChange={handleWardChange}
+                                className="border p-2 rounded-md w-full"
+                                required
+                                disabled={formData.districtId === '0'}
+                            >
+                                <option value="0">Chọn Phường/Xã</option>
+                                {wards.map((ward) => (
+                                    <option key={ward.id} value={ward.id}>{ward.full_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label htmlFor="address" className="block text-sm text-gray-600 mb-1">Địa chỉ cụ thể</label>
+                        <input
+                            id="address"
+                            type="text"
+                            name="address"
+                            placeholder="Số nhà, tên đường"
+                            value={formData.address}
+                            onChange={handleChange}
+                            className="border p-2 rounded-md w-full"
+                            required
+                        />
+                    </div>
+                    
+                    <div>
+                        <label htmlFor="address_line2" className="block text-sm text-gray-600 mb-1">Địa chỉ bổ sung (không bắt buộc)</label>
+                        <input
+                            id="address_line2"
+                            type="text"
+                            name="address_line2"
+                            placeholder="Tòa nhà, số tầng, số phòng, ..."
+                            value={formData.address_line2}
+                            onChange={handleChange}
+                            className="border p-2 rounded-md w-full"
+                        />
+                    </div>
+                    
+                    <div className="flex justify-end space-x-3 mt-6">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="border border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50"
+                        >
+                            Hủy
+                        </button>
+                        <button
+                            type="submit"
+                            className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+                        >
+                            Lưu
                         </button>
                     </div>
                 </form>

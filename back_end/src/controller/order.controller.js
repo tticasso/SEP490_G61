@@ -201,58 +201,85 @@ const createOrder = async (req, res) => {
                     new Date(coupon.start_date) <= now &&
                     new Date(coupon.end_date) >= now &&
                     totalPrice >= coupon.min_order_value) {
-
-                    // Kiểm tra áp dụng cho sản phẩm cụ thể
-                    if (coupon.product_id && !productIds.includes(coupon.product_id.toString())) {
-                        return res.status(400).json({
-                            message: "This coupon only applies to specific products"
-                        });
+        
+                    // Check if coupon is restricted to specific products/categories
+                    let isEligible = true;
+                    let eligibleAmount = totalPrice; // Default to full order amount
+        
+                    // If coupon is restricted to specific product
+                    if (coupon.product_id) {
+                        // Get all items with the specific product
+                        const eligibleItems = orderItems.filter(item => 
+                            item.product_id.toString() === coupon.product_id.toString()
+                        );
+                        
+                        if (eligibleItems.length === 0) {
+                            // No eligible products for this coupon
+                            isEligible = false;
+                        } else {
+                            // Calculate sum of only eligible products
+                            eligibleAmount = 0;
+                            for (const item of eligibleItems) {
+                                const product = await Product.findById(item.product_id);
+                                eligibleAmount += product.price * item.quantity;
+                            }
+                        }
                     }
-
-                    // Kiểm tra áp dụng cho danh mục cụ thể
-                    if (coupon.category_id && !categoryIds.includes(coupon.category_id.toString())) {
-                        return res.status(400).json({
-                            message: "This coupon only applies to specific categories"
-                        });
+        
+                    // If coupon is restricted to specific category
+                    if (isEligible && coupon.category_id) {
+                        // Check if any product belongs to this category
+                        const categoryMatch = categoryIds.includes(coupon.category_id.toString());
+                        if (!categoryMatch) {
+                            isEligible = false;
+                        }
+                        // Note: For a more precise implementation, you would calculate
+                        // the sum of only products in that category
                     }
-
-                    // Tính số tiền giảm giá từ coupon
-                    if (coupon.type === 'fixed') {
-                        couponAmount = coupon.value;
+        
+                    if (isEligible) {
+                        // Tính số tiền giảm giá từ coupon
+                        if (coupon.type === 'fixed') {
+                            couponAmount = coupon.value;
+                        } else {
+                            // Percentage discount
+                            couponAmount = (eligibleAmount * coupon.value) / 100;
+                            // Apply max discount if specified
+                            if (coupon.max_discount_value && couponAmount > coupon.max_discount_value) {
+                                couponAmount = coupon.max_discount_value;
+                            }
+                        }
+        
+                        // Kiểm tra giới hạn số lần sử dụng
+                        if (coupon.max_uses > 0) {
+                            const totalUsed = Array.from(coupon.history.values()).reduce((sum, count) => sum + count, 0);
+                            if (totalUsed >= coupon.max_uses) {
+                                return res.status(400).json({
+                                    message: "This coupon has reached its maximum usage limit"
+                                });
+                            }
+                        }
+        
+                        // Kiểm tra giới hạn sử dụng của người dùng
+                        if (coupon.max_uses_per_user > 0) {
+                            const userUsage = coupon.history.get(customer_id.toString()) || 0;
+                            if (userUsage >= coupon.max_uses_per_user) {
+                                return res.status(400).json({
+                                    message: "You have reached the maximum usage limit for this coupon"
+                                });
+                            }
+                        }
+        
+                        // Cập nhật lịch sử sử dụng coupon
+                        const usageHistory = coupon.history || new Map();
+                        usageHistory.set(customer_id.toString(), (usageHistory.get(customer_id.toString()) || 0) + 1);
+                        coupon.history = usageHistory;
+                        await coupon.save();
                     } else {
-                        // Percentage discount
-                        couponAmount = (totalPrice * coupon.value) / 100;
-                        // Apply max discount if specified
-                        if (coupon.max_discount_value && couponAmount > coupon.max_discount_value) {
-                            couponAmount = coupon.max_discount_value;
-                        }
+                        return res.status(400).json({
+                            message: "This coupon only applies to specific products or categories that are not in your cart"
+                        });
                     }
-
-                    // Kiểm tra giới hạn số lần sử dụng
-                    if (coupon.max_uses > 0) {
-                        const totalUsed = Array.from(coupon.history.values()).reduce((sum, count) => sum + count, 0);
-                        if (totalUsed >= coupon.max_uses) {
-                            return res.status(400).json({
-                                message: "This coupon has reached its maximum usage limit"
-                            });
-                        }
-                    }
-
-                    // Kiểm tra giới hạn sử dụng của người dùng
-                    if (coupon.max_uses_per_user > 0) {
-                        const userUsage = coupon.history.get(customer_id.toString()) || 0;
-                        if (userUsage >= coupon.max_uses_per_user) {
-                            return res.status(400).json({
-                                message: "You have reached the maximum usage limit for this coupon"
-                            });
-                        }
-                    }
-
-                    // Cập nhật lịch sử sử dụng coupon
-                    const usageHistory = coupon.history || new Map();
-                    usageHistory.set(customer_id.toString(), (usageHistory.get(customer_id.toString()) || 0) + 1);
-                    coupon.history = usageHistory;
-                    await coupon.save();
                 }
             }
         }

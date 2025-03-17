@@ -18,8 +18,8 @@ orderRouter.get("/user/:userId", [VerifyJwt.verifyToken], orderController.getOrd
 // Tạo đơn đặt hàng mới
 orderRouter.post("/create", [VerifyJwt.verifyToken], orderController.createOrder)
 
-// Cập nhật trạng thái đơn hàng (chỉ admin có quyền)
-orderRouter.put("/status/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], orderController.updateOrderStatus)
+// Cập nhật trạng thái đơn hàng (chỉ admin và seller có quyền)
+orderRouter.put("/status/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdminOrSeller], orderController.updateOrderStatus)
 
 // Hủy đơn hàng
 orderRouter.put("/cancel/:id", [VerifyJwt.verifyToken], orderController.cancelOrder)

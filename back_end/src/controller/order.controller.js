@@ -18,7 +18,7 @@ const getAllOrders = async (req, res) => {
             .populate('payment_id')
             .populate('discount_id')
             .populate('coupon_id')
-            .populate('user_address_id'); 
+            .populate('user_address_id');
         res.status(200).json(orders);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -503,6 +503,64 @@ const getOrderStatistics = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+// Lấy đơn đặt hàng theo ID shop
+const getOrdersByShopId = async (req, res) => {
+    try {
+        const { shopId } = req.params;
+
+        // Tìm tất cả các đơn hàng có chứa sản phẩm thuộc shop này
+        const orderDetails = await OrderDetail.find()
+            .populate({
+                path: 'product_id',
+                match: { shop_id: shopId },
+                select: 'name price shop_id'
+            });
+
+        // Lọc ra các orderDetail có product_id không null (tức là thuộc shop)
+        const validOrderDetails = orderDetails.filter(detail => detail.product_id !== null);
+
+        // Lấy ra các order_id duy nhất
+        const orderIds = [...new Set(validOrderDetails.map(detail => detail.order_id))];
+
+        // Lấy thông tin đầy đủ của các đơn hàng
+        const orders = await Order.find({
+            _id: { $in: orderIds },
+            is_delete: false
+        })
+            .populate({
+                path: 'customer_id',
+                model: 'users',
+                select: 'firstName lastName email phone'
+            })
+            .populate('shipping_id')
+            .populate('payment_id')
+            .populate('discount_id')
+            .populate('coupon_id')
+            .populate('user_address_id')
+            .sort({ created_at: -1 });
+
+        // Nhóm các orderDetail theo order_id để gửi kèm chi tiết
+        const orderDetailsMap = {};
+        validOrderDetails.forEach(detail => {
+            if (!orderDetailsMap[detail.order_id]) {
+                orderDetailsMap[detail.order_id] = [];
+            }
+            orderDetailsMap[detail.order_id].push(detail);
+        });
+
+        // Kết hợp order và orderDetail
+        const result = orders.map(order => {
+            return {
+                order,
+                orderDetails: orderDetailsMap[order._id] || []
+            };
+        });
+
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 
 const orderController = {
     getAllOrders,
@@ -512,7 +570,8 @@ const orderController = {
     updateOrderStatus,
     cancelOrder,
     deleteOrder,
-    getOrderStatistics
+    getOrderStatistics,
+    getOrdersByShopId
 };
 
 module.exports = orderController;

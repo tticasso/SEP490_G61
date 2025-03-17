@@ -6,7 +6,8 @@ const couponSchema = new Schema({
         type: String,
         required: true,
         unique: true,
-        uppercase: true
+        uppercase: true,
+        index: true
     },
     description: {
         type: String,
@@ -89,8 +90,6 @@ const couponSchema = new Schema({
     }
 });
 
-// Add index for faster lookup by code
-couponSchema.index({ code: 1 });
 
 const Coupon = mongoose.model('Coupon', couponSchema);
 module.exports = Coupon;

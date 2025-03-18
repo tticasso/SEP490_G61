@@ -3,21 +3,36 @@ import { ChevronLeft, UserIcon } from 'lucide-react';
 import ShopService from './services/Shopservice';
 import { toast } from 'react-toastify'; // Assuming you use react-toastify for notifications
 
-const StoreDetail = ({ onBack, shopId }) => {
+const StoreDetail = ({ onBack, shopId, initialShopData }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [shopData, setShopData] = useState({});
+    const [shopData, setShopData] = useState(initialShopData || {});
     const [userData, setUserData] = useState(null);
     const [provinceData, setProvinceData] = useState(null);
 
     // Load shop data on component mount
     useEffect(() => {
         if (shopId) {
-            fetchShopData();
+            if (initialShopData) {
+                // If we have initial data (e.g., from the list view), use it
+                // but still fetch related data
+                if (initialShopData.user_id) {
+                    fetchUserData(initialShopData.user_id);
+                }
+                
+                if (initialShopData.province_id) {
+                    fetchProvinceData(initialShopData.province_id);
+                }
+                
+                setLoading(false);
+            } else {
+                // Otherwise, fetch from API
+                fetchShopData();
+            }
         } else {
             setLoading(false);
         }
-    }, [shopId]);
+    }, [shopId, initialShopData]);
 
     // Fetch shop data from API
     const fetchShopData = async () => {
@@ -41,9 +56,16 @@ const StoreDetail = ({ onBack, shopId }) => {
             setLoading(false);
         } catch (err) {
             console.error('Error fetching shop data:', err);
-            setError('Failed to load shop details. Please try again later.');
-            setLoading(false);
-            toast.error('Failed to load shop details');
+            
+            // If API fails but we have initial data, still use it
+            if (initialShopData) {
+                setShopData(initialShopData);
+                setLoading(false);
+            } else {
+                setError('Failed to load shop details. Please try again later.');
+                setLoading(false);
+                toast.error('Failed to load shop details');
+            }
         }
     };
 
@@ -99,18 +121,53 @@ const StoreDetail = ({ onBack, shopId }) => {
             const newStatus = isCurrentlyActive ? 0 : 1;
             const actionText = isCurrentlyActive ? 'khóa' : 'mở khóa';
             
-            // Update just the is_active field
-            await ShopService.toggleShopActiveStatus(shopId, newStatus);
+            // If shop is already locked and we're trying to unlock it,
+            // handle with special care since the API might fail
+            if (!isCurrentlyActive) {
+                try {
+                    await ShopService.toggleShopActiveStatus(shopId, newStatus);
+                    
+                    // If it succeeds, update the state
+                    setShopData({
+                        ...shopData,
+                        is_active: newStatus
+                    });
+                    
+                    toast.success(`Cửa hàng đã được ${actionText} thành công`);
+                } catch (apiErr) {
+                    console.error('Error unlocking shop:', apiErr);
+                    
+                    // Even if API fails, update the UI state
+                    // This at least gives visual feedback to the admin
+                    setShopData({
+                        ...shopData,
+                        is_active: newStatus
+                    });
+                    
+                    toast.warning(
+                        'Đã cập nhật giao diện, nhưng có lỗi khi gọi API. ' + 
+                        'Vui lòng làm mới trang để xem trạng thái thực tế.'
+                    );
+                }
+            } else {
+                // Normal case - locking an active shop
+                try {
+                    await ShopService.toggleShopActiveStatus(shopId, newStatus);
+                    
+                    // Update local state
+                    setShopData({
+                        ...shopData,
+                        is_active: newStatus
+                    });
+                    
+                    toast.success(`Cửa hàng đã được ${actionText} thành công`);
+                } catch (err) {
+                    console.error('Error locking shop:', err);
+                    toast.error(`Không thể ${actionText} cửa hàng. Vui lòng thử lại sau.`);
+                }
+            }
             
-            // Update local state
-            setShopData({
-                ...shopData,
-                is_active: newStatus
-            });
-            
-            toast.success(`Cửa hàng đã được ${actionText} thành công`);
             setLoading(false);
-            
         } catch (err) {
             console.error('Error toggling account status:', err);
             toast.error('Không thể thay đổi trạng thái tài khoản');

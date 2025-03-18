@@ -229,7 +229,11 @@ const StoreList = () => {
     return (
         <div className="flex-1 bg-gray-50">
             {showStoreDetail ? (
-                <StoreDetail onBack={handleBackFromDetail} shopId={selectedStore._id} />
+                <StoreDetail 
+                    onBack={handleBackFromDetail} 
+                    shopId={selectedStore._id}
+                    initialShopData={selectedStore} // Pass the full shop object
+                />
             ) : (
                 <>
                     {/* Tabs - Removed Pending tab */}

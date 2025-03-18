@@ -49,4 +49,6 @@ shopRouter.put("/approve/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], shopC
 // Từ chối duyệt cửa hàng (chỉ admin)
 shopRouter.put("/reject/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], shopController.rejectShop);
 
+shopRouter.put("/unlock/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], shopController.unlockShop);
+
 module.exports = shopRouter;

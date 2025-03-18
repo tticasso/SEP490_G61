@@ -154,7 +154,7 @@ const Cart = () => {
             }
         } catch (error) {
             console.error('Error validating coupon:', error);
-            setCouponError('Không thể áp dụng mã giảm giá. Vui lòng thử lại sau.');
+            setCouponError('Không thể áp dụng mã giảm giá. ');
         }
     };
 

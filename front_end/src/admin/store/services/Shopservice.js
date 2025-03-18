@@ -19,7 +19,14 @@ class ShopService {
 
   // Toggle shop account active status (lock/unlock)
   toggleShopActiveStatus(id, isActive) {
-    return ApiService.put(`/shops/edit/${id}`, { is_active: isActive });
+    // If we're unlocking a shop (changing is_active from 0 to 1)
+    // Use the special unlock endpoint instead of the standard edit
+    if (isActive === 1) {
+      return ApiService.put(`/shops/unlock/${id}`, { is_active: isActive });
+    } else {
+      // For locking a shop, use the regular edit endpoint
+      return ApiService.put(`/shops/edit/${id}`, { is_active: isActive });
+    }
   }
 
   // Delete shop (admin only)

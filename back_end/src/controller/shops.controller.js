@@ -378,6 +378,30 @@ const uploadShopImage = async (req, res, next) => {
         next(error);
     }
 };
+const unlockShop = async (req, res, next) => {
+    try {
+        // Use findById without checking is_active status
+        const shop = await Shop.findById(req.params.id);
+        if (!shop) {
+            throw createHttpError.NotFound("Shop not found");
+        }
+        
+        // Set is_active to 1 (unlocked)
+        shop.is_active = 1;
+        shop.updated_at = Date.now();
+        await shop.save();
+        
+        res.status(200).json({ 
+            message: "Shop unlocked successfully", 
+            shop 
+        });
+    } catch (error) {
+        if (error.name === 'CastError') {
+            return next(createHttpError.BadRequest("Invalid shop ID"));
+        }
+        next(error);
+    }
+};
 
 const shopController = {
     getAllShops,
@@ -389,7 +413,8 @@ const shopController = {
     approveShop,
     rejectShop,
     getShopByUserId,
-    uploadShopImage
+    uploadShopImage,
+    unlockShop
 };
 
 module.exports = shopController;

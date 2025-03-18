@@ -91,7 +91,7 @@ const MyShop = () => {
         setLoading(false);
       } catch (error) {
         console.error('Error fetching shop data:', error);
-        setError('Không thể tải thông tin cửa hàng. Vui lòng thử lại sau.');
+        setError('Cửa hàng của bạn đã bị khóa. Vui lòng liên hệ với số điện thoại 0966768150 hoặc nhắn tin với admin để được hỗ trợ');
         setLoading(false);
       }
     };

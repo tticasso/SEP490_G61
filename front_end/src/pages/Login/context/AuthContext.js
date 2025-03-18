@@ -1,208 +1,173 @@
 // src/pages/Login/context/AuthContext.js
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AuthService from '../../../services/AuthService';
+import ShopService from '../../../services/ShopService';
 
-// Create the auth context
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
-// Provider component that wraps your app and makes auth object available to any
-// child component that calls useAuth().
-export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRoles, setUserRoles] = useState([]); // Add explicit userRoles state
-  const [loading, setLoading] = useState(true);
-  const [authInitialized, setAuthInitialized] = useState(false);
-
-  // Process user roles from user data
-  const extractRoles = (user) => {
-    if (!user) return [];
+export const AuthProvider = ({ children }) => {
+    const [currentUser, setCurrentUser] = useState(null);
+    const [userRoles, setUserRoles] = useState([]);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [shopStatus, setShopStatus] = useState(null);
     
-    // If user has roles property and it's an array
-    if (user.roles && Array.isArray(user.roles)) {
-      return user.roles.map(role => {
-        // If role is already a string with ROLE_ prefix
-        if (typeof role === 'string' && role.startsWith('ROLE_')) {
-          return role;
-        }
-        // If role is an object with a name property
-        else if (typeof role === 'object' && role.name) {
-          return `ROLE_${role.name}`;
-        }
-        // If role is just a string
-        else if (typeof role === 'string') {
-          return `ROLE_${role}`;
-        }
-        // Default to MEMBER if we can't determine the role
-        return 'ROLE_MEMBER';
-      });
-    }
+    // Khởi tạo thông tin người dùng từ localStorage
+    useEffect(() => {
+        const initializeUser = async () => {
+            try {
+                setLoading(true);
+                
+                // Kiểm tra xem người dùng đã đăng nhập chưa
+                const isAuthenticated = AuthService.isLoggedIn();
+                setIsLoggedIn(isAuthenticated);
+                
+                if (isAuthenticated) {
+                    const user = AuthService.getCurrentUser();
+                    setCurrentUser(user);
+                    setUserRoles(user.roles || []);
+                    
+                    // Kiểm tra trạng thái cửa hàng nếu là người bán
+                    if (user.roles && (user.roles.includes('ROLE_SELLER') || user.roles.includes('SELLER'))) {
+                        const shopStatusData = await ShopService.canAccessSellerDashboard();
+                        setShopStatus(shopStatusData);
+                    }
+                }
+            } catch (error) {
+                console.error("Error initializing auth context:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        initializeUser();
+        
+        // Lắng nghe sự kiện storage để cập nhật khi có thay đổi đăng nhập
+        const handleStorageChange = () => {
+            initializeUser();
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
     
-    // Default role if none found
-    return ['ROLE_MEMBER'];
-  };
-
-  // Load user from localStorage on initial render
-  useEffect(() => {
-    const initAuth = () => {
-      try {
-        const user = AuthService.getCurrentUser();
-        setCurrentUser(user);
-        
-        // Extract and set roles
-        const roles = extractRoles(user);
-        setUserRoles(roles);
-        
-      } catch (error) {
-        console.error('Error initializing auth context:', error);
+    // Đăng nhập
+    const login = async (email, password) => {
+        try {
+            const data = await AuthService.login(email, password);
+            
+            if (data.accessToken) {
+                setIsLoggedIn(true);
+                setCurrentUser(data);
+                setUserRoles(data.roles || []);
+                
+                // Nếu là người bán, kiểm tra trạng thái cửa hàng
+                if (data.roles && (data.roles.includes('ROLE_SELLER') || data.roles.includes('SELLER'))) {
+                    const shopStatusData = await ShopService.canAccessSellerDashboard();
+                    setShopStatus(shopStatusData);
+                }
+            }
+            
+            return data;
+        } catch (error) {
+            console.error("Login error:", error);
+            throw error;
+        }
+    };
+    
+    // Đăng nhập với Google
+    const handleGoogleAuthLogin = (userData) => {
+        try {
+            if (userData && userData.accessToken) {
+                AuthService.setUser(userData);
+                setIsLoggedIn(true);
+                setCurrentUser(userData);
+                setUserRoles(userData.roles || []);
+                
+                // Kiểm tra trạng thái cửa hàng nếu là người bán
+                if (userData.roles && (userData.roles.includes('ROLE_SELLER') || userData.roles.includes('SELLER'))) {
+                    ShopService.canAccessSellerDashboard()
+                        .then(shopStatusData => setShopStatus(shopStatusData));
+                }
+                
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error("Google auth login error:", error);
+            return false;
+        }
+    };
+    
+    // Đăng xuất
+    const logout = () => {
+        AuthService.logout();
+        setIsLoggedIn(false);
         setCurrentUser(null);
         setUserRoles([]);
-      } finally {
-        setLoading(false);
-        setAuthInitialized(true);
-      }
+        setShopStatus(null);
     };
-
-    initAuth();
-  }, []);
-
-  // Listen for storage events to sync auth state across tabs
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'user') {
-        try {
-          const user = e.newValue ? JSON.parse(e.newValue) : null;
-          setCurrentUser(user);
-          
-          // Update roles too
-          const roles = extractRoles(user);
-          setUserRoles(roles);
-        } catch (error) {
-          console.error('Error parsing user from storage event:', error);
-        }
-      }
-    };
-
-    // Custom event for same-tab communication
-    const handleAuthEvent = (e) => {
-      if (e.detail && e.detail.type === 'AUTH_STATE_CHANGED') {
-        const user = e.detail.user;
-        setCurrentUser(user);
-        
-        // Update roles
-        const roles = extractRoles(user);
-        setUserRoles(roles);
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('auth-event', handleAuthEvent);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('auth-event', handleAuthEvent);
-    };
-  }, []);
-
-  // Wrapper for login functionality
-  const login = async (email, password) => {
-    try {
-      const userData = await AuthService.login(email, password);
-      setCurrentUser(userData);
-      
-      // Extract and set roles
-      const roles = extractRoles(userData);
-      setUserRoles(roles);
-      
-      return userData;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  };
-
-  // Wrapper for Google login
-  const handleGoogleAuthLogin = (userData) => {
-    try {
-      // Save to localStorage using direct approach for debugging
-      const enrichedUserData = {
-        ...userData,
-        loginTime: new Date().getTime(),
-        id: userData.id || (userData._id ? userData._id.toString() : null),
-      };
-      
-      localStorage.setItem("user", JSON.stringify(enrichedUserData));
-      
-      // Update context state
-      setCurrentUser(enrichedUserData);
-      
-      // Extract and set roles
-      const roles = extractRoles(enrichedUserData);
-      setUserRoles(roles);
-      
-      // Dispatch custom event for other components to know auth state changed
-      window.dispatchEvent(
-        new CustomEvent('auth-event', { 
-          detail: { 
-            type: 'AUTH_STATE_CHANGED', 
-            user: enrichedUserData 
-          } 
-        })
-      );
-      
-      return true;
-    } catch (error) {
-      console.error('Google auth processing error:', error);
-      return false;
-    }
-  };
-
-  // Wrapper for logout functionality
-  const logout = () => {
-    AuthService.logout();
-    setCurrentUser(null);
-    setUserRoles([]);
     
-    // Dispatch custom event for other components
-    window.dispatchEvent(
-      new CustomEvent('auth-event', { 
-        detail: { 
-          type: 'AUTH_STATE_CHANGED', 
-          user: null 
-        } 
-      })
+    // Làm mới thông tin người dùng từ API
+    const refreshUserData = async () => {
+        try {
+            const updatedUser = await AuthService.refreshUserInfo();
+            
+            if (updatedUser) {
+                setCurrentUser(updatedUser);
+                setUserRoles(updatedUser.roles || []);
+                
+                // Kiểm tra lại trạng thái cửa hàng nếu là người bán
+                if (updatedUser.roles && (updatedUser.roles.includes('ROLE_SELLER') || updatedUser.roles.includes('SELLER'))) {
+                    const shopStatusData = await ShopService.canAccessSellerDashboard();
+                    setShopStatus(shopStatusData);
+                }
+            }
+            
+            return updatedUser;
+        } catch (error) {
+            console.error("Error refreshing user data:", error);
+            return null;
+        }
+    };
+    
+    // Kiểm tra xem người dùng có quyền seller và cửa hàng có hoạt động không
+    const canAccessSellerDashboard = () => {
+        if (!isLoggedIn || !shopStatus) return false;
+        return shopStatus.canAccess === true;
+    };
+    
+    // Lấy lý do không thể truy cập seller dashboard
+    const getSellerDashboardAccessReason = () => {
+        if (!shopStatus) return "unknown";
+        return shopStatus.reason || "unknown";
+    };
+    
+    // Giá trị context
+    const value = {
+        currentUser,
+        userRoles,
+        isLoggedIn,
+        loading,
+        login,
+        logout,
+        handleGoogleAuthLogin,
+        refreshUserData,
+        canAccessSellerDashboard,
+        getSellerDashboardAccessReason,
+        shopStatus
+    };
+    
+    return (
+        <AuthContext.Provider value={value}>
+            {children}
+        </AuthContext.Provider>
     );
-  };
+};
 
-  // Check if user has a specific role
-  const hasRole = (role) => {
-    const formattedRole = role.startsWith('ROLE_') ? role : `ROLE_${role}`;
-    return userRoles.includes(formattedRole);
-  };
+export const useAuth = () => {
+    return useContext(AuthContext);
+};
 
-  const value = {
-    currentUser,
-    userRoles, // Expose userRoles to components
-    isLoggedIn: !!currentUser,
-    hasRole, // Expose helper function
-    login,
-    logout,
-    handleGoogleAuthLogin,
-    loading,
-    authInitialized
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-// Custom hook to use the auth context
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === null) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+export default AuthContext;

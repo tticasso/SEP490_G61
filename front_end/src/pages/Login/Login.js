@@ -25,7 +25,7 @@ const LoginPage = () => {
             redirectPath = '/admin';
         }
         // Then check for seller/mod role
-        else if (roles.includes('ROLE_MOD') || roles.includes('ROLE_SELLER')) {
+        else if (roles.includes('ROLE_SELLER')) {
             redirectPath = '/seller-dashboard';
         }
         // For MEMBER or other roles, go to homepage

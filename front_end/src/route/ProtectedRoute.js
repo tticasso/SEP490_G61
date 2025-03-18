@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../pages/Login/context/AuthContext';
 import UnauthorizedAccess from './UnauthorizedAccess';
+import ShopLocked from '../Seller/ShopLocked';
 
 const ProtectedRoute = ({ children, requiredRoles = [] }) => {
   const { isLoggedIn, loading, userRoles = [] } = useAuth();
@@ -73,10 +74,33 @@ export const AdminRoute = ({ children }) => (
   </ProtectedRoute>
 );
 
-export const SellerRoute = ({ children }) => (
-  <ProtectedRoute requiredRoles={['MOD', 'SELLER']}>
-    {children}
-  </ProtectedRoute>
-);
+export const SellerRoute = ({ children }) => {
+  const { canAccessSellerDashboard, getSellerDashboardAccessReason, isLoggedIn, userRoles } = useAuth();
+  
+  // Kiểm tra người dùng có role seller không
+  const hasSellerRole = userRoles.some(role => 
+    role === 'ROLE_SELLER' || role === 'ROLE_MOD' || role === 'SELLER' || role === 'MOD'
+  );
+  
+  // Nếu người dùng không đăng nhập hoặc không có role seller
+  if (!isLoggedIn || !hasSellerRole) {
+    return (
+      <UnauthorizedAccess 
+        isAuthenticated={isLoggedIn} 
+        redirectTo={isLoggedIn ? "/" : "/login"}
+        message={isLoggedIn ? "Bạn không có quyền truy cập vào trang này." : "Bạn cần đăng nhập để tiếp tục."}
+      />
+    );
+  }
+  
+  // Kiểm tra trạng thái cửa hàng
+  if (!canAccessSellerDashboard()) {
+    const reason = getSellerDashboardAccessReason();
+    return <ShopLocked status={reason} />;
+  }
+  
+  // Nếu đã đăng nhập, có quyền seller và cửa hàng đang hoạt động
+  return children;
+};
 
 export default ProtectedRoute;

@@ -13,15 +13,16 @@ const CustomerManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const [usersPerPage, setUsersPerPage] = useState(5);
-  const totalPages = Math.ceil(totalUsers / usersPerPage);
 
   // Filter states
   const [filter, setFilter] = useState({
     all: true,
-    visible: false,
-    imported: false,
-    trash: false
+    active: false,
+    inactive: false
   });
+
+  // Sort state
+  const [sortOption, setSortOption] = useState('');
 
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,38 +41,86 @@ const CustomerManagement = () => {
 
   // Fetch users from API
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        const response = await ApiService.get('/user/list');
-        setUsers(response);
-        setTotalUsers(response.length);
-        setLoading(false);
-      } catch (error) {
-        setError('Lỗi khi tải dữ liệu người dùng: ' + error);
-        setLoading(false);
-      }
-    };
-
     fetchUsers();
   }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await ApiService.get('/user/list');
+      setUsers(response);
+      setTotalUsers(response.length);
+      setLoading(false);
+    } catch (error) {
+      setError('Lỗi khi tải dữ liệu người dùng: ' + error);
+      setLoading(false);
+    }
+  };
 
   // Handle search
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset về trang đầu tiên khi tìm kiếm
   };
 
-  // Filter users based on search term
-  const filteredUsers = users.filter(user => {
-    const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
-    return fullName.includes(searchTerm.toLowerCase()) ||
-           (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()));
-  });
+  // Handle sorting option change
+  const handleSortChange = (e) => {
+    setSortOption(e.target.value);
+  };
+
+  // Apply filters and sort to users
+  const getFilteredAndSortedUsers = () => {
+    // Apply filters first
+    let result = [...users];
+    
+    if (filter.active) {
+      result = result.filter(user => user.status === true);
+    } else if (filter.inactive) {
+      result = result.filter(user => user.status === false);
+    }
+    
+    // Apply search
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      result = result.filter(user => {
+        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
+        return fullName.includes(searchLower) ||
+              (user.email && user.email.toLowerCase().includes(searchLower)) ||
+              (user.phone && user.phone.includes(searchTerm));
+      });
+    }
+    
+    // Apply sorting
+    if (sortOption) {
+      switch (sortOption) {
+        case 'newest':
+          result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          break;
+        case 'oldest':
+          result.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          break;
+        case 'name':
+          result.sort((a, b) => {
+            const nameA = `${a.lastName || ''} ${a.firstName || ''}`.toLowerCase();
+            const nameB = `${b.lastName || ''} ${b.firstName || ''}`.toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          break;
+        default:
+          break;
+      }
+    }
+    
+    return result;
+  };
+
+  const filteredAndSortedUsers = getFilteredAndSortedUsers();
+  const totalPages = Math.ceil(filteredAndSortedUsers.length / usersPerPage);
 
   // Paginate users
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
-  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+  const currentUsers = filteredAndSortedUsers.slice(indexOfFirstUser, indexOfLastUser);
 
   // Handle pagination
   const goToPage = (page) => {
@@ -82,7 +131,13 @@ const CustomerManagement = () => {
   const formatRoles = (roles) => {
     if (!roles || !Array.isArray(roles)) return 'Thành viên';
     return roles.map(role => {
-      const roleName = typeof role === 'string' ? role : (role.name || '');
+      if (typeof role === 'object' && role.name) {
+        if (role.name === 'ADMIN') return 'Quản trị viên';
+        if (role.name === 'SELLER') return 'Người bán';
+        return 'Thành viên';
+      }
+      
+      const roleName = typeof role === 'string' ? role : '';
       if (roleName.includes('ADMIN')) return 'Quản trị viên';
       if (roleName.includes('SELLER')) return 'Người bán';
       return 'Thành viên';
@@ -93,7 +148,7 @@ const CustomerManagement = () => {
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return `${date.getHours()}:${date.getMinutes()} ${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')} ${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
   };
 
   // Handle view user detail
@@ -162,11 +217,11 @@ const CustomerManagement = () => {
     const errors = {};
     
     if (!newUser.firstName.trim()) {
-      errors.firstName = 'Vui lòng nhập họ';
+      errors.firstName = 'Vui lòng nhập tên';
     }
     
     if (!newUser.lastName.trim()) {
-      errors.lastName = 'Vui lòng nhập tên';
+      errors.lastName = 'Vui lòng nhập họ';
     }
     
     if (!newUser.email.trim()) {
@@ -202,11 +257,27 @@ const CustomerManagement = () => {
     }
     
     try {
+      // Prepare data for API
+      const userData = {
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        phone: newUser.phone,
+        password: newUser.password,
+        roles: [newUser.roles[0]]  // Make sure roles is formatted correctly
+      };
+
       // Call API to create new user
-      const response = await ApiService.post('/user/create', newUser);
+      const response = await ApiService.post('/auth/signup', userData);
       
-      // Add new user to list
-      setUsers([...users, response]);
+      // Add new user to list - set default values for fields not returned from API
+      const newUserData = {
+        ...response,
+        status: true, // Default to active
+        roles: [{ name: newUser.roles[0] }] // Ensure roles is properly formatted for display
+      };
+      
+      setUsers([...users, newUserData]);
       
       // Reset form and close modal
       setNewUser({
@@ -222,6 +293,7 @@ const CustomerManagement = () => {
       // Show success message
       alert('Thêm người dùng mới thành công!');
     } catch (error) {
+      console.error("Creation error:", error);
       setFormErrors({
         submit: 'Lỗi khi thêm người dùng: ' + error
       });
@@ -236,28 +308,32 @@ const CustomerManagement = () => {
     return <div className="text-red-500 p-4">{error}</div>;
   }
 
+  // Count active and inactive users
+  const activeUsersCount = users.filter(user => user.status === true).length;
+  const inactiveUsersCount = users.filter(user => user.status === false).length;
+
   return (
     <div className="flex-1 bg-gray-50">
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex space-x-6 text-gray-600">
           <button 
-            className={`${filter.all ? 'text-blue-600' : ''}`}
-            onClick={() => setFilter({all: true, visible: false, imported: false, trash: false})}
+            className={`${filter.all ? 'text-blue-600 font-medium' : ''}`}
+            onClick={() => setFilter({all: true, active: false, inactive: false})}
           >
             Tất cả ( {users.length} )
           </button>
           <button 
-            className={`${filter.visible ? 'text-blue-600' : ''}`}
-            onClick={() => setFilter({all: false, visible: true, imported: false, trash: false})}
+            className={`${filter.active ? 'text-blue-600 font-medium' : ''}`}
+            onClick={() => setFilter({all: false, active: true, inactive: false})}
           >
-            Đang hoạt động ( {users.filter(user => user.status).length} )
+            Đang hoạt động ( {activeUsersCount} )
           </button>
           <button 
-            className={`${filter.trash ? 'text-blue-600' : ''}`}
-            onClick={() => setFilter({all: false, visible: false, imported: false, trash: true})}
+            className={`${filter.inactive ? 'text-blue-600 font-medium' : ''}`}
+            onClick={() => setFilter({all: false, active: false, inactive: true})}
           >
-            Bị khóa ( {users.filter(user => !user.status).length} )
+            Bị khóa ( {inactiveUsersCount} )
           </button>
         </div>
       </div>
@@ -276,7 +352,11 @@ const CustomerManagement = () => {
             Thêm người dùng mới
           </button>
           <div className="mr-4">
-            <select className="border border-gray-300 rounded-md px-3 py-2 bg-white">
+            <select 
+              className="border border-gray-300 rounded-md px-3 py-2 bg-white"
+              value={sortOption}
+              onChange={handleSortChange}
+            >
               <option value="">Sắp xếp theo</option>
               <option value="newest">Mới nhất</option>
               <option value="oldest">Cũ nhất</option>
@@ -337,7 +417,7 @@ const CustomerManagement = () => {
                           className="text-sm text-gray-900 hover:text-blue-600 cursor-pointer"
                           onClick={() => handleViewUserDetail(user)}
                         >
-                          {user.firstName} {user.lastName}
+                          {user.lastName} {user.firstName}
                         </span>
                       </div>
                     </td>
@@ -385,19 +465,33 @@ const CustomerManagement = () => {
                   <ChevronLeft size={16} />
                 </button>
                 
-                {[...Array(totalPages)].map((_, index) => (
-                  <button 
-                    key={index + 1}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${
-                      currentPage === index + 1
-                        ? 'bg-pink-500 text-white'
-                        : 'text-gray-700'
-                    }`}
-                    onClick={() => goToPage(index + 1)}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
+                {[...Array(Math.min(5, totalPages))].map((_, index) => {
+                  // Calculate which page numbers to show
+                  let pageNumber;
+                  if (totalPages <= 5) {
+                    pageNumber = index + 1;
+                  } else if (currentPage <= 3) {
+                    pageNumber = index + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNumber = totalPages - 4 + index;
+                  } else {
+                    pageNumber = currentPage - 2 + index;
+                  }
+                  
+                  return (
+                    <button 
+                      key={pageNumber}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${
+                        currentPage === pageNumber
+                          ? 'bg-pink-500 text-white'
+                          : 'text-gray-700'
+                      }`}
+                      onClick={() => goToPage(pageNumber)}
+                    >
+                      {pageNumber}
+                    </button>
+                  );
+                })}
                 
                 <button 
                   className={`p-2 border border-gray-300 rounded-md ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -415,7 +509,10 @@ const CustomerManagement = () => {
                 <select 
                   className="mx-2 border border-gray-300 rounded p-1"
                   value={usersPerPage}
-                  onChange={(e) => setUsersPerPage(Number(e.target.value))}
+                  onChange={(e) => {
+                    setUsersPerPage(Number(e.target.value));
+                    setCurrentPage(1); // Reset to first page when changing items per page
+                  }}
                 >
                   <option value="5">5</option>
                   <option value="10">10</option>
@@ -423,7 +520,7 @@ const CustomerManagement = () => {
                   <option value="50">50</option>
                 </select>
                 <span>/</span>
-                <span className="ml-2">{totalUsers}</span>
+                <span className="ml-2">{filteredAndSortedUsers.length}</span>
               </div>
             </div>
           )}

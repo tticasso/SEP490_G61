@@ -26,6 +26,9 @@ const CategoryManagement = () => {
     // Search state
     const [searchTerm, setSearchTerm] = useState('');
     
+    // Sorting state
+    const [sortOption, setSortOption] = useState('');
+    
     // Selected categories for bulk actions
     const [selectedCategories, setSelectedCategories] = useState([]);
 
@@ -79,11 +82,20 @@ const CategoryManagement = () => {
     // Handle search
     const handleSearch = (e) => {
         setSearchTerm(e.target.value);
+        setCurrentPage(1); // Reset to first page on search
+    };
+
+    // Handle sorting
+    const handleSortChange = (e) => {
+        setSortOption(e.target.value);
     };
 
     // Handle refresh
     const handleRefresh = () => {
         fetchCategories();
+        setSearchTerm('');
+        setSortOption('');
+        setCurrentPage(1);
     };
 
     // Handle add new category
@@ -139,27 +151,54 @@ const CategoryManagement = () => {
         }
     };
 
-    // Filter categories based on active filter and search term
-    const filteredCategories = categories.filter(category => {
-        // Apply search
+    // Get filtered and sorted categories
+    const getFilteredAndSortedCategories = () => {
+        // First apply search filter
+        let result = [...categories];
+        
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase();
-            return (
-                category.name.toLowerCase().includes(searchLower) ||
-                (category.description && category.description.toLowerCase().includes(searchLower))
-            );
+            result = result.filter(category => {
+                return (
+                    category.name.toLowerCase().includes(searchLower) ||
+                    (category.description && category.description.toLowerCase().includes(searchLower))
+                );
+            });
         }
         
-        return true;
-    });
+        // Then apply sorting
+        if (sortOption) {
+            switch (sortOption) {
+                case 'newest':
+                    result.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+                    break;
+                case 'oldest':
+                    result.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+                    break;
+                case 'name-asc':
+                    result.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'name-desc':
+                    result.sort((a, b) => b.name.localeCompare(a.name));
+                    break;
+                default:
+                    break;
+            }
+        }
+        
+        return result;
+    };
 
+    // Get filtered and sorted categories
+    const filteredAndSortedCategories = getFilteredAndSortedCategories();
+    
     // Calculate total pages
-    const totalPages = Math.ceil(filteredCategories.length / categoriesPerPage);
+    const totalPages = Math.ceil(filteredAndSortedCategories.length / categoriesPerPage);
 
     // Paginate categories
     const indexOfLastCategory = currentPage * categoriesPerPage;
     const indexOfFirstCategory = indexOfLastCategory - categoriesPerPage;
-    const currentCategories = filteredCategories.slice(indexOfFirstCategory, indexOfLastCategory);
+    const currentCategories = filteredAndSortedCategories.slice(indexOfFirstCategory, indexOfLastCategory);
 
     // Format date
     const formatDate = (dateString) => {
@@ -179,32 +218,6 @@ const CategoryManagement = () => {
         <div className="flex-1 bg-gray-50">
             {/* Tabs */}
             <div className="bg-white border-b border-gray-200 px-6 py-4">
-                <div className="flex space-x-6 text-gray-600">
-                    <button
-                        className={`${filter.all ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: true, visible: false, imported: false, trash: false })}
-                    >
-                        Tất cả ( {categories.length} )
-                    </button>
-                    <button
-                        className={`${filter.visible ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, visible: true, imported: false, trash: false })}
-                    >
-                        Hiển thị ( {categories.length} )
-                    </button>
-                    <button
-                        className={`${filter.imported ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, visible: false, imported: true, trash: false })}
-                    >
-                        Nhập ( 0 )
-                    </button>
-                    <button
-                        className={`${filter.trash ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, visible: false, imported: false, trash: true })}
-                    >
-                        Thùng rác ( 0 )
-                    </button>
-                </div>
 
                 <div className="flex items-center mt-4">
                     <div className="flex items-center mr-4 cursor-pointer" onClick={handleRefresh}>
@@ -232,8 +245,12 @@ const CategoryManagement = () => {
 
                 <div className="flex items-center">
                     <div className="mr-4">
-                        <select className="border border-gray-300 rounded-md px-3 py-2 bg-white">
-                            <option>Sắp xếp theo</option>
+                        <select 
+                            className="border border-gray-300 rounded-md px-3 py-2 bg-white"
+                            value={sortOption}
+                            onChange={handleSortChange}
+                        >
+                            <option value="">Sắp xếp theo</option>
                             <option value="newest">Mới nhất</option>
                             <option value="oldest">Cũ nhất</option>
                             <option value="name-asc">Tên A-Z</option>
@@ -296,10 +313,16 @@ const CategoryManagement = () => {
                                         </td>
                                         <td className="py-3 px-4">
                                             <div className="flex items-center">
-                                                <span className="text-sm text-gray-900">{category.name}</span>
+                                                <span className="text-sm font-medium text-gray-900">{category.name}</span>
                                             </div>
                                         </td>
-                                        <td className="py-3 px-4 text-sm text-gray-700">{category.description || 'N/A'}</td>
+                                        <td className="py-3 px-4 text-sm text-gray-700">
+                                            {category.description ? (
+                                                <div className="max-w-xs overflow-hidden text-ellipsis">
+                                                    {category.description}
+                                                </div>
+                                            ) : 'N/A'}
+                                        </td>
                                         <td className="py-3 px-4 text-sm text-gray-700">{formatDate(category.updated_at)}</td>
                                         <td className="py-3 px-4">
                                             <div className="flex items-center space-x-3">
@@ -382,7 +405,10 @@ const CategoryManagement = () => {
                                 <select 
                                     className="mx-2 border border-gray-300 rounded p-1"
                                     value={categoriesPerPage}
-                                    onChange={(e) => setCategoriesPerPage(Number(e.target.value))}
+                                    onChange={(e) => {
+                                        setCategoriesPerPage(Number(e.target.value));
+                                        setCurrentPage(1); // Reset to first page when changing items per page
+                                    }}
                                 >
                                     <option value="5">5</option>
                                     <option value="10">10</option>
@@ -390,7 +416,7 @@ const CategoryManagement = () => {
                                     <option value="50">50</option>
                                 </select>
                                 <span>/</span>
-                                <span className="ml-2">{totalCategories}</span>
+                                <span className="ml-2">{filteredAndSortedCategories.length}</span>
                             </div>
                         </div>
                     )}

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Edit, ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react';
+import { Eye, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import ApiService from '../../services/ApiService';
-import EditProductModal from './modal/EditProductModal';
-import AddProductModal from './modal/AddProductModal';
+import ProductDetailModal from './modal/ProductDetailModal';
 
 const ProductManagement = () => {
     // State cho dữ liệu sản phẩm
@@ -20,7 +19,6 @@ const ProductManagement = () => {
     const [filter, setFilter] = useState({
         all: true,
         visible: false,
-        imported: false,
         trash: false
     });
     
@@ -30,12 +28,9 @@ const ProductManagement = () => {
     // Selected products for bulk actions
     const [selectedProducts, setSelectedProducts] = useState([]);
 
-    // Edit modal state
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null);
-
-    // Add modal state
-    const [showAddModal, setShowAddModal] = useState(false);
+    // Detail modal state
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
 
     // Fetch products from API
     useEffect(() => {
@@ -88,32 +83,24 @@ const ProductManagement = () => {
         fetchProducts();
     };
 
-    // Handle edit product
-    const handleEditProduct = (product) => {
-        setEditingProduct(product);
-        setShowEditModal(true);
+    // Handle view product details
+    const handleViewProduct = (product) => {
+        setSelectedProduct(product);
+        setShowDetailModal(true);
     };
 
-    // Handle update product (callback from EditProductModal)
-    const handleUpdateProduct = (updatedProduct) => {
-        setProducts(products.map(product => 
-            product._id === updatedProduct._id ? updatedProduct : product
-        ));
-    };
-
-    // Handle product added (callback from AddProductModal)
-    const handleProductAdded = (newProduct) => {
-        setProducts([...products, newProduct]);
-        setTotalProducts(totalProducts + 1);
-    };
-
-    // Handle delete product
-    const handleDeleteProduct = async (productId) => {
-        if (window.confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) {
+    // Handle soft delete (move to trash)
+    const handleSoftDelete = async (productId) => {
+        if (window.confirm('Bạn có chắc chắn muốn đưa sản phẩm này vào thùng rác?')) {
             try {
-                await ApiService.delete(`/product/delete/${productId}`);
-                // Update local state after successful deletion
-                setProducts(products.filter(product => product._id !== productId));
+                // Sử dụng API mới cho xóa mềm
+                const result = await ApiService.put(`/product/soft-delete/${productId}`);
+                
+                // Update local state
+                setProducts(products.map(product => 
+                    product._id === productId ? {...product, is_delete: true} : product
+                ));
+                
                 // Remove from selected products
                 setSelectedProducts(selectedProducts.filter(id => id !== productId));
             } catch (error) {
@@ -122,22 +109,64 @@ const ProductManagement = () => {
         }
     };
 
-    // Handle bulk delete
-    const handleBulkDelete = async () => {
-        if (selectedProducts.length === 0) return;
-        
-        if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedProducts.length} sản phẩm đã chọn?`)) {
-            try {
-                // Delete each selected product
-                await Promise.all(selectedProducts.map(productId => 
-                    ApiService.delete(`/product/delete/${productId}`)
+    // Handle bulk soft delete
+    const handleBulkSoftDelete = async () => {
+    if (selectedProducts.length === 0) return;
+    
+    if (window.confirm(`Bạn có chắc chắn muốn đưa ${selectedProducts.length} sản phẩm đã chọn vào thùng rác?`)) {
+        try {
+            // Sử dụng API bulk soft delete mới
+            const result = await ApiService.post('/product/bulk-soft-delete', {
+                productIds: selectedProducts
+            });
+            
+            // Cập nhật trạng thái local state dựa trên kết quả từ server
+            if (result.success && result.success.length > 0) {
+                setProducts(products.map(product => 
+                    result.success.includes(product._id) ? {...product, is_delete: true} : product
                 ));
                 
-                // Update local state
-                setProducts(products.filter(product => !selectedProducts.includes(product._id)));
+                // Xóa các sản phẩm đã xử lý khỏi danh sách đã chọn
                 setSelectedProducts([]);
+            }
+            
+            // Hiển thị thông báo lỗi nếu có
+            if (result.errors && result.errors.length > 0) {
+                setError(`Có ${result.errors.length} sản phẩm không thể xóa. Vui lòng kiểm tra quyền truy cập.`);
+            }
+        } catch (error) {
+            setError('Lỗi khi xóa sản phẩm: ' + error);
+        }
+    }
+};
+
+    // Handle bulk restore from trash
+    const handleBulkRestore = async () => {
+        if (selectedProducts.length === 0) return;
+        
+        if (window.confirm(`Bạn có chắc chắn muốn khôi phục ${selectedProducts.length} sản phẩm đã chọn?`)) {
+            try {
+                // Sử dụng API bulk restore mới
+                const result = await ApiService.post('/product/bulk-restore', {
+                    productIds: selectedProducts
+                });
+                
+                // Cập nhật trạng thái local state dựa trên kết quả từ server
+                if (result.success && result.success.length > 0) {
+                    setProducts(products.map(product => 
+                        result.success.includes(product._id) ? {...product, is_delete: false} : product
+                    ));
+                    
+                    // Xóa các sản phẩm đã xử lý khỏi danh sách đã chọn
+                    setSelectedProducts([]);
+                }
+                
+                // Hiển thị thông báo lỗi nếu có
+                if (result.errors && result.errors.length > 0) {
+                    setError(`Có ${result.errors.length} sản phẩm không thể khôi phục. Vui lòng kiểm tra quyền truy cập.`);
+                }
             } catch (error) {
-                setError('Lỗi khi xóa sản phẩm: ' + error);
+                setError('Lỗi khi khôi phục sản phẩm: ' + error);
             }
         }
     };
@@ -146,15 +175,16 @@ const ProductManagement = () => {
     const filteredProducts = products.filter(product => {
         // Apply filter
         if (filter.visible && !product.is_active) return false;
-        if (filter.imported) return false; // Need to define what "imported" means in your context
         if (filter.trash && !product.is_delete) return false;
+        if (!filter.trash && !filter.visible && filter.all && product.is_delete) return false;
         
         // Apply search
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase();
             return (
                 product.name.toLowerCase().includes(searchLower) ||
-                (product.description && product.description.toLowerCase().includes(searchLower))
+                (product.description && product.description.toLowerCase().includes(searchLower)) ||
+                (product.shop_id && product.shop_id.name && product.shop_id.name.toLowerCase().includes(searchLower))
             );
         }
         
@@ -168,7 +198,7 @@ const ProductManagement = () => {
 
     // Format price to VND
     const formatPrice = (price) => {
-        return price.toLocaleString('vi-VN') + ' đ';
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
     };
 
     if (loading) {
@@ -184,27 +214,22 @@ const ProductManagement = () => {
             {/* Tabs */}
             <div className="bg-white border-b border-gray-200 px-6 py-4">
                 <div className="flex space-x-6 text-gray-600">
+                <button
+                        className={`${filter.visible ? 'text-blue-600' : ''}`}
+                        onClick={() => setFilter({ all: false, visible: true, trash: false })}
+                    >
+                        Tất cả ( {products.filter(p => p.is_active && !p.is_delete).length} )
+                    </button>
                     <button
                         className={`${filter.all ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: true, visible: false, imported: false, trash: false })}
+                        onClick={() => setFilter({ all: true, visible: false, trash: false })}
                     >
-                        Tất cả ( {products.length} )
+                        Đang bán ( {products.filter(p => !p.is_delete).length} )
                     </button>
-                    <button
-                        className={`${filter.visible ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, visible: true, imported: false, trash: false })}
-                    >
-                        Hiện thị ( {products.filter(p => p.is_active).length} )
-                    </button>
-                    <button
-                        className={`${filter.imported ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, visible: false, imported: true, trash: false })}
-                    >
-                        Nhập ( 0 )
-                    </button>
+                    
                     <button
                         className={`${filter.trash ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, visible: false, imported: false, trash: true })}
+                        onClick={() => setFilter({ all: false, visible: false, trash: true })}
                     >
                         Thùng rác ( {products.filter(p => p.is_delete).length} )
                     </button>
@@ -225,13 +250,23 @@ const ProductManagement = () => {
             <div className="flex justify-between items-center px-6 py-4">
                 <div className="flex items-center">
                     <div className="text-gray-700 mr-2">Chức năng:</div>
-                    <button 
-                        className={`text-pink-500 ${selectedProducts.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                        onClick={handleBulkDelete}
-                        disabled={selectedProducts.length === 0}
-                    >
-                        Thêm vào thùng rác ( {selectedProducts.length} )
-                    </button>
+                    {!filter.trash ? (
+                        <button 
+                            className={`text-pink-500 ${selectedProducts.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            onClick={handleBulkSoftDelete}
+                            disabled={selectedProducts.length === 0}
+                        >
+                            Thêm vào thùng rác ( {selectedProducts.length} )
+                        </button>
+                    ) : (
+                        <button 
+                            className={`text-green-500 ${selectedProducts.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            onClick={handleBulkRestore}
+                            disabled={selectedProducts.length === 0}
+                        >
+                            Khôi phục ( {selectedProducts.length} )
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex items-center">
@@ -272,6 +307,9 @@ const ProductManagement = () => {
                                 </th>
                                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
                                     Tên sản phẩm
+                                </th>
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                    Cửa hàng
                                 </th>
                                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
                                     Danh mục
@@ -316,6 +354,9 @@ const ProductManagement = () => {
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 text-sm text-gray-700">
+                                            {product.shop_id && product.shop_id.name ? product.shop_id.name : 'N/A'}
+                                        </td>
+                                        <td className="py-3 px-4 text-sm text-gray-700">
                                             {product.category_id && product.category_id.length > 0 
                                                 ? product.category_id.map(cat => cat.name).join(', ') 
                                                 : 'N/A'}
@@ -331,32 +372,55 @@ const ProductManagement = () => {
                                             <div className="flex items-center">
                                                 <span className={`h-2 w-2 rounded-full mr-2 ${product.is_active ? 'bg-green-500' : 'bg-red-500'}`}></span>
                                                 <span className="text-sm text-gray-700">
-                                                    {product.is_active ? 'Đang bán' : 'Ngừng bán'}
+                                                    {product.is_delete 
+                                                        ? 'Đã xóa' 
+                                                        : product.is_active 
+                                                            ? 'Đang bán' 
+                                                            : 'Ngừng bán'}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="py-3 px-4">
                                             <div className="flex items-center space-x-3">
                                                 <button 
-                                                    className="text-gray-500 hover:text-blue-600"
-                                                    onClick={() => handleEditProduct(product)}
+                                                    className="text-blue-500 hover:text-blue-600"
+                                                    onClick={() => handleViewProduct(product)}
                                                 >
-                                                    <Edit size={18} />
+                                                    <Eye size={18} />
                                                 </button>
-                                                <span className="text-gray-300">|</span>
-                                                <button 
-                                                    className="text-gray-500 hover:text-red-600"
-                                                    onClick={() => handleDeleteProduct(product._id)}
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
+                                                {!product.is_delete && (
+                                                    <button 
+                                                        className="text-red-500 hover:text-red-600 ml-3"
+                                                        onClick={() => handleSoftDelete(product._id)}
+                                                    >
+                                                        Xóa
+                                                    </button>
+                                                )}
+                                                {product.is_delete && (
+    <button 
+        className="text-green-500 hover:text-green-600 ml-3"
+        onClick={() => {
+            if (window.confirm('Khôi phục sản phẩm này?')) {
+                ApiService.put(`/product/restore/${product._id}`)
+                    .then(() => {
+                        setProducts(products.map(p => 
+                            p._id === product._id ? {...p, is_delete: false} : p
+                        ));
+                    })
+                    .catch(err => setError('Lỗi khi khôi phục: ' + err));
+            }
+        }}
+    >
+        Khôi phục
+    </button>
+)}
                                             </div>
                                         </td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="8" className="py-4 px-6 text-center text-gray-500">
+                                    <td colSpan="9" className="py-4 px-6 text-center text-gray-500">
                                         Không có sản phẩm nào phù hợp với tìm kiếm
                                     </td>
                                 </tr>
@@ -388,7 +452,7 @@ const ProductManagement = () => {
                                                 key={pageNumber}
                                                 className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${
                                                     currentPage === pageNumber
-                                                        ? 'bg-pink-500 text-white'
+                                                        ? 'bg-blue-500 text-white'
                                                         : 'text-gray-700'
                                                 }`}
                                                 onClick={() => goToPage(pageNumber)}
@@ -431,34 +495,14 @@ const ProductManagement = () => {
                 </div>
             </div>
 
-            {/* Add New Product Button (Fixed position) */}
-            <div className="fixed bottom-8 right-8">
-                <button 
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg flex items-center justify-center"
-                    onClick={() => setShowAddModal(true)}
-                >
-                    <Plus size={20} />
-                    <span className="ml-2">Thêm mới</span>
-                </button>
-            </div>
-
-            {/* Edit Product Modal */}
-            {showEditModal && (
-                <EditProductModal 
-                    product={editingProduct}
+            {/* Product Detail Modal */}
+            {showDetailModal && (
+                <ProductDetailModal 
+                    product={selectedProduct}
                     onClose={() => {
-                        setShowEditModal(false);
-                        setEditingProduct(null);
+                        setShowDetailModal(false);
+                        setSelectedProduct(null);
                     }}
-                    onUpdate={handleUpdateProduct}
-                />
-            )}
-
-            {/* Add Product Modal */}
-            {showAddModal && (
-                <AddProductModal 
-                    onClose={() => setShowAddModal(false)}
-                    onProductAdded={handleProductAdded}
                 />
             )}
         </div>

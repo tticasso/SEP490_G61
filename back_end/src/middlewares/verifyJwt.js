@@ -12,13 +12,30 @@ async function verifyToken(req, res, next) {
         }
 
         // Verify Token
-        jwt.verify(tokenRequest, config.secret, (err, decode) => {
+        jwt.verify(tokenRequest, config.secret, async (err, decode) => {
             if (err) {
                 const message = err instanceof jwt.TokenExpiredError ? "This JWT token expired" : err.message;
                 throw createHttpError.Unauthorized(message);
             }
             // Update request
             req.userId = decode.id;
+            
+            // Kiểm tra và thiết lập isAdmin
+            try {
+                const existUser = await User.findById(decode.id).exec();
+                if (existUser) {
+                    const roles = await Role.find({ _id: { $in: existUser.roles } });
+                    if (roles && roles.some(role => role.name === "ADMIN")) {
+                        req.isAdmin = true;
+                    } else {
+                        req.isAdmin = false;
+                    }
+                }
+            } catch (error) {
+                console.error("Error checking admin role:", error);
+                req.isAdmin = false;
+            }
+            
             next();
         });
     } catch (error) {

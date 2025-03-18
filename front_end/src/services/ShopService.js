@@ -14,8 +14,8 @@ class ShopService {
                 return null;
             }
             
-            // Gọi API để lấy thông tin cửa hàng theo user ID
-            const shop = await ApiService.get(`/shops/user/${currentUser.id}`);
+            // Gọi API để lấy thông tin cửa hàng của người dùng hiện tại
+            const shop = await ApiService.get(`/shops/my-shop`);
             
             // Kiểm tra nếu cửa hàng tồn tại
             if (shop) {
@@ -30,7 +30,7 @@ class ShopService {
         } catch (error) {
             console.error("Không thể kiểm tra trạng thái cửa hàng:", error);
             // Nếu là lỗi 404, có thể người dùng chưa đăng ký cửa hàng
-            if (error.message && error.message.includes("404")) {
+            if (error && (error.includes("404") || error.includes("Not found") || error.includes("No shop found"))) {
                 return { notFound: true };
             }
             return null;

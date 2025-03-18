@@ -62,6 +62,10 @@ const EditShippingModal = ({ shipping, onClose, onUpdate }) => {
         // Basic validation
         const errors = {};
         
+        if (!editingShipping.name) {
+            errors.name = 'Tên phương thức vận chuyển không được để trống';
+        }
+        
         if (!editingShipping.price || parseFloat(editingShipping.price) <= 0) {
             errors.price = 'Giá phải lớn hơn 0';
         }
@@ -132,6 +136,24 @@ const EditShippingModal = ({ shipping, onClose, onUpdate }) => {
                                 readOnly
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                             />
+                        </div>
+
+                        {/* Tên phương thức vận chuyển */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Tên phương thức vận chuyển <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                name="name"
+                                value={editingShipping.name || ''}
+                                onChange={handleInputChange}
+                                className={`w-full px-3 py-2 border ${formErrors.name ? 'border-red-500' : 'border-gray-300'} rounded-md`}
+                                placeholder="Nhập tên phương thức vận chuyển"
+                            />
+                            {formErrors.name && (
+                                <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
+                            )}
                         </div>
 
                         {/* Giá vận chuyển */}

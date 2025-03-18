@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
-import { BarChart2, Package, Grid, ShoppingBag, Users, Truck, HelpCircle, Settings, ChevronDown, ArrowRight, Tag, Gift } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { BarChart2, Package, Grid, ShoppingBag, Users, Truck, HelpCircle, Settings, ChevronDown, ArrowRight, Tag, LogOut } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import AuthService from '../services/AuthService';
 
 // Sidebar Component
 const Sidebar = () => {
   const [expandedMenus, setExpandedMenus] = useState(['products']);
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
+  
+  // Handle logout
+  const handleLogout = () => {
+    AuthService.logout();
+    navigate('/login');
+    window.location.reload(); // Reload to ensure all states are reset
+  };
   
   const menuItems = [
     { id: 'dashboard', icon: <BarChart2 size={20} />, label: 'Bảng điều khiển', hasSubmenu: false, path: '/admin/dashboard' },
@@ -60,9 +69,9 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="h-screen bg-white border-r border-gray-200 overflow-y-auto px-6">
+    <div className="h-screen bg-white border-r border-gray-200 overflow-y-auto px-6 flex flex-col">
       
-      <div className="px-4 py-2">
+      <div className="px-4 py-2 flex-grow">
         {menuItems.map((item) => (
           <div key={item.id}>
             {item.hasSubmenu ? (
@@ -110,6 +119,17 @@ const Sidebar = () => {
             )}
           </div>
         ))}
+      </div>
+      
+      {/* Logout button - new addition */}
+      <div className="px-4 py-6 border-t border-gray-200 mt-auto">
+        <button 
+          onClick={handleLogout}
+          className="flex items-center w-full p-3 rounded-lg text-red-600 hover:bg-red-50"
+        >
+          <LogOut size={20} className="mr-3" />
+          <span className="font-medium">Đăng xuất</span>
+        </button>
       </div>
     </div>
   );

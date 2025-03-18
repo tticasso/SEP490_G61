@@ -29,18 +29,18 @@ const MainContent = () => {
     <div className="flex flex-col flex-1">
       {/* Header */}
       <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4">
-        <div onClick={() => window.location.href ='/'} className="p-4 flex gap-2 items-center">
+        <div className="p-4 flex gap-2 items-center">
           <img src={logo} alt="VVDShop Logo" className="h-10" />
           <p>TROOC2HAND</p>
         </div>
-        <div className="relative w-3/5">
+        {/* <div className="relative w-3/5">
           <input
             type="text"
             placeholder="Search"
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
           <Search className="absolute left-3 top-2.5 text-gray-400" size={20} />
-        </div>
+        </div> */}
 
         <div className="flex items-center">
           <div className="mr-4 flex items-center">

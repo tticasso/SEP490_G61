@@ -181,7 +181,26 @@ const Header = () => {
         };
     }, []);
 
-   
+    const checkIfUserIsSeller = () => {
+        if (!isLoggedIn || !currentUser || !currentUser.roles) {
+            return false;
+        }
+        
+        return currentUser.roles.some(role => {
+            // Check different role formats
+            if (typeof role === 'object' && role !== null) {
+                return role.name === "SELLER" || role.name === "ROLE_SELLER";
+            }
+            
+            if (typeof role === 'string') {
+                return role === "SELLER" || role === "ROLE_SELLER";
+            }
+            
+            return false;
+        });
+    };
+
+    const userIsSeller = checkIfUserIsSeller();
 
     const formatPrice = (price) => {
         return new Intl.NumberFormat('vi-VN', {
@@ -515,7 +534,12 @@ const Header = () => {
                     <a href="categories" className="hover:text-purple-600">Danh mục</a>
                     <a href="#" className="hover:text-purple-600">Bài viết</a>
                     <a href="#" className="hover:text-purple-600">Hỗ trợ</a>
-                    <a href="shop-registration" className="text-red-500 font-semibold">Đăng ký bán hàng</a>
+                    
+                    {/* Hide "Đăng ký bán hàng" link if user is already a seller */}
+                    {!userIsSeller && (
+                        <a href="shop-registration" className="text-red-500 font-semibold">Đăng ký bán hàng</a>
+                    )}
+                    
                     <span className="ml-auto text-red-500 font-semibold items-center flex gap-2">
                         <PiggyBank size={30} className='color-red'></PiggyBank> Khuyến mại 20% cho đơn hàng đầu tiên
                     </span>

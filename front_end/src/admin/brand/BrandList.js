@@ -12,7 +12,7 @@ const BrandList = () => {
     
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
-    const [brandsPerPage, setbrandsPerPage] = useState(5);
+    const [brandsPerPage, setBrandsPerPage] = useState(5);
     const [totalBrands, setTotalBrands] = useState(0);
     
     // Filter states
@@ -26,6 +26,9 @@ const BrandList = () => {
     // Search state
     const [searchTerm, setSearchTerm] = useState('');
     
+    // Sorting state
+    const [sortOption, setSortOption] = useState('');
+
     // Selected brands for bulk actions
     const [selectedBrands, setSelectedBrands] = useState([]);
 
@@ -50,7 +53,7 @@ const BrandList = () => {
         } catch (error) {
             setError('Lỗi khi tải dữ liệu thương hiệu: ' + error);
             setLoading(false);
-        }
+        }    
     };
 
     // Handle checkbox selection
@@ -79,11 +82,20 @@ const BrandList = () => {
     // Handle search
     const handleSearch = (e) => {
         setSearchTerm(e.target.value);
+        setCurrentPage(1); // Reset to first page on search
+    };
+
+    // Handle sorting
+    const handleSortChange = (e) => {
+        setSortOption(e.target.value);
     };
 
     // Handle refresh
     const handleRefresh = () => {
         fetchBrands();
+        setSearchTerm('');
+        setSortOption('');
+        setCurrentPage(1);
     };
 
     // Handle add new brand
@@ -140,26 +152,72 @@ const BrandList = () => {
     };
 
     // Filter brands based on active filter and search term
-    const filteredBrands = brands.filter(brand => {
-        // Apply search
+    const getFilteredAndSortedBrands = () => {
+        // First apply search filter
+        let result = [...brands];
+        
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase();
-            return (
-                brand.name.toLowerCase().includes(searchLower) ||
-                (brand.description && brand.description.toLowerCase().includes(searchLower))
-            );
+            result = result.filter(brand => {
+                return (
+                    brand.name.toLowerCase().includes(searchLower) ||
+                    (brand.description && brand.description.toLowerCase().includes(searchLower))
+                );
+            });
         }
         
-        return true;
-    });
+        // Then apply sorting
+        if (sortOption) {
+            switch (sortOption) {
+                case 'newest':
+                    result.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+                    break;
+                case 'oldest':
+                    result.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+                    break;
+                case 'name-asc':
+                    result.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'name-desc':
+                    result.sort((a, b) => b.name.localeCompare(a.name));
+                    break;
+                default:
+                    break;
+            }
+        }
+        
+        return result;
+    };
 
+    // Get filtered and sorted brands
+    const filteredAndSortedBrands = getFilteredAndSortedBrands();
+    
     // Calculate total pages
-    const totalPages = Math.ceil(filteredBrands.length / brandsPerPage);
+    const totalPages = Math.ceil(filteredAndSortedBrands.length / brandsPerPage);
 
     // Paginate brands
     const indexOfLastBrand = currentPage * brandsPerPage;
     const indexOfFirstBrand = indexOfLastBrand - brandsPerPage;
-    const currentBrands = filteredBrands.slice(indexOfFirstBrand, indexOfLastBrand);
+    const currentBrands = filteredAndSortedBrands.slice(indexOfFirstBrand, indexOfLastBrand);
+
+    // Format categories to display
+    const formatCategories = (categories) => {
+        if (!categories || !Array.isArray(categories) || categories.length === 0) {
+            return 'N/A';
+        }
+        
+        // Extract category names, handling both object and string IDs
+        const categoryNames = categories.map(cat => {
+            if (typeof cat === 'object' && cat !== null) {
+                return cat.name;
+            }
+            
+            return cat;
+        });
+      
+        console.log("cat: ", categories);
+        return categoryNames.join(', ');
+    };
 
     if (loading) {
         return <div className="flex justify-center items-center h-64">Đang tải dữ liệu...</div>;
@@ -173,32 +231,6 @@ const BrandList = () => {
         <div className="flex-1 bg-gray-50">
             {/* Tabs */}
             <div className="bg-white border-b border-gray-200 px-6 py-4">
-                <div className="flex space-x-6 text-gray-600">
-                    <button
-                        className={`${filter.all ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: true, visible: false, imported: false, trash: false })}
-                    >
-                        Tất cả ( {brands.length} )
-                    </button>
-                    <button
-                        className={`${filter.visible ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, visible: true, imported: false, trash: false })}
-                    >
-                        Hiển thị ( {brands.length} )
-                    </button>
-                    <button
-                        className={`${filter.imported ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, visible: false, imported: true, trash: false })}
-                    >
-                        Nhập ( 0 )
-                    </button>
-                    <button
-                        className={`${filter.trash ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, visible: false, imported: false, trash: true })}
-                    >
-                        Thùng rác ( 0 )
-                    </button>
-                </div>
 
                 <div className="flex items-center mt-4">
                     <div className="flex items-center mr-4 cursor-pointer" onClick={handleRefresh}>
@@ -226,8 +258,12 @@ const BrandList = () => {
 
                 <div className="flex items-center">
                     <div className="mr-4">
-                        <select className="border border-gray-300 rounded-md px-3 py-2 bg-white">
-                            <option>Sắp xếp theo</option>
+                        <select 
+                            className="border border-gray-300 rounded-md px-3 py-2 bg-white"
+                            value={sortOption}
+                            onChange={handleSortChange}
+                        >
+                            <option value="">Sắp xếp theo</option>
                             <option value="newest">Mới nhất</option>
                             <option value="oldest">Cũ nhất</option>
                             <option value="name-asc">Tên A-Z</option>
@@ -288,12 +324,16 @@ const BrandList = () => {
                                         </td>
                                         <td className="py-3 px-4">
                                             <div className="flex items-center">
-                                                <span className="text-sm text-gray-900">{brand.name}</span>
+                                                <span className="text-sm font-medium text-gray-900">{brand.name}</span>
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 text-sm text-gray-700">
                                             {brand.categories && brand.categories.length > 0 
-                                                ? brand.categories.map(cat => cat.name).join(', ') 
+                                                ? (
+                                                    <div className="max-w-xs overflow-hidden">
+                                                        {formatCategories(brand.categories)}
+                                                    </div>
+                                                ) 
                                                 : 'N/A'}
                                         </td>
                                         <td className="py-3 px-4 text-sm text-gray-700">
@@ -380,7 +420,10 @@ const BrandList = () => {
                                 <select 
                                     className="mx-2 border border-gray-300 rounded p-1"
                                     value={brandsPerPage}
-                                    onChange={(e) => setbrandsPerPage(Number(e.target.value))}
+                                    onChange={(e) => {
+                                        setBrandsPerPage(Number(e.target.value));
+                                        setCurrentPage(1); // Reset to first page when changing items per page
+                                    }}
                                 >
                                     <option value="5">5</option>
                                     <option value="10">10</option>

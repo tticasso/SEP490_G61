@@ -6,9 +6,10 @@ import { useNavigate } from 'react-router-dom';
 
 const AddShipping = () => {
     const [formData, setFormData] = useState({
-        created_by: '',
+        name: '',
         price: '',
-        description: ''
+        description: '',
+        estimate_time: 24 // Default 24 hours for estimated delivery time
     });
     const [formErrors, setFormErrors] = useState({});
     const [loading, setLoading] = useState(false);
@@ -75,6 +76,26 @@ const AddShipping = () => {
         }
     };
 
+    // Handle estimate time input change
+    const handleEstimateTimeChange = (e) => {
+        const value = e.target.value;
+        
+        // Only allow positive integers
+        if (value === '' || /^\d+$/.test(value)) {
+            setFormData({
+                ...formData,
+                estimate_time: value
+            });
+            
+            if (formErrors.estimate_time) {
+                setFormErrors({
+                    ...formErrors,
+                    estimate_time: ''
+                });
+            }
+        }
+    };
+
     // Handle user selection
     const handleUserChange = (e) => {
         setSelectedUser(e.target.value);
@@ -89,8 +110,16 @@ const AddShipping = () => {
         // Validation
         const errors = {};
         
+        if (!formData.name || formData.name.trim() === '') {
+            errors.name = 'Tên phương thức vận chuyển không được để trống';
+        }
+        
         if (!formData.price || parseFloat(formData.price) <= 0) {
             errors.price = 'Giá phải lớn hơn 0';
+        }
+        
+        if (!formData.estimate_time || parseInt(formData.estimate_time) <= 0) {
+            errors.estimate_time = 'Thời gian dự kiến phải lớn hơn 0';
         }
     
         if (Object.keys(errors).length > 0) {
@@ -123,7 +152,8 @@ const AddShipping = () => {
             const dataToSubmit = {
                 ...formData,
                 user_id: userData.id, // Thêm user_id từ dữ liệu người dùng
-                price: parseFloat(formData.price)
+                price: parseFloat(formData.price),
+                estimate_time: parseInt(formData.estimate_time)
             };
     
             // Log để kiểm tra
@@ -212,6 +242,23 @@ const AddShipping = () => {
                             </div>
                             {formErrors.price && (
                                 <p className="mt-1 text-sm text-red-500">{formErrors.price}</p>
+                            )}
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Thời gian dự kiến (giờ) <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                name="estimate_time"
+                                placeholder="24"
+                                className={`w-full p-3 border ${formErrors.estimate_time ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400`}
+                                value={formData.estimate_time || ''}
+                                onChange={handleEstimateTimeChange}
+                            />
+                            {formErrors.estimate_time && (
+                                <p className="mt-1 text-sm text-red-500">{formErrors.estimate_time}</p>
                             )}
                         </div>
 

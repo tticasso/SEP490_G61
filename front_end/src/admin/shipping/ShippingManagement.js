@@ -34,6 +34,9 @@ const ShippingManagement = () => {
     
     // User info (assuming you have user info stored in localStorage or similar)
     const [currentUser, setCurrentUser] = useState(null);
+    
+    // State for storing users data to get creator names
+    const [users, setUsers] = useState([]);
 
     const navigate = useNavigate();
 
@@ -46,6 +49,7 @@ const ShippingManagement = () => {
     // Fetch shippings from API
     useEffect(() => {
         fetchShippings();
+        fetchUsers(); // Fetch users to get creator names
     }, []);
 
     const fetchShippings = async () => {
@@ -59,6 +63,27 @@ const ShippingManagement = () => {
             setError('Lỗi khi tải dữ liệu phương thức vận chuyển: ' + error);
             setLoading(false);
         }
+    };
+
+    // Fetch users to get creator names
+    const fetchUsers = async () => {
+        try {
+            const response = await ApiService.get('/user/list', true);
+            setUsers(response);
+        } catch (error) {
+            console.error('Lỗi khi tải dữ liệu người dùng:', error);
+        }
+    };
+
+    // Get creator name from creator ID
+    const getCreatorName = (creatorId) => {
+        if (!creatorId) return 'N/A';
+        
+        const creator = users.find(user => user._id === creatorId);
+        if (creator) {
+            return `${creator.firstName} ${creator.lastName}`;
+        }
+        return creatorId; // Fallback to ID if name not found
     };
 
     // Handle checkbox selection
@@ -92,6 +117,7 @@ const ShippingManagement = () => {
     // Handle refresh
     const handleRefresh = () => {
         fetchShippings();
+        fetchUsers();
     };
 
     // Handle add new shipping
@@ -159,6 +185,7 @@ const ShippingManagement = () => {
             const searchLower = searchTerm.toLowerCase();
             return (
                 (shipping.id && shipping.id.toLowerCase().includes(searchLower)) ||
+                (shipping.name && shipping.name.toLowerCase().includes(searchLower)) ||
                 (shipping.description && shipping.description.toLowerCase().includes(searchLower))
             );
         }
@@ -278,6 +305,9 @@ const ShippingManagement = () => {
                                     ID
                                 </th>
                                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                    Tên phương thức
+                                </th>
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
                                     Giá
                                 </th>
                                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
@@ -309,6 +339,7 @@ const ShippingManagement = () => {
                                             />
                                         </td>
                                         <td className="py-3 px-4 text-sm text-gray-700">{shipping.id}</td>
+                                        <td className="py-3 px-4 text-sm text-gray-700 font-medium">{shipping.name || 'Không có tên'}</td>
                                         <td className="py-3 px-4 text-sm text-gray-700">{formatCurrency(shipping.price)}</td>
                                         <td className="py-3 px-4">
                                             <div className="flex items-center">
@@ -316,7 +347,7 @@ const ShippingManagement = () => {
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 text-sm text-gray-700">
-                                            {shipping.created_by || 'N/A'}
+                                            {getCreatorName(shipping.created_by)}
                                         </td>
                                         <td className="py-3 px-4 text-sm text-gray-700">{formatDate(shipping.created_at)}</td>
                                         <td className="py-3 px-4">
@@ -340,7 +371,7 @@ const ShippingManagement = () => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="7" className="py-4 px-6 text-center text-gray-500">
+                                    <td colSpan="8" className="py-4 px-6 text-center text-gray-500">
                                         Không có phương thức vận chuyển nào phù hợp với tìm kiếm
                                     </td>
                                 </tr>

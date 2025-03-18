@@ -17,4 +17,10 @@ ProductRouter.post("/create", [VerifyJwt.verifyToken], productController.createP
 ProductRouter.put("/edit/:id", [VerifyJwt.verifyToken], productController.updateProduct);
 ProductRouter.delete("/delete/:id", [VerifyJwt.verifyToken], productController.deleteProduct);
 
+// Thêm routes mới cho xóa mềm và khôi phục
+ProductRouter.put("/soft-delete/:id", [VerifyJwt.verifyToken], productController.softDeleteProduct);
+ProductRouter.put("/restore/:id", [VerifyJwt.verifyToken], productController.restoreProduct);
+ProductRouter.post("/bulk-soft-delete", [VerifyJwt.verifyToken], productController.bulkSoftDeleteProducts);
+ProductRouter.post("/bulk-restore", [VerifyJwt.verifyToken], productController.bulkRestoreProducts);
+
 module.exports = ProductRouter

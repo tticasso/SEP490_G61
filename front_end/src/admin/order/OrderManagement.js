@@ -52,16 +52,16 @@ const OrderManagement = () => {
     try {
       setLoading(true);
       let endpoint = '/order/list';
-  
+
       const response = await ApiService.get(endpoint);
       console.log("====== ORDER LIST DEBUG ======");
       console.log("Orders response:", response);
-      
+
       // Kiểm tra thông tin khách hàng trong đơn hàng đầu tiên (nếu có)
       if (response && response.length > 0) {
         console.log("First order:", response[0]);
         console.log("Customer data in first order:", response[0].customer_id);
-        
+
         // Xem xét cấu trúc của tất cả các đơn hàng để tìm vấn đề
         const customerDataTypes = response.map(order => ({
           orderId: order.id,
@@ -70,7 +70,7 @@ const OrderManagement = () => {
         }));
         console.log("Customer data analysis:", customerDataTypes);
       }
-      
+
       setOrders(response);
       setTotalItems(response.length);
       setLoading(false);
@@ -460,7 +460,7 @@ const OrderManagement = () => {
                             {order.payment_id?.name || 'Không có thông tin'}
                           </td>
                           <td className="py-4 px-4 text-sm text-gray-900">
-                            {order.discount_id?.code || 'Không áp dụng'}
+                            {order.discount_id?.code || order.coupon_id?.code || 'Không áp dụng'}
                           </td>
                           <td className="py-4 px-4">
                             <span className={`px-3 py-1 truncate text-xs font-medium rounded ${getStatusClass(order.status_id)}`}>

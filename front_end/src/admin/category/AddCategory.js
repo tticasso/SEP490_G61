@@ -127,7 +127,7 @@ const AddCategory = () => {
                     </div>
                 )}
 
-                <div className="grid grid-cols-3 gap-6">
+                <div className="p-8">
                     {/* Left column - Form */}
                     <div className="col-span-2">
                         <form onSubmit={handleSubmit}>
@@ -221,56 +221,7 @@ const AddCategory = () => {
                         </form>
                     </div>
 
-                    {/* Right column - Options */}
-                    <div className="col-span-1">
-                        <div>
-                            {/* Parent category */}
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Cấp cha
-                                </label>
-                                <select
-                                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                    value={parentCategory}
-                                    onChange={(e) => setParentCategory(e.target.value)}
-                                >
-                                    <option value="">Không</option>
-                                    {categories.map(category => (
-                                        <option key={category._id} value={category._id}>
-                                            {category.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Image upload */}
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Hình đại diện
-                                </label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
-                                    <div className="mb-3 flex justify-center">
-                                        <Upload size={24} className="text-gray-400" />
-                                    </div>
-                                    <p className="text-sm text-gray-500 mb-2">Upload or drop a file right here</p>
-                                    <p className="text-xs text-gray-400">JPEG,PNG,GIF,JPG</p>
-                                    <input
-                                        type="file"
-                                        className="hidden"
-                                        id="fileUpload"
-                                        onChange={handleImageUpload}
-                                        accept="image/jpeg,image/png,image/gif,image/jpg"
-                                    />
-                                    <label
-                                        htmlFor="fileUpload"
-                                        className="mt-4 inline-block bg-white border border-gray-300 rounded px-4 py-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50"
-                                    >
-                                        Chọn file
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                  
                 </div>
 
                 {/* Action buttons */}

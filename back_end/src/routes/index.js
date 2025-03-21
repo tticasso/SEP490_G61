@@ -12,12 +12,13 @@ const CouponRouter = require('./coupon.routes') // Add coupon routes
 const OrderRouter = require('./order.routes')
 const ShippingRouter = require('./shipping.routes')
 const PaymentRouter = require('./payment.routes')
-const ProductVariantRouter = require('./product-variant.routes')
 const ShopRouter = require('./shops.routes')
 const DocumentRouter = require('./document.routes')
 const ShopFollowRouter = require('./shop-follow.routes')
 const ConversationRouter = require('./conversation.routes')
 const UserStatusRouter = require('./user-status.routes')
+const ProductVariantRouter = require('./product-variant.routes');
+const ProductAttributeRouter = require('./product-attribute.routes');
 
 module.exports = {
     AuthRouter,
@@ -34,10 +35,11 @@ module.exports = {
     OrderRouter,
     ShippingRouter,
     PaymentRouter,
-    ProductVariantRouter,
     ShopRouter,
     DocumentRouter,
     ShopFollowRouter,
     ConversationRouter,
-    UserStatusRouter
+    UserStatusRouter,
+    ProductVariantRouter,
+    ProductAttributeRouter
 }

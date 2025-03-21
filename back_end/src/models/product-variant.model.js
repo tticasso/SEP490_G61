@@ -6,52 +6,47 @@ const productVariantSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Product',
         required: true
-      },
-      sku: {
-        type: String,
-        required: true,
-        unique: true
-      },
-      color: {
+    },
+    name: {
         type: String,
         required: true
-      },
-      size: {
-        type: String,
-        required: true
-      },
-      quantity: {
+    },
+    price: {
         type: Number,
         required: true
-      },
-      price: {
+    },
+    stock: {
         type: Number,
-        required: true
-      },
-      is_active: {
-        type: Boolean,
-        default: true
-      },
-      is_delete: {
+        default: 0
+    },
+    // Variant attributes (color, size, etc.)
+    attributes: {
+        type: Map,
+        of: String
+    },
+    images: [{
+        type: String
+    }],
+    is_default: {
         type: Boolean,
         default: false
-      },
-      created_at: {
+    },
+    is_active: {
+        type: Boolean,
+        default: true
+    },
+    is_delete: {
+        type: Boolean,
+        default: false
+    },
+    created_at: {
         type: Date,
         default: Date.now
-      },
-      updated_at: {
+    },
+    updated_at: {
         type: Date,
         default: Date.now
-      },
-      created_by: {
-        type: Schema.Types.ObjectId,
-        ref: 'users'
-      },
-      updated_by: {
-        type: Schema.Types.ObjectId,
-        ref: 'users'
-      }
+    }
 });
 
 const ProductVariant = mongoose.model('ProductVariant', productVariantSchema);

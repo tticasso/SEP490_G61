@@ -12,12 +12,12 @@ const couponController = require('./coupon.controller') // Add coupon controller
 const orderController = require('./order.controller')
 const shippingController = require('./shipping.controller')
 const paymentController = require('./payment.controller')
-const productVariantController = require('./product-variant.controller')
 const shopController = require('./shops.controller')
 const shopFollowController = require('./shop-follow.controller')
 const conversationController = require('./conversation.controller')
 const userStatusController = require('./user-status.controller')
-
+const productVariantController = require('./product-variant.controller');
+const productAttributeController = require('./product-attribute.controller');
 module.exports = {
     authController,
     userController,
@@ -33,9 +33,10 @@ module.exports = {
     orderController,
     shippingController,
     paymentController,
-    productVariantController,
     shopController,
     shopFollowController,
     conversationController,
-    userStatusController
+    userStatusController,
+    productVariantController,
+    productAttributeController
 }

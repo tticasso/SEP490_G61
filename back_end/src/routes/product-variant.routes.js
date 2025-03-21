@@ -1,21 +1,20 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const {productVariantController}  = require('../controller');
+const { productVariantController } = require('../controller');
 const VerifyJwt = require('../middlewares/verifyJwt');
 
 const ProductVariantRouter = express.Router();
 ProductVariantRouter.use(bodyParser.json());
 
-// Lấy danh sách các biến thể của một sản phẩm (chỉ người bán hàng có quyền)
-ProductVariantRouter.get("/", [VerifyJwt.verifyToken], [VerifyJwt.isSeller], productVariantController.getProductVariants);
+// Public routes
+ProductVariantRouter.get("/product/:productId", productVariantController.getVariantsByProductId);
+ProductVariantRouter.get("/:id", productVariantController.getVariantById);
 
-// Tạo mới một biến thể sản phẩm (chỉ người bán hàng có quyền)
-ProductVariantRouter.post("/create", [VerifyJwt.verifyToken], [VerifyJwt.isSeller], productVariantController.createProductVariant);
-
-// Cập nhật thông tin một biến thể sản phẩm (chỉ người bán hàng có quyền)
-ProductVariantRouter.put("/edit/:variantId", [VerifyJwt.verifyToken], [VerifyJwt.isSeller], productVariantController.updateProductVariant);
-
-// Xóa một biến thể sản phẩm (chỉ người bán hàng có quyền)
-ProductVariantRouter.delete("/delete/:variantId", [VerifyJwt.verifyToken], [VerifyJwt.isSeller], productVariantController.deleteProductVariant);
+// Protected routes - requires authentication
+ProductVariantRouter.post("/create", [VerifyJwt.verifyToken], productVariantController.createVariant);
+ProductVariantRouter.put("/edit/:id", [VerifyJwt.verifyToken], productVariantController.updateVariant);
+ProductVariantRouter.delete("/delete/:id", [VerifyJwt.verifyToken], productVariantController.deleteVariant);
+ProductVariantRouter.put("/stock/:id", [VerifyJwt.verifyToken], productVariantController.updateVariantStock);
+ProductVariantRouter.put("/product/:productId/default/:variantId", [VerifyJwt.verifyToken], productVariantController.setDefaultVariant);
 
 module.exports = ProductVariantRouter;

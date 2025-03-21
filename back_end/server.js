@@ -24,12 +24,13 @@ const { AuthRouter,
     OrderRouter,
     ShippingRouter,
     PaymentRouter,
-    ProductVariantRouter,
     ShopRouter,
     DocumentRouter,
     ShopFollowRouter,
     ConversationRouter,
-    UserStatusRouter
+    UserStatusRouter,
+    ProductVariantRouter,
+    ProductAttributeRouter
 } = require('./src/routes');
 
 const session = require('express-session');
@@ -93,7 +94,6 @@ app.use('/api/brand', BrandRouter);
 app.use('/api/product', ProductRouter);
 app.use('/api/product-review', ProductReviewRouter);
 app.use('/api/address', AddressRouter);
-app.use('/api/product-variant', ProductVariantRouter);
 app.use('/api/shops', ShopRouter);
 app.use('/api/shop-follow', ShopFollowRouter);
 app.use('/api/cart', CartRouter);
@@ -103,7 +103,9 @@ app.use('/api/order', OrderRouter);
 app.use('/api/shipping', ShippingRouter);
 app.use('/api/payment', PaymentRouter);
 app.use('/api/documents', DocumentRouter);
-app.use('/api/user-status', UserStatusRouter)
+app.use('/api/user-status', UserStatusRouter);
+app.use('/api/product-variant', ProductVariantRouter);
+app.use('/api/product-attribute', ProductAttributeRouter);
 // Thêm route mới
 app.use('/api/conversation', ConversationRouter);
 // Kiểm soát các lỗi trong Express web server

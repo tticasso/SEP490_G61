@@ -10,6 +10,7 @@ ProductRouter.use(bodyParser.json())
 ProductRouter.get("/", productController.getAllProducts);
 ProductRouter.get("/shop/:shopId", productController.getProductsByShopId); // Route for getting products by shop ID
 ProductRouter.get("/user/:userId", productController.getProductsByUserId);
+ProductRouter.get("/:id/with-variants", productController.getProductWithVariants); // Add new route for products with variants
 ProductRouter.get("/:id", productController.getProductById); // This must come after other specific routes
 
 // Protected routes - requires authentication

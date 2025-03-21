@@ -36,17 +36,17 @@ const getProductById = async (req, res) => {
 
 async function getProductsByUserId(req, res, next) {
     try {
-      const { userId } = req.params;
-      const products = await Product.find({
-        created_by: userId,
-        is_active: true,
-        is_delete: false,
-        is_hot: true, 
-        is_feature: true 
-      });
-      res.status(200).json(products);
+        const { userId } = req.params;
+        const products = await Product.find({
+            created_by: userId,
+            is_active: true,
+            is_delete: false,
+            is_hot: true,
+            is_feature: true
+        });
+        res.status(200).json(products);
     } catch (error) {
-      next(error);
+        next(error);
     }
 }
 
@@ -54,9 +54,9 @@ async function getProductsByUserId(req, res, next) {
 const getProductsByShopId = async (req, res) => {
     try {
         const { shopId } = req.params;
-        
+
         console.log(`Looking for products with shop_id: ${shopId}`);
-        
+
         // First, try to find products where shop_id is stored as an ObjectId
         let products = [];
         if (mongoose.Types.ObjectId.isValid(shopId)) {
@@ -66,10 +66,10 @@ const getProductsByShopId = async (req, res) => {
                 is_active: true,
                 is_delete: false
             })
-            .populate("category_id", "name")
-            .populate("brand_id", "name");
+                .populate("category_id", "name")
+                .populate("brand_id", "name");
         }
-        
+
         // If no products found and shop_id might be stored as a string, try string comparison
         if (products.length === 0) {
             console.log("No products found with ObjectId, trying string comparison");
@@ -78,12 +78,12 @@ const getProductsByShopId = async (req, res) => {
                 is_active: true,
                 is_delete: false
             })
-            .populate("category_id", "name")
-            .populate("brand_id", "name");
+                .populate("category_id", "name")
+                .populate("brand_id", "name");
         }
-        
+
         console.log(`Found ${products.length} products for shop ${shopId}`);
-        
+
         res.status(200).json(products);
     } catch (error) {
         console.error("Error in getProductsByShopId:", error);
@@ -380,16 +380,16 @@ const bulkRestoreProducts = async (req, res) => {
 // Cập nhật sản phẩm
 const updateProduct = async (req, res) => {
     try {
-        const { 
-            category_id, 
-            brand_id, 
+        const {
+            category_id,
+            brand_id,
             shop_id,
-            name, 
-            slug, 
-            description, 
-            detail, 
-            price, 
-            thumbnail 
+            name,
+            slug,
+            description,
+            detail,
+            price,
+            thumbnail
         } = req.body;
 
         // Lấy thông tin sản phẩm hiện tại
@@ -401,7 +401,7 @@ const updateProduct = async (req, res) => {
         // Kiểm tra quyền cập nhật (chỉ chủ shop hoặc admin)
         const shopToCheck = shop_id || currentProduct.shop_id;
         const shop = await Shop.findById(shopToCheck);
-        
+
         if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
             return res.status(403).json({ message: "You don't have permission to update this product" });
         }
@@ -451,9 +451,9 @@ const updateProduct = async (req, res) => {
             },
             { new: true }
         )
-        .populate("category_id", "name")
-        .populate("brand_id", "name")
-        .populate("shop_id", "name");
+            .populate("category_id", "name")
+            .populate("brand_id", "name")
+            .populate("shop_id", "name");
 
         res.status(200).json(updatedProduct);
     } catch (error) {
@@ -482,6 +482,33 @@ const deleteProduct = async (req, res) => {
     }
 };
 
+const getProductWithVariants = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const product = await Product.findById(id)
+            .populate("category_id", "name")
+            .populate("brand_id", "name")
+            .populate("shop_id", "name");
+
+        if (!product) {
+            return res.status(404).json({ message: "Product not found" });
+        }
+
+        // Get variants
+        const variants = await db.productVariant.find({
+            product_id: id,
+            is_delete: false
+        });
+
+        res.status(200).json({
+            product,
+            variants
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 const productController = {
     getAllProducts,
     getProductById,
@@ -490,6 +517,7 @@ const productController = {
     updateProduct,
     deleteProduct,
     getProductsByUserId,
+    getProductWithVariants,
     softDeleteProduct,    // Thêm methods mới
     restoreProduct,       // Thêm methods mới
     bulkSoftDeleteProducts, // Thêm methods mới

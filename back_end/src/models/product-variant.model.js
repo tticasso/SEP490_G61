@@ -11,6 +11,11 @@ const productVariantSchema = new Schema({
         type: String,
         required: true
     },
+    sku: {
+        type: String,
+        unique: true,  // This ensures uniqueness
+        required: true // Makes the field required
+    },
     price: {
         type: Number,
         required: true

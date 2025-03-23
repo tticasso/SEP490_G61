@@ -55,8 +55,10 @@ const createVariant = async (req, res) => {
             stock,
             attributes,
             images,
-            is_default
+            is_default,
+            sku
         } = req.body;
+
         // Kiểm tra sản phẩm có tồn tại không
         const product = await Product.findById(product_id);
         if (!product || product.is_delete) {
@@ -77,12 +79,16 @@ const createVariant = async (req, res) => {
             );
         }
 
+        // Tạo SKU nếu không được cung cấp
+        const generatedSku = sku || generateSku(product.name, attributes);
+
         // Tạo biến thể mới
         const newVariant = new ProductVariant({
             product_id,
             name,
             price,
             stock,
+            sku: generatedSku,
             attributes: new Map(Object.entries(attributes || {})),
             images: images || [],
             is_default: is_default || false,
@@ -95,6 +101,28 @@ const createVariant = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+// Helper function to generate a SKU
+function generateSku(productName, attributes) {
+    // Create a base from product name (first 2 characters)
+    const base = productName.replace(/\s+/g, '').substring(0, 2).toUpperCase();
+
+    // Get attributes if they exist
+    let attributePart = '';
+    if (attributes) {
+        if (attributes.color) {
+            attributePart += attributes.color.substring(0, 3).toUpperCase();
+        }
+        if (attributes.size) {
+            attributePart += '-' + attributes.size;
+        }
+    }
+
+    // Add a timestamp for uniqueness
+    const timestamp = Date.now().toString().slice(-6);
+
+    return `${base}-${attributePart}-${timestamp}`;
+}
 
 // Cập nhật biến thể
 const updateVariant = async (req, res) => {

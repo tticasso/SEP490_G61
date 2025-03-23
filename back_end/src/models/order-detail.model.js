@@ -17,6 +17,10 @@ const orderDetailSchema = new Schema({
         ref: 'Product',
         required: true
     },
+    variant_id: {
+        type: Schema.Types.ObjectId,
+        ref: 'ProductVariant'
+    },
     quantity: {
         type: Number,
         required: true,

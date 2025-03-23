@@ -2,6 +2,7 @@ const db = require("../models");
 const Cart = db.cart;
 const CartItem = db.cartItem;
 const Product = db.product;
+const ProductVariant = db.productVariant;
 
 // Tạo giỏ hàng mới
 const createCart = async (req, res) => {
@@ -37,9 +38,10 @@ const getCartByUserId = async (req, res) => {
             return res.status(404).json({ message: "Cart not found" });
         }
 
-        // Lấy các sản phẩm trong giỏ hàng
+        // Lấy các sản phẩm trong giỏ hàng và populate cả product_id và variant_id
         const cartItems = await CartItem.find({ cart_id: cart._id })
             .populate("product_id")
+            .populate("variant_id")
             .populate("discount_id");
 
         const cartWithItems = {
@@ -56,7 +58,7 @@ const getCartByUserId = async (req, res) => {
 // Thêm sản phẩm vào giỏ hàng
 const addItemToCart = async (req, res) => {
     try {
-        const { cart_id, product_id, quantity, discount_id } = req.body;
+        const { cart_id, product_id, quantity, variant_id, discount_id } = req.body;
 
         // Kiểm tra giỏ hàng có tồn tại không
         const cartExists = await Cart.findById(cart_id);
@@ -70,8 +72,43 @@ const addItemToCart = async (req, res) => {
             return res.status(404).json({ message: "Product not found" });
         }
 
-        // Kiểm tra sản phẩm đã có trong giỏ hàng chưa
-        const existingItem = await CartItem.findOne({ cart_id, product_id });
+        // Kiểm tra variant nếu có
+        if (variant_id) {
+            const variantExists = await ProductVariant.findById(variant_id);
+            if (!variantExists) {
+                return res.status(404).json({ message: "Variant not found" });
+            }
+            
+            // Kiểm tra xem variant có thuộc về sản phẩm này không
+            if (variantExists.product_id.toString() !== product_id) {
+                return res.status(400).json({ message: "This variant does not belong to the specified product" });
+            }
+            
+            // Kiểm tra số lượng tồn kho của variant
+            if (variantExists.stock < quantity) {
+                return res.status(400).json({ 
+                    message: "Not enough stock available", 
+                    available: variantExists.stock 
+                });
+            }
+        }
+
+        // Kiểm tra sản phẩm đã có trong giỏ hàng chưa - với variant nếu có
+        let existingItem;
+        
+        if (variant_id) {
+            existingItem = await CartItem.findOne({ 
+                cart_id, 
+                product_id,
+                variant_id 
+            });
+        } else {
+            existingItem = await CartItem.findOne({ 
+                cart_id, 
+                product_id,
+                variant_id: { $exists: false } 
+            });
+        }
 
         if (existingItem) {
             // Cập nhật số lượng nếu sản phẩm đã có trong giỏ hàng
@@ -90,6 +127,11 @@ const addItemToCart = async (req, res) => {
                 quantity,
                 discount_id
             });
+            
+            // Thêm variant_id nếu có
+            if (variant_id) {
+                newCartItem.variant_id = variant_id;
+            }
 
             await newCartItem.save();
 
@@ -112,20 +154,29 @@ const updateCartItem = async (req, res) => {
             return res.status(400).json({ message: "Quantity must be at least 1" });
         }
 
-        const updatedItem = await CartItem.findByIdAndUpdate(
-            cart_item_id,
-            { quantity },
-            { new: true }
-        );
-
-        if (!updatedItem) {
+        const cartItem = await CartItem.findById(cart_item_id);
+        if (!cartItem) {
             return res.status(404).json({ message: "Cart item not found" });
         }
+        
+        // Nếu có variant_id, kiểm tra số lượng tồn kho
+        if (cartItem.variant_id) {
+            const variant = await ProductVariant.findById(cartItem.variant_id);
+            if (variant && variant.stock < quantity) {
+                return res.status(400).json({ 
+                    message: "Not enough stock available", 
+                    available: variant.stock 
+                });
+            }
+        }
+
+        cartItem.quantity = quantity;
+        await cartItem.save();
 
         // Cập nhật thời gian cập nhật giỏ hàng
-        await Cart.findByIdAndUpdate(updatedItem.cart_id, { updated_at: Date.now() });
+        await Cart.findByIdAndUpdate(cartItem.cart_id, { updated_at: Date.now() });
 
-        res.status(200).json(updatedItem);
+        res.status(200).json(cartItem);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

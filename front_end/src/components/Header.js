@@ -214,16 +214,27 @@ const Header = () => {
             setCartTotal(0);
             return;
         }
-
+    
         try {
             const response = await ApiService.get(`/cart/user/${userId}`);
-            if (response && response.items) {
-                const total = response.items.reduce((sum, item) => {
+            if (response && response.items && response.items.length > 0) {
+                // First ensure we have complete variant data
+                const itemsWithCompleteVariants = await ensureCompleteVariantInfo(response.items);
+                
+                // Calculate total with proper variant pricing
+                const total = itemsWithCompleteVariants.reduce((sum, item) => {
+                    // First check for variant price
+                    if (item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price) {
+                        return sum + (item.variant_id.price * item.quantity);
+                    }
+                    
+                    // Fall back to product price
                     const price = item.product_id && typeof item.product_id === 'object'
-                        ? (item.product_id.discounted_price || item.product_id.price)
+                        ? (item.product_id.discounted_price || item.product_id.price || 0)
                         : 0;
                     return sum + price * item.quantity;
                 }, 0);
+                
                 setCartTotal(total);
             } else {
                 setCartTotal(0);
@@ -232,6 +243,44 @@ const Header = () => {
             console.error('Error fetching cart total:', error);
             setCartTotal(0);
         }
+    };
+
+    const ensureCompleteVariantInfo = async (items) => {
+        const updatedItems = [...items];
+        
+        for (let i = 0; i < updatedItems.length; i++) {
+            const item = updatedItems[i];
+            
+            // If item has a variant_id but it's not a complete object
+            if (item.variant_id && (typeof item.variant_id === 'string' || !item.variant_id.attributes)) {
+                const productId = typeof item.product_id === 'object' 
+                    ? item.product_id._id 
+                    : item.product_id;
+                    
+                const variantId = typeof item.variant_id === 'string' 
+                    ? item.variant_id 
+                    : item.variant_id._id;
+                
+                if (productId && variantId) {
+                    try {
+                        // Get full variant data
+                        const variants = await ApiService.get(`/product-variant/product/${productId}`, false);
+                        const fullVariant = variants.find(v => v._id === variantId);
+                        
+                        if (fullVariant) {
+                            updatedItems[i] = {
+                                ...item,
+                                variant_id: fullVariant
+                            };
+                        }
+                    } catch (error) {
+                        console.error(`Failed to fetch complete variant data for product ${productId}:`, error);
+                    }
+                }
+            }
+        }
+        
+        return updatedItems;
     };
 
     // Kiểm tra xem người dùng có role SELLER không - cải tiến phương pháp phát hiện role

@@ -7,11 +7,948 @@ import {
   ChevronDown,
   ChevronUp,
   Loader,
-  X
+  X,
+  Eye // Thêm icon Eye
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import ApiService from '../services/ApiService';
 import AuthService from '../services/AuthService';
+
+// Product Details Modal Component
+const ProductDetailsModal = ({ product, onClose }) => {
+  const [loading, setLoading] = useState(true);
+  const [productDetails, setProductDetails] = useState(null);
+  const [variants, setVariants] = useState([]);
+  const [error, setError] = useState(null);
+  
+  // State for variant modal
+  const [showVariantModal, setShowVariantModal] = useState(false);
+  const [currentVariant, setCurrentVariant] = useState(null);
+  const [isEditingVariant, setIsEditingVariant] = useState(false);
+  
+  useEffect(() => {
+    const fetchProductDetails = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch full product details
+        const fetchedProduct = await ApiService.get(`/product/${product.id || product._id}`);
+        setProductDetails(fetchedProduct);
+        
+        // Fetch product variants
+        const fetchedVariants = await ApiService.get(`/product-variant/product/${product.id || product._id}`);
+        setVariants(fetchedVariants || []);
+        
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching product details:', err);
+        setError('Không thể tải thông tin chi tiết sản phẩm. Vui lòng thử lại sau.');
+        
+        // Set fallback data for demo
+        setProductDetails(product);
+        setVariants([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchProductDetails();
+  }, [product]);
+  
+  const handleAddVariant = () => {
+    setCurrentVariant({
+      product_id: product.id || product._id,
+      name: '',
+      price: '',
+      stock: 0,
+      attributes: {},
+      images: [],
+      is_default: variants.length === 0 // First variant is default
+    });
+    setIsEditingVariant(false);
+    setShowVariantModal(true);
+  };
+  
+  const handleEditVariant = (variant) => {
+    // Convert Map to object if needed
+    const variantToEdit = {
+      ...variant,
+      attributes: variant.attributes instanceof Map ? 
+        Object.fromEntries(variant.attributes) : variant.attributes || {}
+    };
+    
+    setCurrentVariant(variantToEdit);
+    setIsEditingVariant(true);
+    setShowVariantModal(true);
+  };
+  
+  const handleDeleteVariant = async (variantId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa biến thể này?')) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await ApiService.delete(`/product-variant/delete/${variantId}`);
+      
+      // Remove deleted variant from state
+      setVariants(variants.filter(v => v._id !== variantId));
+      
+      setError(null);
+    } catch (err) {
+      console.error('Error deleting variant:', err);
+      setError('Không thể xóa biến thể. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleSetDefaultVariant = async (variantId) => {
+    try {
+      setLoading(true);
+      const productId = product.id || product._id;
+      await ApiService.put(`/product-variant/product/${productId}/default/${variantId}`);
+      
+      // Update variants in state
+      setVariants(variants.map(v => ({
+        ...v,
+        is_default: v._id === variantId
+      })));
+      
+      setError(null);
+    } catch (err) {
+      console.error('Error setting default variant:', err);
+      setError('Không thể đặt biến thể mặc định. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Render attributes as a list
+  const renderAttributes = (attributes) => {
+    if (!attributes) return null;
+    
+    // Convert Map to object if necessary
+    const attrObj = attributes instanceof Map ? 
+      Object.fromEntries(attributes) : attributes;
+    
+    return (
+      <ul className="list-disc list-inside pl-2">
+        {Object.entries(attrObj).map(([key, value]) => (
+          <li key={key}><span className="font-medium">{key}:</span> {value}</li>
+        ))}
+      </ul>
+    );
+  };
+  
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-medium">Chi tiết sản phẩm</h3>
+            <button className="text-gray-400 hover:text-gray-600" onClick={onClose}>
+              <X size={24} />
+            </button>
+          </div>
+          <div className="flex justify-center items-center py-10">
+            <Loader className="animate-spin mr-2" />
+            <p>Đang tải thông tin chi tiết...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-medium">Chi tiết sản phẩm</h3>
+          <button className="text-gray-400 hover:text-gray-600" onClick={onClose}>
+            <X size={24} />
+          </button>
+        </div>
+        
+        {error && (
+          <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded mb-6">
+            {error}
+          </div>
+        )}
+        
+        {productDetails && (
+          <div className="space-y-6">
+            {/* Product Information Section */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Product Image */}
+              <div className="col-span-1">
+                <div className="border rounded-md p-2 h-80 flex items-center justify-center">
+                  {productDetails.thumbnail ? (
+                    <img 
+                      src={productDetails.thumbnail} 
+                      alt={productDetails.name} 
+                      className="max-h-full max-w-full object-contain"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "/api/placeholder/200/200";
+                      }}
+                    />
+                  ) : (
+                    <div className="text-gray-300 text-center">
+                      <p>Không có hình ảnh</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Product Info */}
+              <div className="col-span-2 space-y-4">
+                <h2 className="text-2xl font-bold">{productDetails.name}</h2>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Giá bán</p>
+                    <p className="text-xl font-semibold">{productDetails.price?.toLocaleString()}₫</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-500">Đã bán</p>
+                    <p>{productDetails.sold || 0}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-500">Slug</p>
+                    <p className="truncate">{productDetails.slug}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-500">Trạng thái</p>
+                    <div className="flex items-center">
+                      <span className={`inline-block w-3 h-3 rounded-full mr-2 ${productDetails.is_active ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      <span>{productDetails.is_active ? 'Đang hoạt động' : 'Tạm ẩn'}</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-500">Khối lượng</p>
+                    <p>{productDetails.weight} gram</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-500">Tình trạng</p>
+                    <p>
+                      {productDetails.condition === 'new' && 'Mới'}
+                      {productDetails.condition === 'used' && 'Đã qua sử dụng'}
+                      {productDetails.condition === 'refurbished' && 'Tân trang'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-gray-500">Mô tả</p>
+                  <p className="text-gray-700">{productDetails.description}</p>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  {productDetails.is_hot && (
+                    <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs">Nổi bật</span>
+                  )}
+                  {productDetails.is_feature && (
+                    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">Đặc trưng</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Divider */}
+            <hr className="my-6" />
+            
+            {/* Product Detail Section */}
+            <div>
+              <h4 className="text-lg font-medium mb-3">Chi tiết sản phẩm</h4>
+              <div className="prose max-w-none">
+                <p>{productDetails.detail}</p>
+              </div>
+            </div>
+            
+            {/* Divider */}
+            <hr className="my-6" />
+            
+            {/* Product Variants Section */}
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-medium">Biến thể sản phẩm</h4>
+                <button 
+                  className="bg-green-500 text-white px-3 py-1 rounded flex items-center text-sm"
+                  onClick={handleAddVariant}
+                >
+                  <Plus size={16} className="mr-1" />
+                  Thêm biến thể
+                </button>
+              </div>
+              
+              {variants.length === 0 ? (
+                <div className="text-center p-8 bg-gray-50 rounded-md">
+                  <p className="text-gray-500">Sản phẩm chưa có biến thể nào.</p>
+                  <p className="text-gray-500 text-sm mt-1">Nhấn "Thêm biến thể" để tạo biến thể mới.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-collapse">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="py-2 px-4 text-left border">Biến thể</th>
+                        <th className="py-2 px-4 text-left border">Thuộc tính</th>
+                        <th className="py-2 px-4 text-left border">Giá</th>
+                        <th className="py-2 px-4 text-left border">Tồn kho</th>
+                        <th className="py-2 px-4 text-left border">Trạng thái</th>
+                        <th className="py-2 px-4 text-left border">Mặc định</th>
+                        <th className="py-2 px-4 text-left border">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {variants.map((variant) => (
+                        <tr key={variant._id} className="hover:bg-gray-50">
+                          <td className="py-2 px-4 border">{variant.name}</td>
+                          <td className="py-2 px-4 border">
+                            {renderAttributes(variant.attributes)}
+                          </td>
+                          <td className="py-2 px-4 border">{variant.price?.toLocaleString()}₫</td>
+                          <td className="py-2 px-4 border">{variant.stock}</td>
+                          <td className="py-2 px-4 border">
+                            <span className={`inline-block w-3 h-3 rounded-full mr-2 ${variant.is_active ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                            <span>{variant.is_active ? 'Hiện' : 'Ẩn'}</span>
+                          </td>
+                          <td className="py-2 px-4 border">
+                            <input 
+                              type="radio" 
+                              checked={variant.is_default} 
+                              onChange={() => handleSetDefaultVariant(variant._id)}
+                              className="mr-2"
+                            />
+                            {variant.is_default ? 'Mặc định' : ''}
+                          </td>
+                          <td className="py-2 px-4 border">
+                            <div className="flex space-x-2">
+                              <button 
+                                onClick={() => handleEditVariant(variant)}
+                                className="text-blue-500"
+                                title="Sửa biến thể"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteVariant(variant._id)}
+                                className="text-red-500"
+                                title="Xóa biến thể"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            
+            {/* SEO Information */}
+            <div>
+              <h4 className="text-lg font-medium mb-3">Thông tin SEO</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Meta Title</p>
+                  <p className="truncate">{productDetails.meta_title}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Meta Keyword</p>
+                  <p className="truncate">{productDetails.meta_keyword}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <p className="text-sm text-gray-500">Meta Description</p>
+                  <p className="truncate">{productDetails.meta_description}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Variant Edit/Add Modal */}
+        {showVariantModal && currentVariant && (
+          <VariantFormModal
+            variant={currentVariant}
+            isEditing={isEditingVariant}
+            onClose={() => setShowVariantModal(false)}
+            onSave={(newVariant) => {
+              if (isEditingVariant) {
+                // Update variant in list
+                setVariants(variants.map(v => 
+                  v._id === newVariant._id ? newVariant : v
+                ));
+              } else {
+                // Add new variant to list
+                setVariants([...variants, newVariant]);
+              }
+              setShowVariantModal(false);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+// Component for adding/editing variants với khả năng xóa tất cả thuộc tính
+const VariantFormModal = ({ variant, isEditing, onClose, onSave }) => {
+  // Helper function để tạo SKU duy nhất với định dạng linh hoạt
+  const generateSKU = (productId, variantName, attributes) => {
+    // Lấy một số ký tự đầu của tên sản phẩm
+    let prefix = "VAR"; // Mặc định
+    
+    // Đoán tiền tố từ tên sản phẩm nếu có
+    if (variantName) {
+      const words = variantName.split(' ');
+      if (words.length > 0) {
+        // Lấy chữ cái đầu của 1-2 từ đầu tiên
+        const firstWords = words.slice(0, Math.min(2, words.length));
+        prefix = firstWords.map(word => word.charAt(0).toUpperCase()).join('');
+        
+        // Nếu chỉ có 1 ký tự, thêm một ký tự nữa từ từ đầu tiên
+        if (prefix.length === 1 && words[0].length > 1) {
+          prefix += words[0].charAt(1).toUpperCase();
+        }
+      }
+    }
+    
+    // Tạo chuỗi thuộc tính nếu có
+    let attrString = '';
+    if (attributes && typeof attributes === 'object') {
+      // Ưu tiên xử lý color và size nếu có
+      if (attributes.color) {
+        attrString += `-${attributes.color.toUpperCase().substring(0, 3)}`;
+      }
+      
+      if (attributes.size) {
+        attrString += `-${attributes.size.toUpperCase()}`;
+      } 
+      
+      // Nếu không có color và size, lấy thuộc tính đầu tiên (nếu có)
+      if (!attrString && Object.keys(attributes).length > 0) {
+        const firstKey = Object.keys(attributes)[0];
+        attrString += `-${attributes[firstKey].toUpperCase().substring(0, 3)}`;
+      }
+    }
+    
+    // Nếu không có thuộc tính nào, thêm một định danh ngẫu nhiên
+    if (!attrString) {
+      attrString = `-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+    }
+    
+    // Lấy 4 chữ số cuối của ID sản phẩm nếu có
+    let idPart = '';
+    if (productId && productId.length > 4) {
+      idPart = `-${productId.substring(productId.length - 4)}`;
+    } else {
+      // Random ID nếu không có
+      idPart = `-${Math.floor(Math.random() * 9000 + 1000)}`;
+    }
+    
+    // Số thứ tự ngẫu nhiên (001-999)
+    const number = Math.floor(Math.random() * 999).toString().padStart(3, '0');
+    
+    // Kết hợp tất cả thành SKU
+    return `${prefix}${attrString}${idPart}-${number}`;
+  };
+  
+  // Khởi tạo state với dữ liệu mặc định khi cần
+  const [formData, setFormData] = useState({
+    name: variant.name || '',
+    price: variant.price || '',
+    stock: variant.stock || 0,
+    attributes: variant.attributes || {},
+    is_default: variant.is_default || false,
+    is_active: variant.is_active !== undefined ? variant.is_active : true,
+    sku: variant.sku || generateSKU(
+      variant.product_id, 
+      variant.name || '', 
+      variant.attributes || {}
+    )
+  });
+  
+  // State cho thuộc tính mới
+  const [attrName, setAttrName] = useState('');
+  const [attrValue, setAttrValue] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [connectionError, setConnectionError] = useState(false);
+  
+  // State cho nhập liệu thuộc tính color và size
+  const [colorInput, setColorInput] = useState(formData.attributes?.color || '');
+  const [sizeInput, setSizeInput] = useState(formData.attributes?.size || '');
+  
+  // Log thông tin khởi tạo để debug
+  useEffect(() => {
+    console.log("Initial variant data:", {
+      product_id: variant.product_id, 
+      name: formData.name, 
+      price: formData.price, 
+      stock: formData.stock, 
+      attrs: formData.attributes
+    });
+    
+    console.log("Product ID:", variant.product_id);
+    console.log("Variant name:", formData.name);
+    console.log("Initial SKU value:", formData.sku);
+    
+    // Khởi tạo giá trị input color và size từ attributes
+    if (formData.attributes.color) {
+      setColorInput(formData.attributes.color);
+    }
+    
+    if (formData.attributes.size) {
+      setSizeInput(formData.attributes.size);
+    }
+  }, []);
+  
+  // Xử lý khi người dùng nhập color
+  const handleColorChange = (e) => {
+    const value = e.target.value;
+    setColorInput(value);
+    
+    // Cập nhật thuộc tính color trong attributes nếu có giá trị
+    if (value.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        attributes: {
+          ...prev.attributes,
+          color: value.trim()
+        }
+      }));
+    } else {
+      // Nếu giá trị rỗng, xóa thuộc tính color
+      const newAttributes = { ...formData.attributes };
+      delete newAttributes.color;
+      setFormData(prev => ({
+        ...prev,
+        attributes: newAttributes
+      }));
+    }
+  };
+  
+  // Xử lý khi người dùng chọn size
+  const handleSizeChange = (e) => {
+    const value = e.target.value;
+    setSizeInput(value);
+    
+    // Cập nhật thuộc tính size trong attributes nếu có giá trị
+    if (value.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        attributes: {
+          ...prev.attributes,
+          size: value.trim()
+        }
+      }));
+    } else {
+      // Nếu giá trị rỗng, xóa thuộc tính size
+      const newAttributes = { ...formData.attributes };
+      delete newAttributes.size;
+      setFormData(prev => ({
+        ...prev,
+        attributes: newAttributes
+      }));
+    }
+  };
+  
+  // Xử lý khi người dùng tự chỉnh sửa SKU
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  };
+  
+  // Cập nhật SKU khi thuộc tính thay đổi
+  useEffect(() => {
+    // Chỉ tự động cập nhật SKU khi người dùng chưa chỉnh sửa nó
+    if (!formData.userEditedSku) {
+      const newSku = generateSKU(variant.product_id, formData.name, formData.attributes);
+      setFormData(prev => ({
+        ...prev,
+        sku: newSku
+      }));
+    }
+  }, [formData.attributes, formData.name]);
+  
+  // Đánh dấu khi người dùng tự chỉnh sửa SKU
+  const handleSkuChange = (e) => {
+    setFormData({
+      ...formData,
+      sku: e.target.value,
+      userEditedSku: true // Đánh dấu là người dùng đã chỉnh sửa
+    });
+  };
+  
+  // Thêm thuộc tính tùy chọn mới
+  const addAttribute = () => {
+    if (!attrName.trim() || !attrValue.trim()) return;
+    
+    setFormData({
+      ...formData,
+      attributes: {
+        ...formData.attributes,
+        [attrName.trim()]: attrValue.trim()
+      }
+    });
+    
+    // Clear input fields
+    setAttrName('');
+    setAttrValue('');
+  };
+  
+  // Xóa thuộc tính - cho phép xóa tất cả các thuộc tính
+  const removeAttribute = (key) => {
+    const newAttributes = { ...formData.attributes };
+    delete newAttributes[key];
+    
+    setFormData({
+      ...formData,
+      attributes: newAttributes
+    });
+    
+    // Nếu xóa color hoặc size, cập nhật input fields tương ứng
+    if (key === 'color') {
+      setColorInput('');
+    } else if (key === 'size') {
+      setSizeInput('');
+    }
+  };
+  
+  // Tạo SKU mới
+  const regenerateSku = () => {
+    const newSku = generateSKU(variant.product_id, formData.name, formData.attributes);
+    setFormData(prev => ({
+      ...prev,
+      sku: newSku,
+      userEditedSku: false // Reset trạng thái
+    }));
+  };
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Reset error states
+    setError(null);
+    setConnectionError(false);
+    
+    // Xác thực form
+    if (!formData.name || !formData.name.trim()) {
+      setError('Tên biến thể không được để trống');
+      return;
+    }
+    
+    if (!formData.price || parseFloat(formData.price) <= 0) {
+      setError('Giá phải lớn hơn 0');
+      return;
+    }
+    
+    // Đảm bảo SKU không trống
+    if (!formData.sku || !formData.sku.trim()) {
+      const newSku = generateSKU(variant.product_id, formData.name, formData.attributes);
+      setFormData(prev => ({ ...prev, sku: newSku }));
+      setError('Vui lòng cung cấp mã SKU');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // Chuẩn bị dữ liệu gửi đi
+      const variantData = {
+        product_id: variant.product_id,
+        name: formData.name.trim(),
+        sku: formData.sku.trim(),
+        price: parseFloat(formData.price),
+        stock: parseInt(formData.stock, 10) || 0,
+        attributes: formData.attributes,
+        is_default: formData.is_default,
+        is_active: formData.is_active
+      };
+      
+      console.log("Sending variant data:", JSON.stringify(variantData, null, 2));
+      
+      let response;
+      try {
+        if (isEditing) {
+          response = await ApiService.put(`/product-variant/edit/${variant._id}`, variantData);
+        } else {
+          response = await ApiService.post('/product-variant/create', variantData);
+        }
+        
+        console.log("API response:", response);
+        onSave(response);
+      } catch (fetchError) {
+        console.error("Network or API error:", fetchError);
+        
+        // Kiểm tra lỗi kết nối
+        if (fetchError.toString().includes('Failed to fetch') || 
+            fetchError.toString().includes('Network Error') ||
+            fetchError.toString().includes('CONNECTION_REFUSED')) {
+          setConnectionError(true);
+          setError(`Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và đảm bảo server đang chạy. Lỗi: ${fetchError.toString()}`);
+        } else {
+          setError(`Lỗi khi ${isEditing ? 'cập nhật' : 'tạo'} biến thể: ${fetchError.toString()}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error in form submission:', err);
+      setError(`Lỗi: ${err.toString()}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-medium">
+            {isEditing ? 'Chỉnh sửa biến thể' : 'Thêm biến thể mới'}
+          </h3>
+          <button className="text-gray-400 hover:text-gray-600" onClick={onClose}>
+            <X size={24} />
+          </button>
+        </div>
+        
+        {error && (
+          <div className={`p-3 ${connectionError ? 'bg-orange-100 border-orange-400 text-orange-700' : 'bg-red-100 border-red-400 text-red-700'} border rounded mb-6`}>
+            {error}
+            
+            {connectionError && (
+              <div className="mt-2">
+                <p className="font-medium">Gợi ý khắc phục:</p>
+                <ul className="list-disc list-inside text-sm">
+                  <li>Kiểm tra xem server backend có đang chạy không</li>
+                  <li>Kiểm tra cổng (port) 9999 có đúng không</li>
+                  <li>Kiểm tra tường lửa và CORS</li>
+                  <li>Thử khởi động lại server</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Tên biến thể */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tên biến thể <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                required
+              />
+            </div>
+            
+            {/* SKU với nút tạo mới */}
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Mã SKU <span className="text-red-500">*</span>
+                </label>
+                <button 
+                  type="button" 
+                  onClick={regenerateSku}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                >
+                  Tạo mới
+                </button>
+              </div>
+              <input
+                type="text"
+                name="sku"
+                value={formData.sku}
+                onChange={handleSkuChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Mã SKU tự động"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">SKU sẽ tự động cập nhật khi thay đổi thuộc tính</p>
+            </div>
+            
+            {/* Màu sắc (tùy chọn) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Màu sắc (tùy chọn)
+              </label>
+              <input
+                type="text"
+                value={colorInput}
+                onChange={handleColorChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Ví dụ: Đỏ, Xanh, Đen..."
+              />
+            </div>
+            
+            {/* Kích thước (tùy chọn) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Kích thước (tùy chọn)
+              </label>
+              <select
+                value={sizeInput}
+                onChange={handleSizeChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Không có</option>
+                <option value="S">S - Nhỏ</option>
+                <option value="M">M - Vừa</option>
+                <option value="L">L - Lớn</option>
+                <option value="XL">XL - Rất lớn</option>
+                <option value="XXL">XXL - Đặc biệt lớn</option>
+              </select>
+            </div>
+            
+            {/* Giá */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Giá <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                name="price"
+                value={formData.price}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                required
+              />
+            </div>
+            
+            {/* Tồn kho */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tồn kho
+              </label>
+              <input
+                type="number"
+                name="stock"
+                value={formData.stock}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            
+            {/* Các checkbox */}
+            <div className="md:col-span-2 flex space-x-6">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="is_default"
+                  name="is_default"
+                  checked={formData.is_default}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 mr-2"
+                />
+                <label htmlFor="is_default" className="text-sm font-medium text-gray-700">
+                  Biến thể mặc định
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  name="is_active"
+                  checked={formData.is_active}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 mr-2"
+                />
+                <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
+                  Hiển thị
+                </label>
+              </div>
+            </div>
+            
+            {/* Thêm thuộc tính khác */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Thuộc tính khác (tùy chọn)
+              </label>
+              <div className="flex space-x-2 mb-2">
+                <input
+                  type="text"
+                  placeholder="Tên thuộc tính"
+                  value={attrName}
+                  onChange={(e) => setAttrName(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="text"
+                  placeholder="Giá trị"
+                  value={attrValue}
+                  onChange={(e) => setAttrValue(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                />
+                <button
+                  type="button"
+                  onClick={addAttribute}
+                  className="px-3 py-2 bg-blue-500 text-white rounded-md"
+                >
+                  <Plus size={18} />
+                </button>
+              </div>
+              
+              {/* Hiển thị tất cả các thuộc tính - giờ đều có thể xóa */}
+              <div className="space-y-2">
+                {Object.entries(formData.attributes || {}).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                    <div>
+                      <span className="font-medium">{key}:</span> {value}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttribute(key)}
+                      className="text-red-500"
+                      title="Xóa thuộc tính"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end space-x-3 pt-5 border-t">
+            <button
+              type="button"
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700"
+              onClick={onClose}
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              disabled={loading}
+            >
+              {loading ? 'Đang lưu...' : 'Lưu biến thể'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 // Edit Product Modal Component
 const EditProductModal = ({ product, onClose, onUpdate }) => {
@@ -553,6 +1490,16 @@ const ProductList = () => {
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
 
+  // State cho modal chi tiết sản phẩm
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [viewProduct, setViewProduct] = useState(null);
+
+  // Xử lý khi click vào nút xem chi tiết
+  const handleViewProduct = (product) => {
+    setViewProduct(product);
+    setDetailsModalOpen(true);
+  };
+
   // Get shopId from current user (in a real app, you might get this from URL parameters or context)
   useEffect(() => {
     // Tạo biến để theo dõi nếu component unmounted
@@ -945,7 +1892,7 @@ const ProductList = () => {
                   </th>
                   <th className="p-4 text-left w-20">ĐÃ BÁN</th>
                   <th className="p-4 text-left w-28">LOẠI SẢN PHẨM</th>
-                  <th className="p-4 text-left w-24">THAO TÁC</th>
+                  <th className="p-4 text-left w-32">THAO TÁC</th> {/* Điều chỉnh width */}
                 </tr>
               </thead>
               <tbody>
@@ -983,8 +1930,14 @@ const ProductList = () => {
                       <td className="p-4 w-24">{product.price.toLocaleString()}₫</td>
                       <td className="p-4 w-20">{product.sold}</td>
                       <td className="p-4 w-28">{product.type}</td>
-                      <td className="p-4 w-24">
+                      <td className="p-4 w-32">
                         <div className="flex space-x-2 justify-center">
+                          <Eye 
+                            size={20} 
+                            className="text-blue-500 cursor-pointer flex-shrink-0" 
+                            onClick={() => handleViewProduct(product)}
+                            title="Xem chi tiết sản phẩm"
+                          />
                           <Edit 
                             size={20} 
                             className="text-blue-500 cursor-pointer flex-shrink-0" 
@@ -1018,6 +1971,14 @@ const ProductList = () => {
           product={currentProduct}
           onClose={() => setEditModalOpen(false)}
           onUpdate={handleUpdateProduct}
+        />
+      )}
+
+      {/* Product Details Modal */}
+      {detailsModalOpen && viewProduct && (
+        <ProductDetailsModal 
+          product={viewProduct}
+          onClose={() => setDetailsModalOpen(false)}
         />
       )}
     </div>

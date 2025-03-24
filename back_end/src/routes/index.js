@@ -19,6 +19,7 @@ const ConversationRouter = require('./conversation.routes')
 const UserStatusRouter = require('./user-status.routes')
 const ProductVariantRouter = require('./product-variant.routes');
 const ProductAttributeRouter = require('./product-attribute.routes');
+const GeminiRouter = require('./gemini.routes');
 
 module.exports = {
     AuthRouter,
@@ -41,5 +42,6 @@ module.exports = {
     ConversationRouter,
     UserStatusRouter,
     ProductVariantRouter,
-    ProductAttributeRouter
+    ProductAttributeRouter,
+    GeminiRouter
 }

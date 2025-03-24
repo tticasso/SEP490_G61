@@ -133,15 +133,15 @@ const ChatWindow = ({ isOpen }) => {
       <div className="bg-purple-600 text-white p-4 rounded-t-lg">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-medium">Trợ lý AI Cửa hàng sách</h3>
+            <h3 className="font-medium">Trợ lý AI TROOC2HAND</h3>
             <p className="text-xs opacity-80">Hỏi đáp thông tin về sách, đặt hàng và hỗ trợ 24/7</p>
           </div>
-          <button 
+          {/* <button 
             onClick={toggleDebugTool}
             className="text-xs px-2 py-1 bg-purple-800 rounded hover:bg-purple-900"
           >
             Debug
-          </button>
+          </button> */}
         </div>
       </div>
       

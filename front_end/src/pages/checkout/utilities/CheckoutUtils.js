@@ -1,5 +1,6 @@
 /**
- * Utility functions for the checkout process
+ * Enhanced utility functions for the checkout process
+ * Improved to better handle product variants
  */
 
 /**
@@ -16,7 +17,7 @@ export const formatPrice = (price, currency = 'đ') => {
 
 /**
  * Extract product details safely from a cart item
- * Includes variant information if available
+ * Enhanced to properly prioritize variant information
  * 
  * @param {Object} item - Cart item object
  * @returns {Object} Extracted product details with safe fallbacks
@@ -25,15 +26,22 @@ export const extractProductDetails = (item) => {
     const product = item.product_id || {};
     const variant = item.variant_id && typeof item.variant_id === 'object' ? item.variant_id : null;
     
-    // Get price from variant if available, otherwise from product
+    // Always prioritize variant price if available
     const price = variant && variant.price 
         ? variant.price 
         : (product.discounted_price || product.price || 0);
     
-    // Get image from variant if available, otherwise from product
+    // Always prioritize variant image if available
     const image = variant && variant.images && variant.images.length > 0
         ? variant.images[0]
         : (product.image || product.thumbnail);
+    
+    // Extract variant attributes in a safe way
+    const variantAttributes = variant && variant.attributes 
+        ? (variant.attributes instanceof Map 
+            ? Object.fromEntries(variant.attributes) 
+            : variant.attributes) 
+        : null;
         
     return {
         name: product.name || "Product",
@@ -42,10 +50,10 @@ export const extractProductDetails = (item) => {
         quantity: item.quantity || 1,
         id: typeof product === 'object' ? (product._id || '') : (item.product_id || ''),
         variant: variant,
+        variantId: variant ? (variant._id || '') : null,
         variantName: variant ? variant.name : null,
-        variantAttributes: variant && variant.attributes ? 
-            (variant.attributes instanceof Map ? Object.fromEntries(variant.attributes) : variant.attributes) 
-            : null
+        variantAttributes: variantAttributes,
+        variantStock: variant ? variant.stock : null
     };
 };
 
@@ -108,7 +116,8 @@ export const isValidAddress = (address) => {
 };
 
 /**
- * Fetch variant details for order items
+ * Enhanced function to fetch variant details for order items
+ * Handles both direct variant fetch and product-variant lookup
  * 
  * @param {Array} orderItems - List of order items
  * @param {Function} apiService - API service to use for fetching
@@ -139,6 +148,19 @@ export const fetchVariantDetailsForOrder = async (orderItems, apiService) => {
             
             if (productId && variantId && !variantDetails[item._id]) {
                 try {
+                    // First try direct variant fetch by ID
+                    try {
+                        const directVariant = await apiService.get(`/product-variant/${variantId}`, false);
+                        if (directVariant && directVariant._id) {
+                            variantDetails[item._id] = directVariant;
+                            continue;
+                        }
+                    } catch (directError) {
+                        // If direct fetch fails, continue to product variants approach
+                        console.log("Direct variant fetch failed, trying product variants");
+                    }
+                    
+                    // If direct variant fetch fails, try to get all variants for the product
                     const variants = await apiService.get(`/product-variant/product/${productId}`, false);
                     
                     if (variants && variants.length > 0) {
@@ -156,4 +178,76 @@ export const fetchVariantDetailsForOrder = async (orderItems, apiService) => {
     }
     
     return variantDetails;
+};
+
+/**
+ * Calculate the correct price for an order item, considering variants
+ * 
+ * @param {Object} item - The order item
+ * @param {Object} variantDetails - Map of variant details by item ID
+ * @returns {number} The correct price for the item
+ */
+export const getCorrectItemPrice = (item, variantDetails = {}) => {
+    // First check if we have complete variant details for this item
+    if (item._id && variantDetails[item._id] && variantDetails[item._id].price) {
+        return variantDetails[item._id].price;
+    }
+    
+    // Next check if item.variant_id is an object with price
+    if (item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price) {
+        return item.variant_id.price;
+    }
+    
+    // Fall back to product price
+    if (item.product_id && typeof item.product_id === 'object') {
+        return item.product_id.discounted_price || item.product_id.price || 0;
+    }
+    
+    // Default to item.price or 0
+    return item.price || 0;
+};
+
+/**
+ * Prepare order items from cart items with correct variant handling
+ * 
+ * @param {Array} cartItems - The cart items
+ * @returns {Array} Order items ready for API submission
+ */
+export const prepareOrderItems = (cartItems) => {
+    if (!cartItems || !Array.isArray(cartItems)) return [];
+    
+    return cartItems.map(item => {
+        // Get product ID
+        const productId = typeof item.product_id === 'object' 
+            ? item.product_id._id 
+            : item.product_id;
+        
+        // Get variant ID if exists
+        let variantId = null;
+        if (item.variant_id) {
+            variantId = typeof item.variant_id === 'object' 
+                ? item.variant_id._id 
+                : item.variant_id;
+        }
+        
+        // Calculate correct price
+        let price = 0;
+        
+        // Variant price has priority
+        if (item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price) {
+            price = item.variant_id.price;
+        }
+        // Fall back to product price
+        else if (item.product_id && typeof item.product_id === 'object') {
+            price = item.product_id.discounted_price || item.product_id.price || 0;
+        }
+        
+        return {
+            product_id: productId,
+            variant_id: variantId,
+            quantity: item.quantity || 1,
+            price: price,
+            cart_id: item.cart_id
+        };
+    });
 };

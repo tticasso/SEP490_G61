@@ -374,6 +374,220 @@ const setDefaultVariant = async (req, res) => {
     }
 };
 
+// Xóa mềm biến thể (soft delete)
+const softDeleteVariant = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Tìm biến thể hiện tại
+        const variant = await ProductVariant.findById(id);
+        if (!variant) {
+            return res.status(404).json({ message: "Variant not found" });
+        }
+
+        // Kiểm tra quyền (chỉ chủ shop hoặc admin)
+        const product = await Product.findById(variant.product_id);
+        const shop = await Shop.findById(product.shop_id);
+
+        if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
+            return res.status(403).json({ message: "You don't have permission to delete this variant" });
+        }
+
+        // Không cho phép xóa biến thể mặc định nếu có nhiều biến thể
+        if (variant.is_default) {
+            const variantCount = await ProductVariant.countDocuments({
+                product_id: variant.product_id,
+                is_delete: false
+            });
+
+            if (variantCount > 1) {
+                return res.status(400).json({
+                    message: "Cannot delete default variant. Please set another variant as default first."
+                });
+            }
+        }
+
+        // Xóa mềm
+        variant.is_delete = true;
+        variant.updated_at = Date.now();
+        await variant.save();
+
+        res.status(200).json({ message: "Variant moved to trash successfully", variant });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Khôi phục biến thể từ thùng rác
+const restoreVariant = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Tìm biến thể hiện tại
+        const variant = await ProductVariant.findById(id);
+        if (!variant) {
+            return res.status(404).json({ message: "Variant not found" });
+        }
+
+        // Kiểm tra quyền (chỉ chủ shop hoặc admin)
+        const product = await Product.findById(variant.product_id);
+        const shop = await Shop.findById(product.shop_id);
+
+        if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
+            return res.status(403).json({ message: "You don't have permission to restore this variant" });
+        }
+
+        // Khôi phục
+        variant.is_delete = false;
+        variant.updated_at = Date.now();
+        await variant.save();
+
+        res.status(200).json({ message: "Variant restored successfully", variant });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Bulk soft delete variants
+const bulkSoftDeleteVariants = async (req, res) => {
+    try {
+        const { variantIds } = req.body;
+        
+        if (!variantIds || !Array.isArray(variantIds) || variantIds.length === 0) {
+            return res.status(400).json({ message: "No variant IDs provided" });
+        }
+        
+        const results = [];
+        const errors = [];
+        
+        // Process variants one by one to validate permissions
+        for (const variantId of variantIds) {
+            try {
+                const variant = await ProductVariant.findById(variantId);
+                if (!variant) {
+                    errors.push({ id: variantId, error: "Variant not found" });
+                    continue;
+                }
+                
+                // Kiểm tra quyền
+                const product = await Product.findById(variant.product_id);
+                if (!product) {
+                    errors.push({ id: variantId, error: "Product not found" });
+                    continue;
+                }
+                
+                const shop = await Shop.findById(product.shop_id);
+                if (!shop) {
+                    errors.push({ id: variantId, error: "Shop not found" });
+                    continue;
+                }
+                
+                // Nếu không phải admin và không phải chủ shop thì không có quyền
+                if (!req.isAdmin && shop.user_id.toString() !== req.userId.toString()) {
+                    errors.push({ id: variantId, error: "Permission denied" });
+                    continue;
+                }
+                
+                // Nếu là biến thể mặc định, kiểm tra xem có biến thể khác không
+                if (variant.is_default) {
+                    const variantCount = await ProductVariant.countDocuments({
+                        product_id: variant.product_id,
+                        is_delete: false,
+                        _id: { $ne: variantId }
+                    });
+                    
+                    if (variantCount === 0) {
+                        // Đây là biến thể duy nhất hoặc biến thể mặc định duy nhất
+                        // Cho phép xóa
+                    } else {
+                        errors.push({ 
+                            id: variantId, 
+                            error: "Cannot delete default variant. Please set another variant as default first." 
+                        });
+                        continue;
+                    }
+                }
+                
+                // Cập nhật biến thể
+                variant.is_delete = true;
+                variant.updated_at = Date.now();
+                await variant.save();
+                results.push(variantId);
+            } catch (error) {
+                errors.push({ id: variantId, error: error.message });
+            }
+        }
+        
+        res.status(200).json({
+            message: `Processed ${results.length} variants successfully`,
+            success: results,
+            errors: errors
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Bulk restore variants
+const bulkRestoreVariants = async (req, res) => {
+    try {
+        const { variantIds } = req.body;
+        
+        if (!variantIds || !Array.isArray(variantIds) || variantIds.length === 0) {
+            return res.status(400).json({ message: "No variant IDs provided" });
+        }
+        
+        const results = [];
+        const errors = [];
+        
+        // Process variants one by one to validate permissions
+        for (const variantId of variantIds) {
+            try {
+                const variant = await ProductVariant.findById(variantId);
+                if (!variant) {
+                    errors.push({ id: variantId, error: "Variant not found" });
+                    continue;
+                }
+                
+                // Kiểm tra quyền
+                const product = await Product.findById(variant.product_id);
+                if (!product) {
+                    errors.push({ id: variantId, error: "Product not found" });
+                    continue;
+                }
+                
+                const shop = await Shop.findById(product.shop_id);
+                if (!shop) {
+                    errors.push({ id: variantId, error: "Shop not found" });
+                    continue;
+                }
+                
+                // Nếu không phải admin và không phải chủ shop thì không có quyền
+                if (!req.isAdmin && shop.user_id.toString() !== req.userId.toString()) {
+                    errors.push({ id: variantId, error: "Permission denied" });
+                    continue;
+                }
+                
+                // Cập nhật biến thể
+                variant.is_delete = false;
+                variant.updated_at = Date.now();
+                await variant.save();
+                results.push(variantId);
+            } catch (error) {
+                errors.push({ id: variantId, error: error.message });
+            }
+        }
+        
+        res.status(200).json({
+            message: `Processed ${results.length} variants successfully`,
+            success: results,
+            errors: errors
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 const productVariantController = {
     getVariantsByProductId,
     getVariantById,
@@ -382,7 +596,11 @@ const productVariantController = {
     deleteVariant,
     updateVariantStock,
     setDefaultVariant,
-    handleVariantImagesUpload // Export the middleware for routes
+    handleVariantImagesUpload // Export the middleware for routes,
+    softDeleteVariant,
+    restoreVariant,
+    bulkSoftDeleteVariants,
+    bulkRestoreVariants
 };
 
 module.exports = productVariantController;

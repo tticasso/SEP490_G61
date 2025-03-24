@@ -12,6 +12,7 @@ const OrderConfirmation = () => {
   const [variantDetails, setVariantDetails] = useState({});
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [calculatedSubtotal, setCalculatedSubtotal] = useState(0);
+  const [calculatedTotal, setCalculatedTotal] = useState(0); // New state for calculated total
 
   // Get user information
   const currentUser = AuthService.getCurrentUser();
@@ -48,6 +49,14 @@ const OrderConfirmation = () => {
         if (orderData.orderDetails && orderData.orderDetails.length > 0) {
           const subtotal = calculateOrderSubtotal(orderData.orderDetails);
           setCalculatedSubtotal(subtotal);
+          
+          // Calculate total including shipping cost
+          const shippingCost = orderData.order.shipping_id?.price || 0;
+          const totalDiscount = (orderData.order.discount_amount || 0) + (orderData.order.coupon_amount || 0);
+          const total = Math.max(0, subtotal - totalDiscount) + shippingCost;
+          setCalculatedTotal(total);
+          
+          console.log(`Calculated subtotal: ${subtotal}, Shipping cost: ${shippingCost}, Discounts: ${totalDiscount}, Total: ${total}`);
         }
         
         setLoading(false);
@@ -60,7 +69,7 @@ const OrderConfirmation = () => {
         );
         
         if (needsVariantLoad) {
-          await loadVariantDetails(orderData.orderDetails);
+          await loadVariantDetails(orderData.orderDetails, orderData.order);
         }
       } catch (err) {
         console.error("Error fetching order:", err);
@@ -73,7 +82,7 @@ const OrderConfirmation = () => {
   }, []);
 
   // Main function to load variant details only for items that need it
-  const loadVariantDetails = async (details) => {
+  const loadVariantDetails = async (details, orderObj) => {
     try {
       setLoadingVariants(true);
       console.log(`Checking if variant details needed for ${details.length} items`);
@@ -110,6 +119,19 @@ const OrderConfirmation = () => {
         console.log(`Fetching variants for product ${productId}, looking for variant ${variantId}`);
         
         try {
+          // First try direct variant fetch - may be faster and more reliable
+          try {
+            const directVariant = await ApiService.get(`/product-variant/${variantId}`, false);
+            if (directVariant && directVariant._id) {
+              console.log(`Direct fetch of variant ${variantId} successful:`, directVariant);
+              detailsMap[detail._id] = directVariant;
+              continue; // Skip to next iteration if successful
+            }
+          } catch (directFetchError) {
+            console.log(`Direct fetch of variant ${variantId} failed:`, directFetchError);
+            // Fall through to try the product variants approach
+          }
+          
           // Fetch all variants for this product
           const variants = await ApiService.get(`/product-variant/product/${productId}`, false);
           
@@ -128,17 +150,6 @@ const OrderConfirmation = () => {
             detailsMap[detail._id] = variant;
           } else {
             console.log(`No matching variant found for ID ${variantId} in product ${productId}`);
-            
-            // Try to fetch directly by variant ID as fallback
-            try {
-              const directVariant = await ApiService.get(`/product-variant/${variantId}`, false);
-              if (directVariant && directVariant._id) {
-                console.log(`Direct fetch of variant ${variantId} successful:`, directVariant);
-                detailsMap[detail._id] = directVariant;
-              }
-            } catch (directFetchError) {
-              console.log(`Direct fetch of variant ${variantId} failed:`, directFetchError);
-            }
           }
         } catch (error) {
           console.error(`Error fetching variants for product ${productId}:`, error);
@@ -148,10 +159,18 @@ const OrderConfirmation = () => {
       console.log("Final variant details:", detailsMap);
       setVariantDetails(detailsMap);
       
-      // Recalculate subtotal with newly fetched variant info if needed
+      // Recalculate subtotal and total with newly fetched variant info if needed
       if (Object.keys(detailsMap).length > 0) {
         const subtotal = calculateOrderSubtotal(details, detailsMap);
         setCalculatedSubtotal(subtotal);
+        
+        // Recalculate total with updated subtotal
+        const shippingCost = orderObj.shipping_id?.price || 0;
+        const totalDiscount = (orderObj.discount_amount || 0) + (orderObj.coupon_amount || 0);
+        const total = Math.max(0, subtotal - totalDiscount) + shippingCost;
+        setCalculatedTotal(total);
+        
+        console.log(`Updated calculated subtotal: ${subtotal}, Total: ${total}`);
       }
       
     } catch (error) {
@@ -400,11 +419,9 @@ const OrderConfirmation = () => {
   // Calculate shipping cost
   const shippingCost = order.shipping_id?.price || 0;
   
-  // Calculate total manually to ensure accuracy
-  const manualTotal = Math.max(0, subtotal - totalDiscount) + shippingCost;
-  // Use manual total if server total seems incorrect
-  const displayTotal = Math.abs(order.total_price - manualTotal) > manualTotal * 0.5 ? 
-    manualTotal : order.total_price;
+  // ALWAYS use our calculatedTotal if available, otherwise calculate it manually
+  // This ensures shipping is ALWAYS included in the total
+  const displayTotal = calculatedTotal || Math.max(0, subtotal - totalDiscount) + shippingCost;
 
   return (
     <div className="max-w-4xl mx-auto p-6 mt-10">

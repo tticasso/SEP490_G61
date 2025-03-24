@@ -6,6 +6,7 @@ import defaultImage from '../../../assets/khautrang5d.jpg';
  * 
  * Displays a compact preview of a cart item for the order summary.
  * Shows the product image, name, price, variant details, and quantity.
+ * Enhanced to properly display variant information and pricing.
  * 
  * @param {Object} item - The cart item to display
  */
@@ -29,53 +30,101 @@ const CartItemPreview = ({ item }) => {
     
     const quantity = item.quantity || 1;
 
+    // Check if product is out of stock
+    const isOutOfStock = () => {
+        if (variant && variant.stock !== undefined) {
+            return variant.stock <= 0;
+        }
+        if (product.stock !== undefined) {
+            return product.stock <= 0;
+        }
+        return false;
+    };
+
     // Render variant attributes if available
     const renderVariantInfo = () => {
         if (!variant) return null;
         
-        // Get variant name if available
+        // Prepare display elements
+        const elements = [];
+        
+        // Add variant name if available
         if (variant.name) {
-            return (
-                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+            elements.push(
+                <span key="name" className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
                     {variant.name}
                 </span>
             );
         }
         
-        // Try to get variant attributes
+        // Get variant attributes from either Map or object
         const attributes = variant.attributes instanceof Map 
             ? Object.fromEntries(variant.attributes) 
             : variant.attributes;
         
-        if (!attributes || Object.keys(attributes).length === 0) {
-            return null;
+        // Add attributes if available
+        if (attributes && Object.keys(attributes).length > 0) {
+            elements.push(
+                <div key="attrs" className="text-xs text-gray-600 flex flex-wrap gap-1 mt-1">
+                    {Object.entries(attributes).map(([key, value]) => (
+                        <span key={key} className="bg-gray-100 px-1 py-0.5 rounded">
+                            <span className="capitalize">{key}</span>: <strong>{value}</strong>
+                        </span>
+                    ))}
+                </div>
+            );
         }
         
-        return (
-            <div className="text-xs text-gray-600 flex flex-wrap gap-1 mt-1">
-                {Object.entries(attributes).map(([key, value]) => (
-                    <span key={key} className="bg-gray-100 px-1 py-0.5 rounded">
-                        <span className="capitalize">{key}</span>: <strong>{value}</strong>
-                    </span>
-                ))}
-            </div>
-        );
+        // Add stock information if available
+        if (variant.stock !== undefined) {
+            elements.push(
+                <div key="stock" className="text-xs mt-1">
+                    {variant.stock > 0 ? (
+                        <span className="text-green-600">In stock: {variant.stock}</span>
+                    ) : (
+                        <span className="text-red-600 font-bold">Out of stock</span>
+                    )}
+                </div>
+            );
+        } else if (product.stock !== undefined) {
+            elements.push(
+                <div key="stock" className="text-xs mt-1">
+                    {product.stock > 0 ? (
+                        <span className="text-green-600">In stock: {product.stock}</span>
+                    ) : (
+                        <span className="text-red-600 font-bold">Out of stock</span>
+                    )}
+                </div>
+            );
+        }
+        
+        return elements.length > 0 ? <div className="mt-1">{elements}</div> : null;
     };
 
     return (
-        <div className="flex items-center mb-4">
+        <div className={`flex items-center mb-4 ${isOutOfStock() ? 'bg-red-50 p-2 rounded' : ''}`}>
             <img
                 src={productImage}
                 alt={productName}
-                className="w-20 h-20 object-cover mr-4 rounded"
+                className={`w-20 h-20 object-cover mr-4 rounded ${isOutOfStock() ? 'opacity-50' : ''}`}
                 onError={(e) => { e.target.src = defaultImage }}
             />
             <div className="flex-grow">
-                <h3 className="font-medium">{productName}</h3>
+                <h3 className="font-medium">
+                    {productName}
+                    {isOutOfStock() && (
+                        <span className="text-red-600 text-xs ml-2 bg-red-100 px-2 py-1 rounded">
+                            Out of Stock
+                        </span>
+                    )}
+                </h3>
                 {renderVariantInfo()}
                 <p className="text-gray-600 mt-1">
                     {price.toLocaleString()}đ x {quantity}
                 </p>
+            </div>
+            <div className="text-right font-semibold">
+                {(price * quantity).toLocaleString()}đ
             </div>
         </div>
     );

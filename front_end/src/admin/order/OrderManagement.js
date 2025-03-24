@@ -128,7 +128,7 @@ const OrderManagement = () => {
             (order.customer_id.email && order.customer_id.email.toLowerCase().includes(searchTerm.toLowerCase()))
           )
         ) ||
-        order.total_price.toString().includes(searchTerm)
+        (order.total_price && order.total_price.toString().includes(searchTerm))
       );
     }
 
@@ -398,7 +398,7 @@ const OrderManagement = () => {
               <div className="w-full md:w-auto">
                 <input
                   type="text"
-                  placeholder="Tìm theo mã đơn hàng (ORD-...) hoặc thông tin khách hàng..."
+                  placeholder="Tìm theo mã đơn hàng hoặc thông tin khách hàng..."
                   className="border border-gray-300 rounded-md px-3 py-2 w-full"
                   value={searchTerm}
                   onChange={handleSearch}
@@ -448,7 +448,7 @@ const OrderManagement = () => {
                       currentOrders.map((order) => (
                         <tr key={order._id} className="hover:bg-gray-50">
                           <td className="py-4 px-4 text-sm text-gray-900">
-                            {order.id}
+                            {order.id || order._id}
                           </td>
                           <td className="py-4 px-4 text-sm text-gray-900">
                             {order.customer_id?.firstName} {order.customer_id?.lastName || 'Không có tên'}

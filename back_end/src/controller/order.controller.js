@@ -90,7 +90,7 @@ const createOrder = async (req, res) => {
             payment_id,
             order_payment_id,
             discount_id,
-            coupon_id,  // Add coupon_id to request
+            coupon_id,
             orderItems,
             user_address_id,
         } = req.body;
@@ -112,30 +112,52 @@ const createOrder = async (req, res) => {
             if (!product) {
                 return res.status(404).json({ message: `Product with ID ${item.product_id} not found` });
             }
-
-            // Kiểm tra tồn kho
-            if (product.stock < item.quantity) {
-                return res.status(400).json({
-                    message: `Not enough stock for product ${product.name}. Available: ${product.stock}`
-                });
-            }
-            let itemPrice = item.price || product.price;
-            totalPrice += product.price * item.quantity;
+            
             productIds.push(product._id.toString());
 
+            // Đặt giá mặc định ban đầu là giá của sản phẩm
+            let itemPrice = product.price;
+            
+            // Kiểm tra nếu có variant_id, ưu tiên sử dụng giá của biến thể
             if (item.variant_id) {
                 try {
                     const variant = await db.productVariant.findById(item.variant_id);
-                    if (variant && variant.price) {
-                        itemPrice = variant.price; // Sử dụng giá của biến thể
-                        console.log(`Using variant price for product ${product.name}: ${itemPrice}`);
+                    if (variant) {
+                        // Kiểm tra tồn kho của biến thể thay vì sản phẩm
+                        if (variant.stock < item.quantity) {
+                            return res.status(400).json({
+                                message: `Not enough stock for variant ${variant.name || 'unnamed'} of product ${product.name}. Available: ${variant.stock}`
+                            });
+                        }
+                        
+                        // Sử dụng giá của biến thể
+                        if (variant.price) {
+                            itemPrice = variant.price;
+                            console.log(`Using variant price for product ${product.name}: ${itemPrice}`);
+                        }
                     }
                 } catch (err) {
-                    console.log(`Could not fetch variant price, using provided price: ${itemPrice}`);
+                    console.log(`Could not fetch variant price, using product price: ${itemPrice}`);
+                }
+            } else {
+                // Kiểm tra tồn kho sản phẩm chỉ khi không có biến thể
+                if (product.stock < item.quantity) {
+                    return res.status(400).json({
+                        message: `Not enough stock for product ${product.name}. Available: ${product.stock}`
+                    });
                 }
             }
 
-            let itemTotal = itemPrice * item.quantity;
+            // Nếu có giá được chỉ định trong đơn hàng (override), sử dụng giá đó
+            if (item.price) {
+                itemPrice = item.price;
+                console.log(`Using specified item price: ${itemPrice}`);
+            }
+
+            // Tính toán giá của mục
+            const itemTotal = itemPrice * item.quantity;
+            
+            // Chỉ cộng giá một lần vào tổng
             totalPrice += itemTotal;
             originalPrice += itemTotal; // Lưu giá gốc
 
@@ -157,8 +179,6 @@ const createOrder = async (req, res) => {
         let discountAmount = 0;
         let couponAmount = 0;
         let finalTotalPrice = totalPrice;
-
-
 
         // Áp dụng mã giảm giá nếu có
         if (discount_id) {
@@ -240,8 +260,22 @@ const createOrder = async (req, res) => {
                             // Calculate sum of only eligible products
                             eligibleAmount = 0;
                             for (const item of eligibleItems) {
+                                // Recalculate with the same logic as above to ensure consistent pricing
                                 const product = await Product.findById(item.product_id);
-                                eligibleAmount += product.price * item.quantity;
+                                let itemPrice = product.price;
+                                
+                                if (item.variant_id) {
+                                    const variant = await db.productVariant.findById(item.variant_id);
+                                    if (variant && variant.price) {
+                                        itemPrice = variant.price;
+                                    }
+                                }
+                                
+                                if (item.price) {
+                                    itemPrice = item.price;
+                                }
+                                
+                                eligibleAmount += itemPrice * item.quantity;
                             }
                         }
                     }
@@ -307,23 +341,43 @@ const createOrder = async (req, res) => {
         // Tính tổng giá cuối cùng sau khi áp dụng cả discount và coupon
         finalTotalPrice = totalPrice - discountAmount - couponAmount;
 
+        let shippingCost = 0;
+if (shipping_id) {
+    try {
+        const shippingMethod = await db.shipping.findById(shipping_id);
+        if (shippingMethod && shippingMethod.price) {
+            shippingCost = shippingMethod.price;
+            console.log(`Adding shipping cost: ${shippingCost} to order total`);
+            
+            // Add shipping cost to the final total
+            finalTotalPrice += shippingCost;
+        } else {
+            console.log(`Shipping method not found or has no price: ${shipping_id}`);
+        }
+    } catch (error) {
+        console.error(`Error fetching shipping cost: ${error.message}`);
+    }
+}
+
+// Update the Order creation with the shipping_cost field
+const newOrder = new Order({
+    customer_id,
+    shipping_id,
+    payment_id,
+    order_payment_id,
+    total_price: finalTotalPrice,
+    discount_id,
+    coupon_id,
+    coupon_amount: couponAmount,
+    discount_amount: discountAmount,
+    shipping_cost: shippingCost, // Add this field to store shipping cost
+    user_address_id,
+    original_price: originalPrice
+});
+
         // Đảm bảo giá không âm
         if (finalTotalPrice < 0) finalTotalPrice = 0;
 
-        // Tạo đơn hàng mới
-        const newOrder = new Order({
-            customer_id,
-            shipping_id,
-            payment_id,
-            order_payment_id,
-            total_price: finalTotalPrice,
-            discount_id,
-            coupon_id,  // Add coupon_id to order
-            coupon_amount: couponAmount,  // Add coupon amount to track separately
-            discount_amount: discountAmount,  // Add discount amount to track separately
-            user_address_id,
-            original_price: originalPrice  // Lưu giá trị tạm tính chính xác
-        });
 
         const savedOrder = await newOrder.save();
 
@@ -333,18 +387,36 @@ const createOrder = async (req, res) => {
             const product = await Product.findById(item.product_id);
 
             // Xác định giá chính xác
-            let itemPrice = item.price || product.price;
+            let itemPrice = product.price;
 
             // Nếu có variant_id, thử tìm biến thể để lấy giá chính xác
             if (item.variant_id) {
                 try {
                     const variant = await db.productVariant.findById(item.variant_id);
-                    if (variant && variant.price) {
-                        itemPrice = variant.price; // Sử dụng giá của biến thể
+                    if (variant) {
+                        if (variant.price) {
+                            itemPrice = variant.price; // Sử dụng giá của biến thể
+                        }
+                        
+                        // Cập nhật tồn kho của biến thể
+                        variant.stock -= item.quantity;
+                        await variant.save();
                     }
                 } catch (err) {
-                    console.log(`Could not fetch variant price for order detail, using provided price: ${itemPrice}`);
+                    console.log(`Could not fetch variant for stock update, only updating product stock`);
+                    // Cập nhật tồn kho sản phẩm nếu không thể cập nhật tồn kho biến thể
+                    product.stock -= item.quantity;
+                    await product.save();
                 }
+            } else {
+                // Cập nhật tồn kho sản phẩm nếu không có biến thể
+                product.stock -= item.quantity;
+                await product.save();
+            }
+
+            // Nếu có giá được chỉ định trong đơn hàng (override), sử dụng giá đó
+            if (item.price) {
+                itemPrice = item.price;
             }
 
             // Tạo chi tiết đơn hàng với price và variant_id
@@ -361,10 +433,6 @@ const createOrder = async (req, res) => {
 
             const savedOrderDetail = await orderDetail.save();
             orderDetailItems.push(savedOrderDetail);
-
-            // Cập nhật tồn kho
-            product.stock -= item.quantity;
-            await product.save();
         }
 
         res.status(201).json({
@@ -374,6 +442,7 @@ const createOrder = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
+        res.status(400).json("Mặt hàng này đã hết");
     }
 };
 

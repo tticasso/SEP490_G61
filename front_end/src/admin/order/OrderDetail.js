@@ -17,6 +17,9 @@ const OrderDetail = ({ orderId, onBack }) => {
   const [customerData, setCustomerData] = useState(null);
   const [addressData, setAddressData] = useState(null);
   const [productImages, setProductImages] = useState({});
+  
+  // State for variant data
+  const [variantDetails, setVariantDetails] = useState({});
 
   // Fetch order data
   useEffect(() => {
@@ -43,42 +46,41 @@ const OrderDetail = ({ orderId, onBack }) => {
   useEffect(() => {
     if (orderDetails && orderDetails.length > 0) {
       fetchProductDetails(orderDetails);
+      // Add new function call to fetch variant details
+      fetchVariantDetails(orderDetails);
     }
   }, [orderDetails]); // Only re-run when orderDetails changes
 
-  // Trong OrderDetail.js của admin
-// Thêm console.log để kiểm tra cấu trúc dữ liệu được trả về
-
-const fetchOrderData = async () => {
-  try {
-    setLoading(true);
-    const response = await ApiService.get(`/order/find/${orderId}`);
-    
-    // Debug logs
-    console.log("===== ORDER DATA STRUCTURE =====");
-    console.log("Full order data:", response);
-    console.log("Customer ID:", response.order.customer_id);
-    
-    // Kiểm tra xem customer_id có phải là object hay chỉ là ID
-    if (response.order.customer_id) {
-      console.log("Customer data type:", typeof response.order.customer_id);
-      if (typeof response.order.customer_id === 'object') {
-        console.log("Customer firstName:", response.order.customer_id.firstName);
-        console.log("Customer lastName:", response.order.customer_id.lastName);
+  const fetchOrderData = async () => {
+    try {
+      setLoading(true);
+      const response = await ApiService.get(`/order/find/${orderId}`);
+      
+      // Debug logs
+      console.log("===== ORDER DATA STRUCTURE =====");
+      console.log("Full order data:", response);
+      console.log("Customer ID:", response.order.customer_id);
+      
+      // Kiểm tra xem customer_id có phải là object hay chỉ là ID
+      if (response.order.customer_id) {
+        console.log("Customer data type:", typeof response.order.customer_id);
+        if (typeof response.order.customer_id === 'object') {
+          console.log("Customer firstName:", response.order.customer_id.firstName);
+          console.log("Customer lastName:", response.order.customer_id.lastName);
+        }
       }
+      
+      setOrderData(response.order);
+      setOrderDetails(response.orderDetails || []);
+      setCurrentStatus(response.order.status_id);
+      
+    } catch (error) {
+      console.error("Error fetching order data:", error);
+      setError('Lỗi khi tải dữ liệu đơn hàng: ' + error);
+    } finally {
+      setLoading(false);
     }
-    
-    setOrderData(response.order);
-    setOrderDetails(response.orderDetails || []);
-    setCurrentStatus(response.order.status_id);
-    
-  } catch (error) {
-    console.error("Error fetching order data:", error);
-    setError('Lỗi khi tải dữ liệu đơn hàng: ' + error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
   
   // Fetch customer data
   const fetchCustomerData = async (customerId) => {
@@ -164,6 +166,83 @@ const fetchOrderData = async () => {
       setProductImages(productImagesMap);
     } catch (error) {
       console.error("Error fetching product details:", error);
+    }
+  };
+
+  // New function: Fetch variant details
+  const fetchVariantDetails = async (orderDetails) => {
+    try {
+      // Filter items that have variant_id
+      const itemsWithVariants = orderDetails.filter(item => item.variant_id);
+      
+      if (itemsWithVariants.length === 0) {
+        console.log("No items with variants found");
+        return;
+      }
+      
+      console.log("Items with variants:", itemsWithVariants);
+      
+      // Process each order item with variant_id
+      const variantDetailsMap = {};
+      
+      for (const item of itemsWithVariants) {
+        // Skip if variant_id is already a populated object with attributes
+        if (typeof item.variant_id === 'object' && 
+            item.variant_id !== null && 
+            (item.variant_id.attributes || item.variant_id.name)) {
+          console.log(`Item ${item._id} already has populated variant:`, item.variant_id);
+          variantDetailsMap[item._id] = item.variant_id;
+          continue;
+        }
+        
+        // Extract variant ID and product ID
+        const variantId = typeof item.variant_id === 'object' 
+          ? (item.variant_id._id || item.variant_id.id) 
+          : item.variant_id;
+          
+        const productId = typeof item.product_id === 'object' 
+          ? (item.product_id._id || item.product_id.id)
+          : item.product_id;
+        
+        if (!variantId || !productId) {
+          console.log(`Missing variantId or productId for item ${item._id}, skipping`);
+          continue;
+        }
+        
+        console.log(`Fetching variant ${variantId} for product ${productId}`);
+        
+        try {
+          // First try to fetch directly by variant ID
+          let variantData = null;
+          
+          try {
+            variantData = await ApiService.get(`/product-variant/${variantId}`);
+            console.log(`Direct variant fetch result for ${variantId}:`, variantData);
+          } catch (variantError) {
+            console.log(`Direct variant fetch failed, trying product variants instead:`, variantError);
+            
+            // If direct fetch fails, try to get all variants for the product and find the right one
+            const productVariants = await ApiService.get(`/product-variant/product/${productId}`);
+            
+            if (Array.isArray(productVariants)) {
+              variantData = productVariants.find(v => v._id === variantId);
+              console.log(`Found variant in product variants:`, variantData);
+            }
+          }
+          
+          if (variantData) {
+            variantDetailsMap[item._id] = variantData;
+          }
+        } catch (error) {
+          console.error(`Error fetching variant for item ${item._id}:`, error);
+        }
+      }
+      
+      console.log("Variant details map:", variantDetailsMap);
+      setVariantDetails(variantDetailsMap);
+      
+    } catch (error) {
+      console.error("Error in fetchVariantDetails:", error);
     }
   };
 
@@ -285,6 +364,49 @@ const fetchOrderData = async () => {
     return parts.join(', ');
   };
 
+  // Render variant attributes
+  const renderVariantAttributes = (variant) => {
+    if (!variant || !variant.attributes) return null;
+    
+    // Handle different attribute formats
+    const attributes = variant.attributes instanceof Map 
+      ? Object.fromEntries(variant.attributes) 
+      : variant.attributes;
+    
+    if (!attributes || Object.keys(attributes).length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="flex flex-wrap gap-1 mt-1">
+        {Object.entries(attributes).map(([key, value]) => (
+          <span key={key} className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs">
+            <span className="capitalize">{key}</span>: <strong>{value}</strong>
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  // Get image for an order item, considering variants
+  const getItemImage = (item) => {
+    // Check if there's a variant with image
+    if (item._id && variantDetails[item._id] && 
+        variantDetails[item._id].images && 
+        variantDetails[item._id].images.length > 0) {
+      return variantDetails[item._id].images[0];
+    }
+    
+    // Fall back to the product image from our product details fetch
+    const productId = typeof item.product_id === 'object' ? item.product_id._id : item.product_id;
+    if (productId && productImages[productId]) {
+      return productImages[productId];
+    }
+    
+    // Last fallback to product image in the item data or default image
+    return item.product_id?.image || ShopOwner;
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-64">Đang tải dữ liệu...</div>;
   }
@@ -308,7 +430,7 @@ const fetchOrderData = async () => {
   const couponAmount = orderData.coupon_amount || 0;
   
   // Tổng thanh toán - sử dụng giá trị từ API hoặc tính toán nếu cần
-  const total = orderData.total_price || (subtotal + shippingCost - discountAmount - couponAmount);
+  const total = (subtotal + shippingCost - discountAmount - couponAmount);
 
   return (
     <div className="flex-1 bg-white">
@@ -430,7 +552,7 @@ const fetchOrderData = async () => {
           </div>
         </div>
 
-        {/* Products section */}
+        {/* Products section - Updated to show variant information */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
             <ShoppingBag size={20} className="mr-2" />
@@ -440,13 +562,44 @@ const fetchOrderData = async () => {
             {orderDetails.map((item) => (
               <div key={item._id} className="p-4 flex items-start border-b border-gray-200">
                 <img
-                  src={productImages[typeof item.product_id === 'object' ? item.product_id._id : item.product_id] || item.product_id?.image || ShopOwner}
+                  src={getItemImage(item)}
                   className="w-24 h-24 object-cover rounded-md mr-4"
                   alt={item.product_id?.name || 'Sản phẩm'}
+                  onError={(e) => { e.target.src = ShopOwner }}
                 />
                 <div className="flex-grow">
-                  <h3 className="text-md font-medium text-gray-800 mb-1">{item.product_id?.name || 'Sản phẩm không tên'}</h3>
+                  <h3 className="text-md font-medium text-gray-800 mb-1">
+                    {item.product_id?.name || 'Sản phẩm không tên'}
+                  </h3>
+                  
+                  {/* Display variant information if available */}
+                  {item._id && variantDetails[item._id] && (
+                    <div className="mb-2">
+                      {/* Variant name */}
+                      {variantDetails[item._id].name && (
+                        <div className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs inline-block">
+                          {variantDetails[item._id].name}
+                        </div>
+                      )}
+                      
+                      {/* Variant attributes */}
+                      {renderVariantAttributes(variantDetails[item._id])}
+                      
+                      {/* Stock info */}
+                      {variantDetails[item._id].stock !== undefined && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {variantDetails[item._id].stock > 0 ? (
+                            <span className="text-green-600">Tồn kho: {variantDetails[item._id].stock}</span>
+                          ) : (
+                            <span className="text-red-600">Hết hàng</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="text-gray-600 mb-2">{formatPrice(item.price)} × {item.quantity}</div>
+                  
                   {/* Hiển thị mô tả sản phẩm */}
                   {item.product_id?.detail && (
                     <p className="text-sm text-gray-500">{item.product_id.detail}</p>

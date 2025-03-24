@@ -64,29 +64,28 @@ const CheckoutPage = () => {
                 await fetchAllCartItems();
             }
 
-            // loadAppliedCoupon();
-
-            // setLoading(false);
-
             // Check for applied coupon
             const appliedCouponStr = localStorage.getItem('appliedCoupon');
             if (appliedCouponStr) {
                 const couponData = JSON.parse(appliedCouponStr);
                 setAppliedCoupon(couponData);
 
-                // Calculate discount amount
-                if (couponData.type === 'percentage') {
-                    // Percentage discount
-                    let discount = (cartTotal * couponData.value) / 100;
-                    // Apply maximum discount limit if exists
-                    if (couponData.max_discount_value) {
-                        discount = Math.min(discount, couponData.max_discount_value);
+                // Wait for cart total to be set before calculating discount
+                setTimeout(() => {
+                    // Calculate discount amount
+                    if (couponData.type === 'percentage') {
+                        // Percentage discount
+                        let discount = (cartTotal * couponData.value) / 100;
+                        // Apply maximum discount limit if exists
+                        if (couponData.max_discount_value) {
+                            discount = Math.min(discount, couponData.max_discount_value);
+                        }
+                        setDiscountAmount(discount);
+                    } else if (couponData.type === 'fixed') {
+                        // Fixed discount
+                        setDiscountAmount(couponData.value);
                     }
-                    setDiscountAmount(discount);
-                } else if (couponData.type === 'fixed') {
-                    // Fixed discount
-                    setDiscountAmount(couponData.value);
-                }
+                }, 0);
             }
 
             setLoading(false);
@@ -104,26 +103,45 @@ const CheckoutPage = () => {
             const item = updatedItems[i];
 
             // If item has a variant_id but it's not a complete object
-            if (item.variant_id && (typeof item.variant_id === 'string' || !item.variant_id.attributes)) {
+            if (item.variant_id && (
+                typeof item.variant_id === 'string' || 
+                !item.variant_id.attributes || 
+                !item.variant_id.price
+            )) {
                 const productId = typeof item.product_id === 'object'
                     ? item.product_id._id
                     : item.product_id;
 
                 const variantId = typeof item.variant_id === 'string'
                     ? item.variant_id
-                    : item.variant_id._id;
+                    : (item.variant_id?._id || item.variant_id?.id);
+
+                console.log(`Fetching complete variant data for product: ${productId}, variant: ${variantId}`);
 
                 if (productId && variantId) {
                     try {
-                        // Get full variant data
-                        const variants = await ApiService.get(`/product-variant/product/${productId}`, false);
-                        const fullVariant = variants.find(v => v._id === variantId);
+                        // First try direct variant fetch
+                        let fullVariant = null;
+                        try {
+                            fullVariant = await ApiService.get(`/product-variant/${variantId}`, false);
+                            console.log("Direct variant fetch result:", fullVariant);
+                        } catch (variantError) {
+                            console.log("Direct variant fetch failed, trying product variants:", variantError);
+                            
+                            // If direct fetch fails, get all variants for the product
+                            const variants = await ApiService.get(`/product-variant/product/${productId}`, false);
+                            if (Array.isArray(variants)) {
+                                fullVariant = variants.find(v => v._id === variantId);
+                                console.log("Found variant in product variants:", fullVariant);
+                            }
+                        }
 
                         if (fullVariant) {
                             updatedItems[i] = {
                                 ...item,
                                 variant_id: fullVariant
                             };
+                            console.log(`Updated item ${i} with complete variant data`);
                         }
                     } catch (error) {
                         console.error(`Failed to fetch complete variant data for product ${productId}:`, error);
@@ -135,19 +153,27 @@ const CheckoutPage = () => {
         return updatedItems;
     };
 
+    // Improved variant-aware price calculation
     const calculateSubtotalWithVariants = (items) => {
-        return items.reduce((total, item) => {
-            // First check for variant price
+        const total = items.reduce((total, item) => {
+            let itemPrice = 0;
+            
+            // First check for variant price (highest priority)
             if (item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price) {
-                return total + (item.variant_id.price * item.quantity);
-            }
-
+                itemPrice = item.variant_id.price;
+                console.log(`Using variant price for ${item._id}: ${itemPrice}`);
+            } 
             // Fall back to product price
-            const price = item.product_id && typeof item.product_id === 'object'
-                ? (item.product_id.discounted_price || item.product_id.price || 0)
-                : 0;
-            return total + price * item.quantity;
+            else if (item.product_id && typeof item.product_id === 'object') {
+                itemPrice = item.product_id.discounted_price || item.product_id.price || 0;
+                console.log(`Using product price for ${item._id}: ${itemPrice}`);
+            }
+            
+            return total + (itemPrice * item.quantity);
         }, 0);
+        
+        console.log(`Calculated subtotal with variants: ${total}`);
+        return total;
     };
 
     // Fetch all products from cart via API (backup)
@@ -155,16 +181,12 @@ const CheckoutPage = () => {
         try {
             const response = await ApiService.get(`/cart/user/${userId}`);
             if (response && response.items) {
-                setCartItems(response.items);
+                // Get any missing variant details if needed
+                const itemsWithVariants = await ensureCompleteVariantInfo(response.items);
+                setCartItems(itemsWithVariants);
 
-                // Calculate cart total
-                const subtotal = response.items.reduce((total, item) => {
-                    const price = item.product_id && typeof item.product_id === 'object'
-                        ? (item.product_id.discounted_price || item.product_id.price || 0)
-                        : 0;
-                    return total + price * item.quantity;
-                }, 0);
-
+                // Calculate cart total with variant-aware pricing
+                const subtotal = calculateSubtotalWithVariants(itemsWithVariants);
                 setCartTotal(subtotal);
             } else {
                 setCartItems([]);
@@ -624,33 +646,102 @@ const CheckoutPage = () => {
         // Add shipping fee
         const selectedShippingMethod = deliveryMethods.find(method => method.id === deliveryMethod);
         const deliveryPrice = selectedShippingMethod ? selectedShippingMethod.price : 0;
-
-        return afterDiscount + deliveryPrice;
+        console.log("afterDiscount: ", afterDiscount);
+        console.log("selectedShippingMethod: ", selectedShippingMethod);
+        console.log("deliveryPrice: ", deliveryPrice);
+        
+        // Calculate final total including shipping fee
+        const finalTotal = afterDiscount + deliveryPrice;
+        console.log('Order total calculation:', {
+            subtotal,
+            discountAmount,
+            afterDiscount,
+            deliveryPrice,
+            finalTotal
+        });
+        return finalTotal;
     };
 
+
+    // Enhanced Place Order with improved variant handling
+    // In CheckoutPage.js, modify the handlePlaceOrder function to include shipping_cost
+
     const handlePlaceOrder = async () => {
+        // Kiểm tra xem có sản phẩm nào hết hàng không
+        const outOfStockItems = cartItems.filter(item => {
+            // Kiểm tra variant stock trước nếu có
+            if (item.variant_id && typeof item.variant_id === 'object') {
+                return item.variant_id.stock !== undefined && item.variant_id.stock <= 0;
+            }
+            // Nếu không, kiểm tra product stock
+            if (item.product_id && typeof item.product_id === 'object') {
+                return item.product_id.stock !== undefined && item.product_id.stock <= 0;
+            }
+            return false;
+        });
+    
+        // Nếu có sản phẩm hết hàng, hiển thị thông báo và không cho phép đặt hàng
+        if (outOfStockItems.length > 0) {
+            const productNames = outOfStockItems.map(item => {
+                const product = item.product_id || {};
+                const productName = product.name || "Product";
+                
+                // Lấy tên variant nếu có
+                const variant = item.variant_id && typeof item.variant_id === 'object' ? item.variant_id : null;
+                const variantName = variant && variant.name ? ` (${variant.name})` : '';
+                
+                return `${productName}${variantName}`;
+            }).join(', ');
+    
+            alert(`Cannot place order. The following items are out of stock: ${productNames}`);
+            return;
+        }
+    
         if (!selectedAddress || !paymentMethod || cartItems.length === 0) {
             alert("Please select address, payment method and have products in cart");
             return;
         }
-
+    
         try {
             // Show loading
             setLoading(true);
-
-            // Prepare order data
-            const orderItems = cartItems.map(item => ({
-                product_id: typeof item.product_id === 'object' ? item.product_id._id : item.product_id,
-                variant_id: item.variant_id ? (typeof item.variant_id === 'object' ? item.variant_id._id : item.variant_id) : null,
-                quantity: item.quantity,
-                cart_id: item.cart_id,
-                // Thêm price để đảm bảo giá chính xác được truyền đi
-                price: item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price
-                    ? item.variant_id.price
-                    : (typeof item.product_id === 'object' ? (item.product_id.discounted_price || item.product_id.price) : 0)
-            }));
-
-
+    
+            // Get selected shipping method and its cost
+            const selectedShippingMethod = deliveryMethods.find(method => method.id === deliveryMethod);
+            const shippingCost = selectedShippingMethod ? selectedShippingMethod.price : 0;
+    
+            // Prepare order data with proper variant handling
+            const orderItems = cartItems.map(item => {
+                const productId = typeof item.product_id === 'object' ? item.product_id._id : item.product_id;
+                
+                // Handle variant ID
+                let variantId = null;
+                if (item.variant_id) {
+                    variantId = typeof item.variant_id === 'object' ? item.variant_id._id : item.variant_id;
+                }
+                
+                // Determine the correct price to send
+                let itemPrice;
+                if (item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price) {
+                    // Use variant price if available
+                    itemPrice = item.variant_id.price;
+                } else if (typeof item.product_id === 'object') {
+                    // Otherwise use product price
+                    itemPrice = item.product_id.discounted_price || item.product_id.price || 0;
+                } else {
+                    // Fallback
+                    itemPrice = 0;
+                }
+                
+                return {
+                    product_id: productId,
+                    variant_id: variantId,
+                    quantity: item.quantity,
+                    price: itemPrice, // Send the determined price
+                    cart_id: item.cart_id
+                };
+            });
+            
             // Create payload for API with proper coupon handling
             const orderPayload = {
                 customer_id: userId,
@@ -662,53 +753,34 @@ const CheckoutPage = () => {
                 // For the coupon, we need proper ID handling
                 coupon_id: appliedCoupon ? (appliedCoupon._id || appliedCoupon.id || null) : null,
                 discount_amount: discountAmount || 0,
-                // Add total to help with validation
-                total_price: calculateTotal()
+                // Add explicit shipping cost field
+                shipping_cost: shippingCost,
+                // Add total to help with validation (subtotal + shipping - discount)
+                total_price: calculateTotal(),
             };
-
+    
             console.log("Sending order payload:", orderPayload);
-
+    
             // Call API to create order
             const response = await ApiService.post('/order/create', orderPayload);
-
+    
             // Handle successful order placement
             if (response && response.order) {
                 // Clear saved data in localStorage
                 localStorage.removeItem('selectedCartItems');
                 localStorage.removeItem('appliedCoupon');
-
+    
                 // Clear cart after successful order
                 if (cartItems.length > 0 && cartItems[0].cart_id) {
                     await ApiService.delete(`/cart/clear/${cartItems[0].cart_id}`);
                 }
-
+    
                 // Redirect to order confirmation page
                 window.location.href = `/order-confirmation?orderId=${response.order._id}`;
             }
         } catch (error) {
             console.error("Error creating order:", error);
-
-            // Display specific error message for coupon issues
-            if (error.response && error.response.data) {
-                const errorMessage = error.response.data.message || "Unknown error";
-
-                // Handle case where coupon cannot be applied
-                if (errorMessage.includes("coupon") || errorMessage.includes("discount")) {
-                    alert(`Coupon Error: ${errorMessage}`);
-
-                    // Offer to remove coupon and retry
-                    if (window.confirm("Would you like to remove the coupon and try again?")) {
-                        handleRemoveCoupon();
-                        // Wait for state to update
-                        setTimeout(() => handlePlaceOrder(), 500);
-                        return;
-                    }
-                } else {
-                    alert(`An error occurred: ${errorMessage}`);
-                }
-            } else {
-                alert(`An error occurred: ${error.message || 'Please try again later'}`);
-            }
+            alert(`Error placing order: ${error.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }

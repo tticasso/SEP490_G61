@@ -17,4 +17,10 @@ ProductVariantRouter.delete("/delete/:id", [VerifyJwt.verifyToken], productVaria
 ProductVariantRouter.put("/stock/:id", [VerifyJwt.verifyToken], productVariantController.updateVariantStock);
 ProductVariantRouter.put("/product/:productId/default/:variantId", [VerifyJwt.verifyToken], productVariantController.setDefaultVariant);
 
+// Add new routes for soft delete and restore
+ProductVariantRouter.put("/soft-delete/:id", [VerifyJwt.verifyToken], productVariantController.softDeleteVariant);
+ProductVariantRouter.put("/restore/:id", [VerifyJwt.verifyToken], productVariantController.restoreVariant);
+ProductVariantRouter.post("/bulk-soft-delete", [VerifyJwt.verifyToken], productVariantController.bulkSoftDeleteVariants);
+ProductVariantRouter.post("/bulk-restore", [VerifyJwt.verifyToken], productVariantController.bulkRestoreVariants);
+
 module.exports = ProductVariantRouter;

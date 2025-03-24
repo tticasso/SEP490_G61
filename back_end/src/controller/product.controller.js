@@ -4,6 +4,21 @@ const Product = db.product;
 const Category = db.categories;
 const Brand = db.brand;
 const Shop = db.shop;
+const { uploadProductImage, removeFile } = require("../services/upload.service");
+
+// Middleware to handle file upload for product
+const handleProductImageUpload = (req, res, next) => {
+    uploadProductImage(req, res, function (err) {
+        if (err) {
+            return res.status(400).json({
+                message: "Image upload failed",
+                error: err.message
+            });
+        }
+        // File uploaded successfully, continue
+        next();
+    });
+};
 
 // Lấy tất cả sản phẩm (có kèm danh mục, thương hiệu & cửa hàng)
 const getAllProducts = async (req, res) => {
@@ -103,7 +118,6 @@ const createProduct = async (req, res) => {
             description,
             detail,
             price,
-            thumbnail,
             meta_title,
             meta_keyword,
             meta_description,
@@ -118,25 +132,33 @@ const createProduct = async (req, res) => {
             updated_by
         } = req.body;
 
+        // Get thumbnail path from file upload
+        const thumbnail = req.file ? req.file.path.replace(/\\/g, '/') : null;
+
         // Kiểm tra xem danh mục và thương hiệu có tồn tại không
         const categoryExists = await Category.find({ _id: { $in: category_id } });
         if (categoryExists.length !== category_id.length) {
+            // If upload failed, remove the uploaded file
+            if (thumbnail) removeFile(thumbnail);
             return res.status(400).json({ message: "One or more category IDs are invalid" });
         }
 
         const brandExists = await Brand.findById(brand_id);
         if (!brandExists) {
+            if (thumbnail) removeFile(thumbnail);
             return res.status(400).json({ message: "Invalid brand ID" });
         }
 
         // Kiểm tra xem cửa hàng có tồn tại không
         const shopExists = await Shop.findById(shop_id);
         if (!shopExists) {
+            if (thumbnail) removeFile(thumbnail);
             return res.status(400).json({ message: "Invalid shop ID" });
         }
 
         // Kiểm tra xem người dùng có quyền với cửa hàng này không
         if (req.userId && shopExists.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
+            if (thumbnail) removeFile(thumbnail);
             return res.status(403).json({ message: "You don't have permission to add products to this shop" });
         }
 
@@ -144,13 +166,13 @@ const createProduct = async (req, res) => {
         const newProduct = new Product({
             category_id,
             brand_id,
-            shop_id, // Add shop_id to the new product
+            shop_id,
             name,
             slug,
             description,
             detail,
             price,
-            thumbnail,
+            thumbnail, // Save the file path
             meta_title,
             meta_keyword,
             meta_description,
@@ -170,6 +192,10 @@ const createProduct = async (req, res) => {
         await newProduct.save();
         res.status(201).json(newProduct);
     } catch (error) {
+        // If there was an error, clean up any uploaded file
+        if (req.file) {
+            removeFile(req.file.path);
+        }
         res.status(500).json({ message: error.message });
     }
 };
@@ -184,16 +210,16 @@ const softDeleteProduct = async (req, res) => {
 
         // Kiểm tra quyền xóa (chỉ chủ shop hoặc admin)
         const shop = await Shop.findById(product.shop_id);
-        
+
         // Kiểm tra nếu shop không tồn tại hoặc không có user_id
         if (!shop) {
             return res.status(404).json({ message: "Shop not found for this product" });
         }
-        
+
         if (!shop.user_id) {
             return res.status(400).json({ message: "Shop owner information is missing" });
         }
-        
+
         // Nếu người dùng là admin, cho phép thao tác
         if (req.isAdmin) {
             product.is_delete = true;
@@ -201,11 +227,11 @@ const softDeleteProduct = async (req, res) => {
             if (req.userId) {
                 product.updated_by = req.userId;
             }
-            
+
             await product.save();
             return res.status(200).json({ message: "Product moved to trash successfully", product });
         }
-        
+
         // Kiểm tra quyền (nếu không phải admin)
         if (shop.user_id.toString() !== req.userId.toString()) {
             return res.status(403).json({ message: "You don't have permission to modify this product" });
@@ -217,7 +243,7 @@ const softDeleteProduct = async (req, res) => {
         if (req.userId) {
             product.updated_by = req.userId;
         }
-        
+
         await product.save();
         res.status(200).json({ message: "Product moved to trash successfully", product });
     } catch (error) {
@@ -236,12 +262,12 @@ const restoreProduct = async (req, res) => {
 
         // Kiểm tra quyền khôi phục (chỉ chủ shop hoặc admin)
         const shop = await Shop.findById(product.shop_id);
-        
+
         // Kiểm tra nếu shop không tồn tại
         if (!shop) {
             return res.status(404).json({ message: "Shop not found for this product" });
         }
-        
+
         // Kiểm tra quyền (nếu là admin thì bỏ qua kiểm tra)
         if (!req.isAdmin && shop.user_id.toString() !== req.userId.toString()) {
             return res.status(403).json({ message: "You don't have permission to modify this product" });
@@ -253,7 +279,7 @@ const restoreProduct = async (req, res) => {
         if (req.userId) {
             product.updated_by = req.userId;
         }
-        
+
         await product.save();
         res.status(200).json({ message: "Product restored successfully", product });
     } catch (error) {
@@ -265,14 +291,14 @@ const restoreProduct = async (req, res) => {
 const bulkSoftDeleteProducts = async (req, res) => {
     try {
         const { productIds } = req.body;
-        
+
         if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
             return res.status(400).json({ message: "No product IDs provided" });
         }
-        
+
         const results = [];
         const errors = [];
-        
+
         // Process products one by one to validate permissions
         for (const productId of productIds) {
             try {
@@ -281,34 +307,34 @@ const bulkSoftDeleteProducts = async (req, res) => {
                     errors.push({ id: productId, error: "Product not found" });
                     continue;
                 }
-                
+
                 // Kiểm tra quyền
                 const shop = await Shop.findById(product.shop_id);
                 if (!shop) {
                     errors.push({ id: productId, error: "Shop not found" });
                     continue;
                 }
-                
+
                 // Nếu không phải admin và không phải chủ shop thì không có quyền
                 if (!req.isAdmin && shop.user_id.toString() !== req.userId.toString()) {
                     errors.push({ id: productId, error: "Permission denied" });
                     continue;
                 }
-                
+
                 // Cập nhật sản phẩm
                 product.is_delete = true;
                 product.updated_at = Date.now();
                 if (req.userId) {
                     product.updated_by = req.userId;
                 }
-                
+
                 await product.save();
                 results.push(productId);
             } catch (error) {
                 errors.push({ id: productId, error: error.message });
             }
         }
-        
+
         res.status(200).json({
             message: `Processed ${results.length} products successfully`,
             success: results,
@@ -323,14 +349,14 @@ const bulkSoftDeleteProducts = async (req, res) => {
 const bulkRestoreProducts = async (req, res) => {
     try {
         const { productIds } = req.body;
-        
+
         if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
             return res.status(400).json({ message: "No product IDs provided" });
         }
-        
+
         const results = [];
         const errors = [];
-        
+
         // Process products one by one to validate permissions
         for (const productId of productIds) {
             try {
@@ -339,34 +365,34 @@ const bulkRestoreProducts = async (req, res) => {
                     errors.push({ id: productId, error: "Product not found" });
                     continue;
                 }
-                
+
                 // Kiểm tra quyền
                 const shop = await Shop.findById(product.shop_id);
                 if (!shop) {
                     errors.push({ id: productId, error: "Shop not found" });
                     continue;
                 }
-                
+
                 // Nếu không phải admin và không phải chủ shop thì không có quyền
                 if (!req.isAdmin && shop.user_id.toString() !== req.userId.toString()) {
                     errors.push({ id: productId, error: "Permission denied" });
                     continue;
                 }
-                
+
                 // Cập nhật sản phẩm
                 product.is_delete = false;
                 product.updated_at = Date.now();
                 if (req.userId) {
                     product.updated_by = req.userId;
                 }
-                
+
                 await product.save();
                 results.push(productId);
             } catch (error) {
                 errors.push({ id: productId, error: error.message });
             }
         }
-        
+
         res.status(200).json({
             message: `Processed ${results.length} products successfully`,
             success: results,
@@ -389,12 +415,18 @@ const updateProduct = async (req, res) => {
             description,
             detail,
             price,
-            thumbnail
+            meta_title,
+            meta_keyword,
+            meta_description
         } = req.body;
+
+        // Get thumbnail from file upload if exists
+        const thumbnail = req.file ? req.file.path.replace(/\\/g, '/') : null;
 
         // Lấy thông tin sản phẩm hiện tại
         const currentProduct = await Product.findById(req.params.id);
         if (!currentProduct) {
+            if (thumbnail) removeFile(thumbnail);
             return res.status(404).json({ message: "Product not found" });
         }
 
@@ -403,6 +435,7 @@ const updateProduct = async (req, res) => {
         const shop = await Shop.findById(shopToCheck);
 
         if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
+            if (thumbnail) removeFile(thumbnail);
             return res.status(403).json({ message: "You don't have permission to update this product" });
         }
 
@@ -410,6 +443,7 @@ const updateProduct = async (req, res) => {
         if (category_id) {
             const categoryExists = await Category.find({ _id: { $in: category_id } });
             if (categoryExists.length !== category_id.length) {
+                if (thumbnail) removeFile(thumbnail);
                 return res.status(400).json({ message: "One or more category IDs are invalid" });
             }
         }
@@ -417,6 +451,7 @@ const updateProduct = async (req, res) => {
         if (brand_id) {
             const brandExists = await Brand.findById(brand_id);
             if (!brandExists) {
+                if (thumbnail) removeFile(thumbnail);
                 return res.status(400).json({ message: "Invalid brand ID" });
             }
         }
@@ -425,13 +460,20 @@ const updateProduct = async (req, res) => {
         if (shop_id && shop_id !== currentProduct.shop_id.toString()) {
             const shopExists = await Shop.findById(shop_id);
             if (!shopExists) {
+                if (thumbnail) removeFile(thumbnail);
                 return res.status(400).json({ message: "Invalid shop ID" });
             }
 
             // Chỉ admin mới được chuyển sản phẩm sang shop khác
             if (!req.isAdmin) {
+                if (thumbnail) removeFile(thumbnail);
                 return res.status(403).json({ message: "Only admin can transfer products between shops" });
             }
+        }
+
+        // If a new thumbnail is uploaded, delete the old one
+        if (thumbnail && currentProduct.thumbnail) {
+            removeFile(currentProduct.thumbnail);
         }
 
         const updatedProduct = await Product.findByIdAndUpdate(
@@ -445,7 +487,10 @@ const updateProduct = async (req, res) => {
                 ...(description && { description }),
                 ...(detail && { detail }),
                 ...(price && { price }),
-                ...(thumbnail && { thumbnail }),
+                ...(thumbnail && { thumbnail }), // Update thumbnail if provided
+                ...(meta_title && { meta_title }),
+                ...(meta_keyword && { meta_keyword }),
+                ...(meta_description && { meta_description }),
                 updated_at: Date.now(),
                 ...(req.userId && { updated_by: req.userId })
             },
@@ -457,6 +502,10 @@ const updateProduct = async (req, res) => {
 
         res.status(200).json(updatedProduct);
     } catch (error) {
+        // If there was an error, clean up any uploaded file
+        if (req.file) {
+            removeFile(req.file.path);
+        }
         res.status(500).json({ message: error.message });
     }
 };
@@ -473,6 +522,11 @@ const deleteProduct = async (req, res) => {
         const shop = await Shop.findById(product.shop_id);
         if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
             return res.status(403).json({ message: "You don't have permission to delete this product" });
+        }
+
+        // Delete the thumbnail file if it exists
+        if (product.thumbnail) {
+            removeFile(product.thumbnail);
         }
 
         const deletedProduct = await Product.findByIdAndDelete(req.params.id);
@@ -509,6 +563,7 @@ const getProductWithVariants = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
 const productController = {
     getAllProducts,
     getProductById,
@@ -518,10 +573,11 @@ const productController = {
     deleteProduct,
     getProductsByUserId,
     getProductWithVariants,
-    softDeleteProduct,    // Thêm methods mới
-    restoreProduct,       // Thêm methods mới
-    bulkSoftDeleteProducts, // Thêm methods mới
-    bulkRestoreProducts   // Thêm methods mới
+    softDeleteProduct,
+    restoreProduct,
+    bulkSoftDeleteProducts,
+    bulkRestoreProducts,
+    handleProductImageUpload // Export the middleware for routes
 };
 
 module.exports = productController;

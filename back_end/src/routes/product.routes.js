@@ -4,7 +4,8 @@ const { productController } = require('../controller')
 const VerifyJwt = require('../middlewares/verifyJwt');
 
 const ProductRouter = express.Router()
-ProductRouter.use(bodyParser.json())
+// Không sử dụng bodyParser.json() ở đây nữa vì nó sẽ xung đột với multer
+// (multer yêu cầu request dạng multipart/form-data)
 
 // Public routes
 ProductRouter.get("/", productController.getAllProducts);
@@ -14,8 +15,15 @@ ProductRouter.get("/:id/with-variants", productController.getProductWithVariants
 ProductRouter.get("/:id", productController.getProductById); // This must come after other specific routes
 
 // Protected routes - requires authentication
-ProductRouter.post("/create", [VerifyJwt.verifyToken], productController.createProduct);
-ProductRouter.put("/edit/:id", [VerifyJwt.verifyToken], productController.updateProduct);
+// Thêm middleware xử lý upload ảnh trước khi xử lý request
+ProductRouter.post("/create",
+    [VerifyJwt.verifyToken, productController.handleProductImageUpload],
+    productController.createProduct
+);
+ProductRouter.put("/edit/:id",
+    [VerifyJwt.verifyToken, productController.handleProductImageUpload],
+    productController.updateProduct
+);
 ProductRouter.delete("/delete/:id", [VerifyJwt.verifyToken], productController.deleteProduct);
 
 // Thêm routes mới cho xóa mềm và khôi phục

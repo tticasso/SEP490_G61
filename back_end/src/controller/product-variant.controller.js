@@ -3,6 +3,21 @@ const mongoose = require('mongoose');
 const ProductVariant = db.productVariant;
 const Product = db.product;
 const Shop = db.shop;
+const { uploadVariantImages, removeFile } = require("../services/upload.service");
+
+// Middleware to handle file upload for variant images
+const handleVariantImagesUpload = (req, res, next) => {
+    uploadVariantImages(req, res, function (err) {
+        if (err) {
+            return res.status(400).json({
+                message: "Images upload failed",
+                error: err.message
+            });
+        }
+        // Files uploaded successfully, continue
+        next();
+    });
+};
 
 // Lấy tất cả biến thể của sản phẩm
 const getVariantsByProductId = async (req, res) => {
@@ -54,20 +69,37 @@ const createVariant = async (req, res) => {
             price,
             stock,
             attributes,
-            images,
             is_default,
             sku
         } = req.body;
 
+        // Parse attributes if sent as JSON string
+        let parsedAttributes = attributes;
+        if (typeof attributes === 'string') {
+            try {
+                parsedAttributes = JSON.parse(attributes);
+            } catch (e) {
+                return res.status(400).json({ message: "Invalid attributes format" });
+            }
+        }
+
         // Kiểm tra sản phẩm có tồn tại không
         const product = await Product.findById(product_id);
         if (!product || product.is_delete) {
+            // Clean up uploaded files if any
+            if (req.files && req.files.length > 0) {
+                req.files.forEach(file => removeFile(file.path));
+            }
             return res.status(404).json({ message: "Product not found" });
         }
 
         // Kiểm tra quyền (chỉ chủ shop hoặc admin)
         const shop = await Shop.findById(product.shop_id);
         if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
+            // Clean up uploaded files if any
+            if (req.files && req.files.length > 0) {
+                req.files.forEach(file => removeFile(file.path));
+            }
             return res.status(403).json({ message: "You don't have permission to add variants to this product" });
         }
 
@@ -80,7 +112,10 @@ const createVariant = async (req, res) => {
         }
 
         // Tạo SKU nếu không được cung cấp
-        const generatedSku = sku || generateSku(product.name, attributes);
+        const generatedSku = sku || generateSku(product.name, parsedAttributes);
+
+        // Get image paths from uploaded files
+        const imagePaths = req.files ? req.files.map(file => file.path.replace(/\\/g, '/')) : [];
 
         // Tạo biến thể mới
         const newVariant = new ProductVariant({
@@ -89,8 +124,8 @@ const createVariant = async (req, res) => {
             price,
             stock,
             sku: generatedSku,
-            attributes: new Map(Object.entries(attributes || {})),
-            images: images || [],
+            attributes: new Map(Object.entries(parsedAttributes || {})),
+            images: imagePaths, // Save the file paths
             is_default: is_default || false,
         });
 
@@ -98,6 +133,10 @@ const createVariant = async (req, res) => {
 
         res.status(201).json(newVariant);
     } catch (error) {
+        // Clean up uploaded files if any
+        if (req.files && req.files.length > 0) {
+            req.files.forEach(file => removeFile(file.path));
+        }
         res.status(500).json({ message: error.message });
     }
 };
@@ -133,14 +172,31 @@ const updateVariant = async (req, res) => {
             price,
             stock,
             attributes,
-            images,
             is_default,
             is_active
         } = req.body;
 
+        // Parse attributes if sent as JSON string
+        let parsedAttributes = attributes;
+        if (typeof attributes === 'string') {
+            try {
+                parsedAttributes = JSON.parse(attributes);
+            } catch (e) {
+                // Clean up uploaded files if any
+                if (req.files && req.files.length > 0) {
+                    req.files.forEach(file => removeFile(file.path));
+                }
+                return res.status(400).json({ message: "Invalid attributes format" });
+            }
+        }
+
         // Tìm biến thể hiện tại
         const variant = await ProductVariant.findById(id);
         if (!variant || variant.is_delete) {
+            // Clean up uploaded files if any
+            if (req.files && req.files.length > 0) {
+                req.files.forEach(file => removeFile(file.path));
+            }
             return res.status(404).json({ message: "Variant not found" });
         }
 
@@ -149,6 +205,10 @@ const updateVariant = async (req, res) => {
         const shop = await Shop.findById(product.shop_id);
 
         if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
+            // Clean up uploaded files if any
+            if (req.files && req.files.length > 0) {
+                req.files.forEach(file => removeFile(file.path));
+            }
             return res.status(403).json({ message: "You don't have permission to update this variant" });
         }
 
@@ -160,6 +220,20 @@ const updateVariant = async (req, res) => {
             );
         }
 
+        // Get image paths from uploaded files
+        let newImages = [];
+        if (req.files && req.files.length > 0) {
+            newImages = req.files.map(file => file.path.replace(/\\/g, '/'));
+
+            // Delete old images if new ones are uploaded
+            if (variant.images && variant.images.length > 0) {
+                variant.images.forEach(imagePath => removeFile(imagePath));
+            }
+        }
+
+        // If we have new images, use them, otherwise keep the existing ones
+        const images = newImages.length > 0 ? newImages : variant.images;
+
         // Cập nhật biến thể
         const updatedVariant = await ProductVariant.findByIdAndUpdate(
             id,
@@ -167,8 +241,8 @@ const updateVariant = async (req, res) => {
                 ...(name && { name }),
                 ...(price && { price }),
                 ...(stock !== undefined && { stock }),
-                ...(attributes && { attributes: new Map(Object.entries(attributes)) }),
-                ...(images && { images }),
+                ...(parsedAttributes && { attributes: new Map(Object.entries(parsedAttributes)) }),
+                ...(newImages.length > 0 && { images }),
                 ...(is_default !== undefined && { is_default }),
                 ...(is_active !== undefined && { is_active }),
                 updated_at: Date.now()
@@ -178,6 +252,10 @@ const updateVariant = async (req, res) => {
 
         res.status(200).json(updatedVariant);
     } catch (error) {
+        // Clean up uploaded files if any
+        if (req.files && req.files.length > 0) {
+            req.files.forEach(file => removeFile(file.path));
+        }
         res.status(500).json({ message: error.message });
     }
 };
@@ -248,6 +326,7 @@ const updateVariantStock = async (req, res) => {
         if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
             return res.status(403).json({ message: "You don't have permission to update this variant" });
         }
+
         // Cập nhật tồn kho
         variant.stock = stock;
         variant.updated_at = Date.now();
@@ -302,7 +381,8 @@ const productVariantController = {
     updateVariant,
     deleteVariant,
     updateVariantStock,
-    setDefaultVariant
+    setDefaultVariant,
+    handleVariantImagesUpload // Export the middleware for routes
 };
 
 module.exports = productVariantController;

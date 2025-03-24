@@ -30,7 +30,8 @@ const { AuthRouter,
     ConversationRouter,
     UserStatusRouter,
     ProductVariantRouter,
-    ProductAttributeRouter
+    ProductAttributeRouter,
+    GeminiRouter
 } = require('./src/routes');
 
 const session = require('express-session');
@@ -51,10 +52,11 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(cors({
-    origin: 'http://localhost:3000', // Thay đổi thành domain frontend của bạn
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token']
+  // Cho phép truy cập từ cả localhost:3000 và IP cụ thể
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token']
 }));
 
 // Bổ sung middleware kiểm soát hoạt động của Web server
@@ -63,6 +65,8 @@ app.use(morgan("dev"));
 
 // Cấu hình static files cho uploads - đặt trước các routes
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.use('/api/gemini', GeminiRouter);
 
 // Đảm bảo thư mục uploads tồn tại
 const uploadDirs = [

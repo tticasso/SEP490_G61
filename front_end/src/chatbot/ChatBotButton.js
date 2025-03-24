@@ -1,4 +1,4 @@
-// src/chatbot/ChatBotButton.js
+// SEP490_G61/front_end/src/chatbot/ChatBotButton.js
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, X, BotMessageSquare } from 'lucide-react';
 
@@ -40,18 +40,18 @@ const ChatBotButton = ({ isOpen, toggleChat }) => {
     <div className="relative">
       <button
         onClick={toggleChat}
-        className={`fixed bottom-6 right-6 w-14 h-14 rounded-full ${isOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-pink-500 hover:bg-pink-600'} text-white flex items-center justify-center shadow-lg transition-colors z-50 ${isAnimating ? 'animate-bounce' : ''}`}
+        className={`fixed bottom-6 right-6 w-14 h-14 rounded-full ${isOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-purple-600 hover:bg-purple-700'} text-white flex items-center justify-center shadow-lg transition-colors z-50 ${isAnimating ? 'animate-bounce' : ''}`}
         aria-label={isOpen ? "Đóng chat" : "Mở chat"}
       >
         {isOpen ? <X size={24} /> : <BotMessageSquare size={24} />}
       </button>
       
       {/* Hiển thị số tin nhắn chưa đọc */}
-      {/* {!isOpen && unreadCount > 0 && (
+      {!isOpen && unreadCount > 0 && (
         <div className="absolute top-0 right-6 transform -translate-y-1/2 translate-x-1/2 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full z-50">
           {unreadCount}
         </div>
-      )} */}
+      )}
     </div>
   );
 };

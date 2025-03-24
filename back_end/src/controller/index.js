@@ -18,6 +18,7 @@ const conversationController = require('./conversation.controller')
 const userStatusController = require('./user-status.controller')
 const productVariantController = require('./product-variant.controller');
 const productAttributeController = require('./product-attribute.controller');
+const geminiController = require('./gemini.controller')
 module.exports = {
     authController,
     userController,
@@ -38,5 +39,6 @@ module.exports = {
     conversationController,
     userStatusController,
     productVariantController,
-    productAttributeController
+    productAttributeController,
+    geminiController
 }

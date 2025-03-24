@@ -1,4 +1,4 @@
-// src/chatbot/ChatBot.js
+// SEP490_G61/front_end/src/chatbot/ChatBot.js
 import React, { useState, useEffect } from 'react';
 import ChatBotButton from './ChatBotButton';
 import ChatWindow from './ChatWindow';

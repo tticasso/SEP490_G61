@@ -24,71 +24,64 @@ import ApiService from '../services/ApiService';
 // Import MessageEventBus từ Message.js
 import { MessageEventBus } from '../pages/UserProfile/components/Message';
 import { CartEventBus } from '../pages/cart/CartEventBus';
+import ProductCategoriesSidebar from './ProductCategoriesSidebar';
+import CategoryDropdown from './CategoryDropdown';
 
 
-const ProductCategoriesSidebar = ({ isOpen, onClose, buttonRef }) => {
-    const sidebarRef = useRef(null);
 
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (
-                sidebarRef.current &&
-                !sidebarRef.current.contains(event.target) &&
-                buttonRef.current &&
-                !buttonRef.current.contains(event.target) &&
-                !event.target.closest('.cartbutton')
-            ) {
-                onClose();
-            }
-        };
 
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
 
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isOpen, onClose]);
+// CSS Animation for the flashing promotion text
+const flashingAnimation = `
+@keyframes flash {
+  0%, 100% { 
+    color: #ff3333; 
+    transform: scale(1);
+  }
+  25% { 
+    color: #ff0000; 
+    transform: scale(1.05);
+  }
+  50% { 
+    color: #ffcc00; 
+    transform: scale(1);
+  }
+  75% { 
+    color: #ff3333; 
+    transform: scale(1.05);
+  }
+}
 
-    const categories = [
-        { name: 'Máy tính & laptop', hasSubcategories: true },
-        { name: 'Đồng hồ', hasSubcategories: false },
-        { name: 'Thời trang nam', hasSubcategories: true },
-        { name: 'Thời trang nữ', hasSubcategories: false },
-        { name: 'Mẹ & bé', hasSubcategories: false },
-        { name: 'Nhà cửa & đời sống', hasSubcategories: false },
-        { name: 'Sắc đẹp', hasSubcategories: false },
-        { name: 'Sức khỏe', hasSubcategories: false }
-    ];
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
 
-    return (
-        <div
-            ref={sidebarRef}
-            className={`
-                fixed z-50 top-[140px] left-[280px] w-64 bg-white 
-                border shadow-lg rounded-md 
-                transition-all duration-300 ease-in-out 
-                ${isOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}
-            `}
-        >
-            <ul className="py-2">
-                {categories.map((category, index) => (
-                    <li
-                        onClick={() => window.location.href = "categories"}
-                        key={index}
-                        className="px-4 py-2 hover:bg-gray-100 flex justify-between items-center cursor-pointer"
-                    >
-                        {category.name}
-                        {category.hasSubcategories && (
-                            <ChevronRight size={16} className="text-gray-500" />
-                        )}
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
+.flashing-text {
+  animation: flash 2s infinite, bounce 1.5s infinite;
+  font-weight: bold;
+  background-size: 200% 200%;
+  color: white;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.flashing-text:hover {
+  background-position: right center;
+  transform: scale(1.05);
+}
+
+.piggy-bank-icon {
+  animation: bounce 1.5s infinite;
+}
+`;
 
 const Header = () => {
     const navigate = useNavigate();
@@ -122,8 +115,8 @@ const Header = () => {
         };
     }, []);
 
-     // Always check both id and _id for compatibility
-     const userId = currentUser?.id || currentUser?._id || "";
+    // Always check both id and _id for compatibility
+    const userId = currentUser?.id || currentUser?._id || "";
 
     useEffect(() => {
         if (isLoggedIn) {
@@ -143,15 +136,15 @@ const Header = () => {
     useEffect(() => {
         // Đăng ký lắng nghe sự kiện khi giỏ hàng cập nhật
         const unsubscribe = CartEventBus.subscribe('cartUpdated', () => {
-          console.log('Cart updated, refreshing total...');
-          fetchCartTotal();
+            console.log('Cart updated, refreshing total...');
+            fetchCartTotal();
         });
-        
+
         // Cleanup khi component unmount
         return () => {
-          unsubscribe();
+            unsubscribe();
         };
-      }, []);
+    }, []);
 
     // Lắng nghe sự kiện localStorage thay đổi
     useEffect(() => {
@@ -185,17 +178,17 @@ const Header = () => {
         if (!isLoggedIn || !currentUser || !currentUser.roles) {
             return false;
         }
-        
+
         return currentUser.roles.some(role => {
             // Check different role formats
             if (typeof role === 'object' && role !== null) {
                 return role.name === "SELLER" || role.name === "ROLE_SELLER";
             }
-            
+
             if (typeof role === 'string') {
                 return role === "SELLER" || role === "ROLE_SELLER";
             }
-            
+
             return false;
         });
     };
@@ -214,27 +207,27 @@ const Header = () => {
             setCartTotal(0);
             return;
         }
-    
+
         try {
             const response = await ApiService.get(`/cart/user/${userId}`);
             if (response && response.items && response.items.length > 0) {
                 // First ensure we have complete variant data
                 const itemsWithCompleteVariants = await ensureCompleteVariantInfo(response.items);
-                
+
                 // Calculate total with proper variant pricing
                 const total = itemsWithCompleteVariants.reduce((sum, item) => {
                     // First check for variant price
                     if (item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price) {
                         return sum + (item.variant_id.price * item.quantity);
                     }
-                    
+
                     // Fall back to product price
                     const price = item.product_id && typeof item.product_id === 'object'
                         ? (item.product_id.discounted_price || item.product_id.price || 0)
                         : 0;
                     return sum + price * item.quantity;
                 }, 0);
-                
+
                 setCartTotal(total);
             } else {
                 setCartTotal(0);
@@ -247,26 +240,26 @@ const Header = () => {
 
     const ensureCompleteVariantInfo = async (items) => {
         const updatedItems = [...items];
-        
+
         for (let i = 0; i < updatedItems.length; i++) {
             const item = updatedItems[i];
-            
+
             // If item has a variant_id but it's not a complete object
             if (item.variant_id && (typeof item.variant_id === 'string' || !item.variant_id.attributes)) {
-                const productId = typeof item.product_id === 'object' 
-                    ? item.product_id._id 
+                const productId = typeof item.product_id === 'object'
+                    ? item.product_id._id
                     : item.product_id;
-                    
-                const variantId = typeof item.variant_id === 'string' 
-                    ? item.variant_id 
+
+                const variantId = typeof item.variant_id === 'string'
+                    ? item.variant_id
                     : item.variant_id._id;
-                
+
                 if (productId && variantId) {
                     try {
                         // Get full variant data
                         const variants = await ApiService.get(`/product-variant/product/${productId}`, false);
                         const fullVariant = variants.find(v => v._id === variantId);
-                        
+
                         if (fullVariant) {
                             updatedItems[i] = {
                                 ...item,
@@ -279,7 +272,7 @@ const Header = () => {
                 }
             }
         }
-        
+
         return updatedItems;
     };
 
@@ -347,6 +340,9 @@ const Header = () => {
 
     return (
         <div className="bg-white shadow-sm relative">
+            {/* Add the animation CSS */}
+            <style>{flashingAnimation}</style>
+
             {/* Top Notification Bar */}
             <div className='border-b'>
                 <div className="mx-auto max-w-7xl py-2 flex items-center justify-between flex ">
@@ -392,19 +388,7 @@ const Header = () => {
                     {/* Category and Search */}
                     <div className="flex-grow flex items-center space-x-4">
                         {/* Category Dropdown */}
-                        <div className="relative">
-                            <select className="bg-gray-100 px-4 py-2 rounded-md text-sm appearance-none pr-8">
-                                <option>Tất cả danh mục</option>
-                                <option>Điện tử</option>
-                                <option>Thời trang</option>
-                                <option>Nhà cửa</option>
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                                </svg>
-                            </div>
-                        </div>
+                        <CategoryDropdown />
 
                         {/* Search Input */}
                         <form onSubmit={handleSearch} className="flex-grow relative w-2/5">
@@ -583,15 +567,18 @@ const Header = () => {
                     <a href="categories" className="hover:text-purple-600">Danh mục</a>
                     <a href="#" className="hover:text-purple-600">Bài viết</a>
                     <a href="#" className="hover:text-purple-600">Hỗ trợ</a>
-                    
+
                     {/* Hide "Đăng ký bán hàng" link if user is already a seller */}
                     {!userIsSeller && (
                         <a href="shop-registration" className="text-red-500 font-semibold">Đăng ký bán hàng</a>
                     )}
-                    
-                    <span className="ml-auto text-red-500 font-semibold items-center flex gap-2">
-                        <PiggyBank size={30} className='color-red'></PiggyBank> Khuyến mại 20% cho đơn hàng đầu tiên
-                    </span>
+
+                    {/* Updated flashing promotion text */}
+                    <div className="ml-auto flashing-text cursor-pointer"
+                        onClick={() => navigate('/categories')}>
+                        <PiggyBank size={24} className="piggy-bank-icon" />
+                        <span>Khuyến mại 20% cho đơn hàng đầu tiên</span>
+                    </div>
                 </div>
             </nav>
 

@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCartIcon } from 'lucide-react';
-import image from '../../assets/image1.png';
+import image1 from '../../assets/image1.png'; // Đường dẫn đến ảnh banner đầu tiên
+import image2 from '../../assets/quanaosecondhand.jpg'; // Sử dụng ảnh có sẵn cho slider
+import image3 from '../../assets/giay2hand.jpg'; // Sử dụng ảnh có sẵn cho slider
+import image4 from '../../assets/dongho2hand.jpg'; // Sử dụng ảnh có sẵn cho slider
+import image5 from '../../assets/quanaosecondhand.jpg'; // Sử dụng ảnh có sẵn cho slider
+
 import ApiService from '../../services/ApiService';
 import CartModal from '../cart/CartModal';
 import { useAuth } from '../Login/context/AuthContext';
@@ -12,6 +17,7 @@ import CategorySidebar from './components/CategorySidebar';
 import PromotionalBanners from './components/PromotionalBanners';
 import ProductModal from './components/ProductModal';
 import ProductSection from './components/ProductSection';
+import ImageSlider from './components/ImageSlider'; // Import ImageSlider component
 
 const TroocEcommerce = () => {
     const [hoveredProduct, setHoveredProduct] = useState(null);
@@ -31,6 +37,15 @@ const TroocEcommerce = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // Banner slider images
+    const bannerImages = [
+        { src: image1, alt: "Banner 1" },
+        { src: image2, alt: "Banner 2" },
+        { src: image3, alt: "Banner 3" },
+        { src: image4, alt: "Banner 4" },
+        { src: image5, alt: "Banner 5" },
+    ];
 
     // Get current user information
     const { currentUser, isLoggedIn } = useAuth();
@@ -186,7 +201,6 @@ const TroocEcommerce = () => {
         }
     };
 
-
     // Handle variant selection from ProductVariantSelector
     const handleVariantSelect = (variant) => {
         setSelectedVariant(variant);
@@ -260,9 +274,24 @@ const TroocEcommerce = () => {
                     <div className="pt-4 pb-4 bg-[#F1F5F9]">
                         <div className="space-y-2">
                             <div className="w-full flex gap-x-8 justify-center">
-                                <CategorySidebar categories={categories} />
-                                <div className='w-4/5'>
-                                    <img src={image} alt="Banner" className="w-full" />
+                                {/* Updated CategorySidebar with clickable categories */}
+                                <div className="w-1/5 bg-white">
+                                    <div className="space-y-2 pt-3 pb-3 pl-3 pr-5">
+                                        {categories.slice(0,6).map((category) => (
+                                            <div 
+                                                key={category._id} 
+                                                className="p-3 border-b border-black cursor-pointer hover:bg-gray-100 transition-colors"
+                                                onClick={() => window.location.href = `/categories?category=${category._id}`}
+                                            >
+                                                <h3 className="font-medium text-gray-800 mb-2">{category.name}</h3>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                {/* Image Slider replacing single image */}
+                                <div className='w-4/5 h-80'> {/* Added fixed height */}
+                                    <ImageSlider images={bannerImages} />
                                 </div>
                             </div>
                         </div>

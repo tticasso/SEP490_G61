@@ -23,5 +23,7 @@ router.post('/clear-cache', verifyToken, geminiController.clearCache);
 // Route để kiểm tra tình trạng API
 router.get('/status', geminiController.status);
 
+router.post('/refresh-data', verifyToken, geminiController.refreshProductData);
+
 // Đổi thành module.exports = router để đúng cú pháp
 module.exports = router;

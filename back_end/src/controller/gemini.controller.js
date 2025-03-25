@@ -2,6 +2,9 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
+const db = require('../models');
+const Product = db.product;
+const Categories = db.categories;
 
 // Khởi tạo Google Generative AI với API key
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -18,7 +21,7 @@ const requestTracker = {
 
 // Cấu hình mô hình
 const MODEL_CONFIG = {
-  model: 'gemini-2.0-flash',
+  model: 'gemini-2.0-flash-lite',
   generationConfig: {
     temperature: 0.7, // 0-1, càng cao càng sáng tạo
     topP: 0.95,
@@ -26,6 +29,39 @@ const MODEL_CONFIG = {
     maxOutputTokens: 500, // Giới hạn số tokens trong phản hồi
   }
 };
+
+// Hàm lấy dữ liệu sản phẩm
+async function getProductsData() {
+  try {
+    // Lấy sản phẩm đang active (is_active = true, is_delete = false)
+    const products = await Product.find({ 
+      is_active: true,
+      is_delete: false
+    })
+      .select('name description price category_id brand_id slug thumbnail condition')
+      .populate("category_id", "name")
+      .populate("brand_id", "name")
+      .limit(100); // Giới hạn để tối ưu hiệu suất
+    
+    return products;
+  } catch (error) {
+    console.error("Lỗi khi lấy dữ liệu sản phẩm:", error);
+    return [];
+  }
+}
+
+// Hàm lấy dữ liệu danh mục
+async function getCategoriesData() {
+  try {
+    const categories = await Categories.find()
+      .select('name description')
+      .limit(30);
+    return categories;
+  } catch (error) {
+    console.error("Lỗi khi lấy dữ liệu danh mục:", error);
+    return [];
+  }
+}
 
 // Reset bộ đếm request
 function checkAndResetTracker() {
@@ -78,17 +114,51 @@ exports.chatCompletion = async (req, res) => {
     // Khởi tạo model
     const model = genAI.getGenerativeModel(MODEL_CONFIG);
     
+    // Fetch product and category data
+    const productsData = await getProductsData();
+    const categoriesData = await getCategoriesData();
+    
+    console.log(`Đã lấy ${productsData.length} sản phẩm và ${categoriesData.length} danh mục`);
+    
+    // Convert to simplified format for the prompt
+    const productsInfo = productsData.map(p => ({
+      id: p._id.toString(),
+      name: p.name,
+      price: p.price,
+      category: p.category_id && Array.isArray(p.category_id) && p.category_id.length > 0 
+        ? p.category_id[0].name 
+        : (p.category_id?.name || 'Không phân loại'),
+      brand: p.brand_id?.name || 'Không thương hiệu',
+      condition: p.condition || 'Không xác định',
+      description: p.description?.substring(0, 100) + '...' || ''
+    }));
+    
+    const categoriesInfo = categoriesData.map(c => ({
+      id: c._id.toString(),
+      name: c.name,
+      description: c.description || ''
+    }));
+    
     // System prompt cho AI
     const systemPrompt = `
-    Bạn là trợ lý AI hỗ trợ khách hàng của cửa hàng bán đồ đã qua sử dụng (Secondhand). 
+    Bạn là trợ lý AI hỗ trợ khách hàng của cửa hàng bán đồ đã qua sử dụng TROOC2HAND. 
     Hãy trả lời ngắn gọn, thân thiện và hữu ích về các sản phẩm, dịch vụ, cách đặt hàng, vận chuyển, v.v.
     Đảm bảo phản hồi của bạn luôn mang tính chuyên nghiệp và bằng tiếng Việt.
     
+    THÔNG TIN VỀ SẢN PHẨM HIỆN CÓ TRÊN HỆ THỐNG:
+    ${JSON.stringify(productsInfo, null, 2)}
+    
+    DANH MỤC SẢN PHẨM:
+    ${JSON.stringify(categoriesInfo, null, 2)}
+    
     Ví dụ về các chủ đề mà bạn có thể trả lời:
-    - Thông tin về các sản phẩm
+    - Thông tin về các sản phẩm cụ thể có trong hệ thống và giới thiệu những mặt hàng phù hợp
     - Hướng dẫn đặt hàng và thanh toán: Người dùng có thể chọn sản phẩm để xem các biến thể, vì là đồ đã qua sử dụng nên kích cỡ, màu sắc đều đã được xác định sẵn
     - Chính sách đổi trả và vận chuyển
     - Khuyến mãi và sự kiện đặc biệt
+    
+    Khi người dùng hỏi về sản phẩm cụ thể, hãy trích dẫn thông tin từ dữ liệu sản phẩm được cung cấp ở trên.
+    Khi người dùng muốn tìm sản phẩm theo danh mục, hãy giới thiệu những sản phẩm phù hợp từ danh mục đó.
     `;
     
     // Khởi tạo chat
@@ -146,6 +216,25 @@ exports.chatCompletion = async (req, res) => {
       success: false,
       message: "Lỗi khi xử lý yêu cầu. Vui lòng thử lại sau.",
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Làm mới dữ liệu sản phẩm
+exports.refreshProductData = async (req, res) => {
+  try {
+    // Clear the cache to ensure fresh responses
+    responseCache.clear();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Dữ liệu sản phẩm đã được làm mới'
+    });
+  } catch (error) {
+    console.error("Lỗi khi làm mới dữ liệu:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi làm mới dữ liệu sản phẩm"
     });
   }
 };

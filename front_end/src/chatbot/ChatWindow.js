@@ -9,9 +9,12 @@ import ApiDebugTool from './ApiDebugTool';
 const ChatWindow = ({ isOpen }) => {
   // Lưu trạng thái chat trong localStorage
   const [messages, setMessages] = useState(() => {
-    const savedMessages = localStorage.getItem('chatMessages');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userId = user.id || 'guest';
+    const chatKey = `chatMessages_${userId}`;
+    
+    const savedMessages = localStorage.getItem(chatKey);
     if (savedMessages) {
-      // Parse saved messages và chuyển đổi chuỗi thời gian thành đối tượng Date
       const parsedMessages = JSON.parse(savedMessages);
       return parsedMessages.map(msg => ({
         ...msg,
@@ -19,7 +22,7 @@ const ChatWindow = ({ isOpen }) => {
       }));
     } else {
       return [
-        { id: 1, text: "Xin chào! Tôi là trợ lý AI hỗ trợ cửa hàng sách. Tôi có thể giúp gì cho bạn?", sender: 'bot', time: new Date() }
+        { id: 1, text: "Xin chào! Tôi là trợ lý AI hỗ trợ cửa hàng TROOC2HAND. Tôi có thể giúp gì cho bạn?", sender: 'bot', time: new Date() }
       ];
     }
   });
@@ -37,12 +40,16 @@ const ChatWindow = ({ isOpen }) => {
     "Thời gian giao hàng là bao lâu?",
     "Các phương thức thanh toán"
   ];
-  
+
   // Lưu tin nhắn vào localStorage khi có thay đổi
   useEffect(() => {
-    localStorage.setItem('chatMessages', JSON.stringify(messages));
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userId = user.id || 'guest';
+    const chatKey = `chatMessages_${userId}`;
+    
+    localStorage.setItem(chatKey, JSON.stringify(messages));
   }, [messages]);
-  
+
   // Cuộn xuống dưới cùng khi có tin nhắn mới
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -50,13 +57,37 @@ const ChatWindow = ({ isOpen }) => {
     }
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    // Hàm xử lý khi storage thay đổi
+    const handleStorageChange = () => {
+      const user = localStorage.getItem('user');
+      if (!user) {
+        // Nếu không có user (đã đăng xuất), reset tin nhắn về ban đầu
+        setMessages([
+          { id: 1, text: "Xin chào! Tôi là trợ lý AI hỗ trợ cửa hàng TROOC2HAND. Tôi có thể giúp gì cho bạn?", sender: 'bot', time: new Date() }
+        ]);
+      }
+    };
+
+    // Đăng ký lắng nghe sự kiện storage
+    window.addEventListener('storage', handleStorageChange);
+
+    // Kiểm tra ngay khi component mount
+    handleStorageChange();
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [setMessages]);
+
   // Xử lý khi người dùng gửi tin nhắn
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (inputValue.trim() === '') return;
-    
+
     console.log("Gửi tin nhắn:", inputValue);
-  
+
     // Thêm tin nhắn của người dùng vào danh sách
     const userMessage = {
       id: Date.now(),
@@ -64,22 +95,22 @@ const ChatWindow = ({ isOpen }) => {
       sender: 'user',
       time: new Date()
     };
-    
+
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInputValue(''); // Xóa input
-    
+
     // Hiển thị trạng thái "đang nhập"
     setIsTyping(true);
     setIsError(false);
-  
+
     try {
       // Gọi API Gemini thay vì OpenAI
       console.log("Gọi sendMessageToGemini với", updatedMessages.length, "tin nhắn");
       const botResponse = await sendMessageToGemini(updatedMessages);
-      
+
       console.log("Nhận phản hồi từ Gemini:", botResponse);
-      
+
       // Thêm phản hồi từ Gemini vào danh sách tin nhắn
       const botMessage = {
         id: Date.now(),
@@ -87,12 +118,12 @@ const ChatWindow = ({ isOpen }) => {
         sender: 'bot',
         time: new Date()
       };
-      
+
       setMessages(prevMessages => [...prevMessages, botMessage]);
     } catch (error) {
       console.error("Lỗi khi gửi tin nhắn:", error);
       setIsError(true);
-      
+
       // Thêm tin nhắn lỗi
       const errorMessage = {
         id: Date.now(),
@@ -100,7 +131,7 @@ const ChatWindow = ({ isOpen }) => {
         sender: 'bot',
         time: new Date()
       };
-      
+
       setMessages(prevMessages => [...prevMessages, errorMessage]);
     } finally {
       // Tắt trạng thái "đang nhập"
@@ -124,58 +155,60 @@ const ChatWindow = ({ isOpen }) => {
   };
 
   return (
-    <div 
-      className={`fixed bottom-24 right-6 w-80 md:w-96 h-[550px] bg-white rounded-lg shadow-xl flex flex-col z-40 transition-transform duration-300 ${
-        isOpen ? 'transform translate-y-0' : 'transform translate-y-full opacity-0 pointer-events-none'
-      }`}
+    <div
+      className={`fixed bottom-24 right-6 w-80 md:w-96 h-[550px] bg-white rounded-lg shadow-xl flex flex-col z-40 transition-transform duration-300 ${isOpen ? 'transform translate-y-0' : 'transform translate-y-full opacity-0 pointer-events-none'
+        }`}
     >
       {/* Header */}
       <div className="bg-purple-600 text-white p-4 rounded-t-lg">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-medium">Trợ lý AI TROOC2HAND</h3>
-            <p className="text-xs opacity-80">Hỏi đáp thông tin về sách, đặt hàng và hỗ trợ 24/7</p>
+            <h3 className="font-medium">TROOC2HAND Bot</h3>
+            <p className="text-xs opacity-80">Hỏi đáp thông tin về sản phẩm, đặt hàng và hỗ trợ 24/7</p>
           </div>
-          {/* <button 
-            onClick={toggleDebugTool}
+          <button
+            onClick={() => {
+              // Xóa tin nhắn và đặt lại tin nhắn chào mừng
+              setMessages([
+                { id: 1, text: "Xin chào! Tôi là trợ lý AI hỗ trợ cửa hàng TROOC2HAND. Tôi có thể giúp gì cho bạn?", sender: 'bot', time: new Date() }
+              ]);
+              localStorage.removeItem("chatMessages");
+            }}
             className="text-xs px-2 py-1 bg-purple-800 rounded hover:bg-purple-900"
           >
-            Debug
-          </button> */}
+            Xóa lịch sử
+          </button>
         </div>
       </div>
-      
+
       {/* Debug Tool - hidden by default */}
       {showDebugTool && <ApiDebugTool />}
-      
+
       {/* Message area */}
       <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
         {messages.map((message) => (
-          <div 
-            key={message.id} 
-            className={`mb-3 max-w-[80%] ${
-              message.sender === 'user' ? 'ml-auto' : 'mr-auto'
-            }`}
-          >
-            <div 
-              className={`p-3 rounded-lg ${
-                message.sender === 'user' 
-                  ? 'bg-purple-600 text-white rounded-br-none' 
-                  : 'bg-gray-200 text-gray-800 rounded-bl-none'
+          <div
+            key={message.id}
+            className={`mb-3 max-w-[80%] ${message.sender === 'user' ? 'ml-auto' : 'mr-auto'
               }`}
+          >
+            <div
+              className={`p-3 rounded-lg ${message.sender === 'user'
+                  ? 'bg-purple-600 text-white rounded-br-none'
+                  : 'bg-gray-200 text-gray-800 rounded-bl-none'
+                }`}
             >
               {message.text}
             </div>
-            <div 
-              className={`text-xs mt-1 text-gray-500 ${
-                message.sender === 'user' ? 'text-right' : 'text-left'
-              }`}
+            <div
+              className={`text-xs mt-1 text-gray-500 ${message.sender === 'user' ? 'text-right' : 'text-left'
+                }`}
             >
               {formatTime(message.time instanceof Date ? message.time : new Date(message.time))}
             </div>
           </div>
         ))}
-        
+
         {/* Hiệu ứng "đang nhập" cho bot */}
         {isTyping && (
           <div className="mb-3 max-w-[80%] mr-auto">
@@ -186,17 +219,17 @@ const ChatWindow = ({ isOpen }) => {
             </div>
           </div>
         )}
-        
+
         {/* Thông báo lỗi */}
         {isError && !isTyping && (
           <div className="text-center text-xs text-red-500 mt-2 mb-2">
             Đã xảy ra lỗi khi kết nối đến dịch vụ AI
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
-      
+
       {/* Input area */}
       <form onSubmit={handleSendMessage} className="p-3 border-t flex">
         <input
@@ -208,7 +241,7 @@ const ChatWindow = ({ isOpen }) => {
           className="flex-1 px-3 py-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-purple-500"
           disabled={isTyping}
         />
-        <button 
+        <button
           type="submit"
           className={`text-white px-3 py-2 rounded-r-md ${isTyping ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}
           disabled={isTyping}
@@ -216,9 +249,9 @@ const ChatWindow = ({ isOpen }) => {
           <Send size={18} />
         </button>
       </form>
-      
+
       {/* Câu hỏi thường gặp */}
-      <div className="p-2 border-t flex flex-wrap gap-2">
+      {/* <div className="p-2 border-t flex flex-wrap gap-2">
         <p className="w-full text-xs text-gray-500">Câu hỏi thường gặp:</p>
         {quickQuestions.map((question, index) => (
           <button
@@ -230,7 +263,7 @@ const ChatWindow = ({ isOpen }) => {
             {question}
           </button>
         ))}
-      </div>
+      </div> */}
     </div>
   );
 };

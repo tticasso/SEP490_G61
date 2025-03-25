@@ -57,9 +57,18 @@ class AuthService {
 
     // Đăng xuất
     logout() {
+        const user = this.getCurrentUser();
+        const userId = user ? (user.id || 'guest') : 'guest';
+        
         localStorage.removeItem("user");
-
-        // Dispatch a storage event to notify other components
+        
+        // Xóa tin nhắn của người dùng hiện tại
+        localStorage.removeItem(`chatMessages_${userId}`);
+        localStorage.removeItem("lastChatOpenTime");
+        
+        // Xóa cả tin nhắn mặc định nếu có
+        localStorage.removeItem("chatMessages");
+        
         window.dispatchEvent(new Event('storage'));
     }
 

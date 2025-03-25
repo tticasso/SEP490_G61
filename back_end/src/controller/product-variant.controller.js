@@ -596,7 +596,7 @@ const productVariantController = {
     deleteVariant,
     updateVariantStock,
     setDefaultVariant,
-    handleVariantImagesUpload // Export the middleware for routes,
+    handleVariantImagesUpload, // Export the middleware for routes,
     softDeleteVariant,
     restoreVariant,
     bulkSoftDeleteVariants,

@@ -11,27 +11,28 @@ require('dotenv').config();
 
 
 const { AuthRouter,
-    UserRouter,
-    RoleRouter,
-    CategoriesRouter,
-    BrandRouter,
-    ProductRouter,
-    ProductReviewRouter,
-    AddressRouter,
-    CartRouter,
-    DiscountRouter,
-    CouponRouter, // Add coupon router
-    OrderRouter,
-    ShippingRouter,
-    PaymentRouter,
-    ShopRouter,
-    DocumentRouter,
-    ShopFollowRouter,
-    ConversationRouter,
-    UserStatusRouter,
-    ProductVariantRouter,
-    ProductAttributeRouter,
-    GeminiRouter
+  UserRouter,
+  RoleRouter,
+  CategoriesRouter,
+  BrandRouter,
+  ProductRouter,
+  ProductReviewRouter,
+  AddressRouter,
+  CartRouter,
+  DiscountRouter,
+  CouponRouter, // Add coupon router
+  OrderRouter,
+  ShippingRouter,
+  PaymentRouter,
+  ShopRouter,
+  DocumentRouter,
+  ShopFollowRouter,
+  ConversationRouter,
+  UserStatusRouter,
+  ProductVariantRouter,
+  ProductAttributeRouter,
+  GeminiRouter,
+  ShopRevenueRouter
 } = require('./src/routes');
 
 const session = require('express-session');
@@ -45,9 +46,9 @@ const app = express();
 
 // Cấu hình session và passport
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'default_secret',
-    resave: false,
-    saveUninitialized: true
+  secret: process.env.SESSION_SECRET || 'default_secret',
+  resave: false,
+  saveUninitialized: true
 }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -70,23 +71,23 @@ app.use('/api/gemini', GeminiRouter);
 
 // Đảm bảo thư mục uploads tồn tại
 const uploadDirs = [
-    path.join(__dirname, 'uploads'),
-    path.join(__dirname, 'uploads/shops'),
-    path.join(__dirname, 'uploads/documents')
+  path.join(__dirname, 'uploads'),
+  path.join(__dirname, 'uploads/shops'),
+  path.join(__dirname, 'uploads/documents')
 ];
 
 uploadDirs.forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`Created directory: ${dir}`);
-    }
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`Created directory: ${dir}`);
+  }
 });
 
 // Định tuyến cho root router
 app.get("/", (req, res, next) => {
-    res.status(200).json({
-        message: "Welcome to RESTFul API - NodeJS"
-    });
+  res.status(200).json({
+    message: "Welcome to RESTFul API - NodeJS"
+  });
 });
 
 // Đăng ký tất cả các routes
@@ -110,27 +111,27 @@ app.use('/api/documents', DocumentRouter);
 app.use('/api/user-status', UserStatusRouter);
 app.use('/api/product-variant', ProductVariantRouter);
 app.use('/api/product-attribute', ProductAttributeRouter);
-// Thêm route mới
 app.use('/api/conversation', ConversationRouter);
+app.use('/api/revenue', ShopRevenueRouter);
 // Kiểm soát các lỗi trong Express web server
 app.use(async (req, res, next) => {
-    next(httpErrors.NotFound());
+  next(httpErrors.NotFound());
 });
 app.use((err, req, res, next) => {
-    res.status(err.status || 500);
-    res.send({
-        "error": {
-            "status": err.status || 500,
-            "message": err.message
-        }
-    });
+  res.status(err.status || 500);
+  res.send({
+    "error": {
+      "status": err.status || 500,
+      "message": err.message
+    }
+  });
 });
 
 // Tạo server HTTP từ ứng dụng Express
 const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
-    origin: 'http://localhost:3000', // Đảm bảo đây là domain của frontend
+    origin: ['http://localhost:3000', 'http://localhost:9999'],// Đảm bảo đây là domain của frontend
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token'],
     credentials: true
@@ -145,137 +146,137 @@ const UserStatus = require('./src/models/user-status.model');
 
 // Cập nhật phần Socket.IO trong server.js
 io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
-    
-    // Authenticate user using token from query params
-    const token = socket.handshake.auth.token;
-    if (!token) {
-      socket.disconnect();
-      return console.log('User not authenticated');
-    }
-    
-    try {
-      // Verify token
-      const decoded = jwt.verify(token, config.secret);
-      socket.userId = decoded.id;
-      console.log('Authenticated user:', socket.userId);
-      
-      // Join user to their room
-      socket.join(`user-${socket.userId}`);
-      
-      // Cập nhật trạng thái thành online
-      updateUserOnlineStatus(socket.userId, true);
-      
-      // Handle conversation joining
-      socket.on('join-conversation', (conversationId) => {
-        socket.join(`conversation-${conversationId}`);
-        console.log(`User ${socket.userId} joined conversation ${conversationId}`);
-      });
-      
-      // Handle new message
-      socket.on('send-message', async (data) => {
-        try {
-          const { conversationId, content } = data;
-          
-          // Save message to database
-          const newMessage = new db.message({
-            conversation_id: conversationId,
-            sender_id: socket.userId,
-            content: content,
-            created_at: new Date()
-          });
-          
-          await newMessage.save();
-          
-          // Update conversation last message
-          await db.conversation.findByIdAndUpdate(
-            conversationId,
-            { 
-              last_message: content,
-              last_message_time: new Date()
-            }
-          );
-          
-          // Broadcast message to all users in this conversation
-          io.to(`conversation-${conversationId}`).emit('new-message', {
-            _id: newMessage._id,
-            conversation_id: conversationId,
-            sender_id: socket.userId,
-            content: content,
-            created_at: newMessage.created_at,
-            is_read: false
-          });
-        } catch (error) {
-          console.error('Error sending message:', error);
-        }
-      });
-      
-      // Handle typing status
-      socket.on('typing', ({ conversationId, isTyping }) => {
-        socket.to(`conversation-${conversationId}`).emit('user-typing', {
-          userId: socket.userId,
-          conversationId,
-          isTyping
+  console.log('New client connected:', socket.id);
+
+  // Authenticate user using token from query params
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    socket.disconnect();
+    return console.log('User not authenticated');
+  }
+
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, config.secret);
+    socket.userId = decoded.id;
+    console.log('Authenticated user:', socket.userId);
+
+    // Join user to their room
+    socket.join(`user-${socket.userId}`);
+
+    // Cập nhật trạng thái thành online
+    updateUserOnlineStatus(socket.userId, true);
+
+    // Handle conversation joining
+    socket.on('join-conversation', (conversationId) => {
+      socket.join(`conversation-${conversationId}`);
+      console.log(`User ${socket.userId} joined conversation ${conversationId}`);
+    });
+
+    // Handle new message
+    socket.on('send-message', async (data) => {
+      try {
+        const { conversationId, content } = data;
+
+        // Save message to database
+        const newMessage = new db.message({
+          conversation_id: conversationId,
+          sender_id: socket.userId,
+          content: content,
+          created_at: new Date()
         });
+
+        await newMessage.save();
+
+        // Update conversation last message
+        await db.conversation.findByIdAndUpdate(
+          conversationId,
+          {
+            last_message: content,
+            last_message_time: new Date()
+          }
+        );
+
+        // Broadcast message to all users in this conversation
+        io.to(`conversation-${conversationId}`).emit('new-message', {
+          _id: newMessage._id,
+          conversation_id: conversationId,
+          sender_id: socket.userId,
+          content: content,
+          created_at: newMessage.created_at,
+          is_read: false
+        });
+      } catch (error) {
+        console.error('Error sending message:', error);
+      }
+    });
+
+    // Handle typing status
+    socket.on('typing', ({ conversationId, isTyping }) => {
+      socket.to(`conversation-${conversationId}`).emit('user-typing', {
+        userId: socket.userId,
+        conversationId,
+        isTyping
       });
-      
-      // Handle disconnect
-      socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
-        // Cập nhật trạng thái thành offline
-        updateUserOnlineStatus(socket.userId, false);
-      });
-      
-    } catch (error) {
-      console.error('Token verification failed:', error);
-      socket.disconnect();
-    }
+    });
+
+    // Handle disconnect
+    socket.on('disconnect', () => {
+      console.log('Client disconnected:', socket.id);
+      // Cập nhật trạng thái thành offline
+      updateUserOnlineStatus(socket.userId, false);
+    });
+
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    socket.disconnect();
+  }
 });
 
 // Hàm cập nhật trạng thái người dùng
 async function updateUserOnlineStatus(userId, isOnline) {
   try {
-      let userStatus = await UserStatus.findOne({ user_id: userId });
-      
-      if (!userStatus) {
-          userStatus = new UserStatus({
-              user_id: userId,
-              is_online: isOnline,
-              last_active: new Date()
-          });
-      } else {
-          userStatus.is_online = isOnline;
-          userStatus.last_active = new Date();
-      }
-      
-      await userStatus.save();
-      
-      // Calculate status including "recently" logic
-      const now = new Date();
-      const diffMinutes = Math.floor((now - userStatus.last_active) / (1000 * 60));
-      
-      let status;
-      if (isOnline) {
-          status = 'online';
-      } else if (diffMinutes < 5) {
-          status = 'recently'; // Recently active (less than 5 minutes)
-      } else {
-          status = 'offline';
-      }
-      
-      // Broadcast status with proper value
-      io.emit('user-status-changed', {
-          userId: userId,
-          status: status
+    let userStatus = await UserStatus.findOne({ user_id: userId });
+
+    if (!userStatus) {
+      userStatus = new UserStatus({
+        user_id: userId,
+        is_online: isOnline,
+        last_active: new Date()
       });
-      
+    } else {
+      userStatus.is_online = isOnline;
+      userStatus.last_active = new Date();
+    }
+
+    await userStatus.save();
+
+    // Calculate status including "recently" logic
+    const now = new Date();
+    const diffMinutes = Math.floor((now - userStatus.last_active) / (1000 * 60));
+
+    let status;
+    if (isOnline) {
+      status = 'online';
+    } else if (diffMinutes < 5) {
+      status = 'recently'; // Recently active (less than 5 minutes)
+    } else {
+      status = 'offline';
+    }
+
+    // Broadcast status with proper value
+    io.emit('user-status-changed', {
+      userId: userId,
+      status: status
+    });
+
   } catch (error) {
-      console.error('Error updating user status:', error);
+    console.error('Error updating user status:', error);
   }
 }
-  
-  // Thay đổi app.listen thành server.listen
-  server.listen(process.env.PORT || 9999, process.env.HOST_NAME || 'localhost', () => {
-    console.log(`Server is running at: http://${process.env.HOST_NAME || 'localhost'}:${process.env.PORT || 9999}`);
-    db.connectDB();
-  });
+
+// Thay đổi app.listen thành server.listen
+server.listen(process.env.PORT || 9999, process.env.HOST_NAME || 'localhost', () => {
+  console.log(`Server is running at: http://${process.env.HOST_NAME || 'localhost'}:${process.env.PORT || 9999}`);
+  db.connectDB();
+});

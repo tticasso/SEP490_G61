@@ -1,3 +1,4 @@
+// src/models/index.js
 const mongoose = require('mongoose')
 const User = require('./user.model')
 const Role = require('./role.model')
@@ -9,7 +10,7 @@ const Address = require('./user-address.model')
 const Cart = require('./cart.model')
 const CartItem = require('./cart-items.model')
 const Discount = require('./discount.model')
-const Coupon = require('./coupon.model') // Add coupon model
+const Coupon = require('./coupon.model')
 const Order = require('./order.model')
 const OrderDetail = require('./order-detail.model')
 const Shipping = require('./shipping.model')
@@ -21,6 +22,9 @@ const Message = require('./message.model')
 const UserStatus = require('./user-status.model')
 const ProductVariant = require('./product-variant.model');
 const ProductAttribute = require('./product-attribute.model');
+const ShopRevenue = require('./shop-revenue.model');
+const PaymentBatch = require('./payment-batch.model');
+
 // Cau hinh mongoose dang global
 mongoose.Promise = global.Promise
 // Dinh nghia doi tuong DB
@@ -40,7 +44,7 @@ db.address = Address
 db.cart = Cart
 db.cartItem = CartItem
 db.discount = Discount
-db.coupon = Coupon // Add coupon to db object
+db.coupon = Coupon
 db.order = Order
 db.orderDetail = OrderDetail
 db.shipping = Shipping
@@ -50,8 +54,10 @@ db.shopFollow = ShopFollow
 db.conversation = Conversation
 db.message = Message
 db.userStatus = UserStatus
-db.productVariant = ProductVariant;
-db.productAttribute = ProductAttribute;
+db.productVariant = ProductVariant
+db.productAttribute = ProductAttribute
+db.shopRevenue = ShopRevenue
+db.paymentBatch = PaymentBatch
 
 // Thuoc tinh tham chieu toi action ket noi CSDL
 db.connectDB = async () => {

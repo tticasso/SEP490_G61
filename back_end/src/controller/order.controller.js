@@ -112,12 +112,12 @@ const createOrder = async (req, res) => {
             if (!product) {
                 return res.status(404).json({ message: `Product with ID ${item.product_id} not found` });
             }
-            
+
             productIds.push(product._id.toString());
 
             // Đặt giá mặc định ban đầu là giá của sản phẩm
             let itemPrice = product.price;
-            
+
             // Kiểm tra nếu có variant_id, ưu tiên sử dụng giá của biến thể
             if (item.variant_id) {
                 try {
@@ -129,7 +129,7 @@ const createOrder = async (req, res) => {
                                 message: `Not enough stock for variant ${variant.name || 'unnamed'} of product ${product.name}. Available: ${variant.stock}`
                             });
                         }
-                        
+
                         // Sử dụng giá của biến thể
                         if (variant.price) {
                             itemPrice = variant.price;
@@ -156,7 +156,7 @@ const createOrder = async (req, res) => {
 
             // Tính toán giá của mục
             const itemTotal = itemPrice * item.quantity;
-            
+
             // Chỉ cộng giá một lần vào tổng
             totalPrice += itemTotal;
             originalPrice += itemTotal; // Lưu giá gốc
@@ -263,18 +263,18 @@ const createOrder = async (req, res) => {
                                 // Recalculate with the same logic as above to ensure consistent pricing
                                 const product = await Product.findById(item.product_id);
                                 let itemPrice = product.price;
-                                
+
                                 if (item.variant_id) {
                                     const variant = await db.productVariant.findById(item.variant_id);
                                     if (variant && variant.price) {
                                         itemPrice = variant.price;
                                     }
                                 }
-                                
+
                                 if (item.price) {
                                     itemPrice = item.price;
                                 }
-                                
+
                                 eligibleAmount += itemPrice * item.quantity;
                             }
                         }
@@ -342,38 +342,38 @@ const createOrder = async (req, res) => {
         finalTotalPrice = totalPrice - discountAmount - couponAmount;
 
         let shippingCost = 0;
-if (shipping_id) {
-    try {
-        const shippingMethod = await db.shipping.findById(shipping_id);
-        if (shippingMethod && shippingMethod.price) {
-            shippingCost = shippingMethod.price;
-            console.log(`Adding shipping cost: ${shippingCost} to order total`);
-            
-            // Add shipping cost to the final total
-            finalTotalPrice += shippingCost;
-        } else {
-            console.log(`Shipping method not found or has no price: ${shipping_id}`);
-        }
-    } catch (error) {
-        console.error(`Error fetching shipping cost: ${error.message}`);
-    }
-}
+        if (shipping_id) {
+            try {
+                const shippingMethod = await db.shipping.findById(shipping_id);
+                if (shippingMethod && shippingMethod.price) {
+                    shippingCost = shippingMethod.price;
+                    console.log(`Adding shipping cost: ${shippingCost} to order total`);
 
-// Update the Order creation with the shipping_cost field
-const newOrder = new Order({
-    customer_id,
-    shipping_id,
-    payment_id,
-    order_payment_id,
-    total_price: finalTotalPrice,
-    discount_id,
-    coupon_id,
-    coupon_amount: couponAmount,
-    discount_amount: discountAmount,
-    shipping_cost: shippingCost, // Add this field to store shipping cost
-    user_address_id,
-    original_price: originalPrice
-});
+                    // Add shipping cost to the final total
+                    finalTotalPrice += shippingCost;
+                } else {
+                    console.log(`Shipping method not found or has no price: ${shipping_id}`);
+                }
+            } catch (error) {
+                console.error(`Error fetching shipping cost: ${error.message}`);
+            }
+        }
+
+        // Update the Order creation with the shipping_cost field
+        const newOrder = new Order({
+            customer_id,
+            shipping_id,
+            payment_id,
+            order_payment_id,
+            total_price: finalTotalPrice,
+            discount_id,
+            coupon_id,
+            coupon_amount: couponAmount,
+            discount_amount: discountAmount,
+            shipping_cost: shippingCost, // Add this field to store shipping cost
+            user_address_id,
+            original_price: originalPrice
+        });
 
         // Đảm bảo giá không âm
         if (finalTotalPrice < 0) finalTotalPrice = 0;
@@ -397,7 +397,7 @@ const newOrder = new Order({
                         if (variant.price) {
                             itemPrice = variant.price; // Sử dụng giá của biến thể
                         }
-                        
+
                         // Cập nhật tồn kho của biến thể
                         variant.stock -= item.quantity;
                         await variant.save();
@@ -459,12 +459,48 @@ const updateOrderStatus = async (req, res) => {
 
         order.status_id = status_id;
 
-        // Nếu đơn hàng đã giao, cập nhật thời gian giao hàng
+        // If order is delivered, update the delivery timestamp
         if (status_id === 'delivered') {
             order.order_delivered_at = new Date();
         }
 
         await order.save();
+
+        // If order has been delivered, create a revenue record
+        if (status_id === 'delivered') {
+            try {
+                // Create revenue record internally
+                const axios = require('axios');
+                const BASE_URL = process.env.API_BASE_URL || `http://${process.env.HOST_NAME || 'localhost'}:${process.env.PORT || 9999}`;
+
+                // Get admin token for internal API call
+                const jwt = require('jsonwebtoken');
+                const config = require("../config/auth.config");
+
+                // Create an admin token for internal use
+                const adminToken = jwt.sign({ id: req.userId, isAdmin: true }, config.secret, {
+                    algorithm: "HS256",
+                    expiresIn: 60 // Short-lived token for this operation
+                });
+
+                // Make internal API call to create revenue record
+                await axios.post(
+                    `${BASE_URL}/api/revenue/create`,
+                    { order_id: id },
+                    {
+                        headers: {
+                            'x-access-token': adminToken
+                        }
+                    }
+                );
+
+                console.log(`Revenue record created for order ${id}`);
+            } catch (revenueError) {
+                console.error('Error creating revenue record:', revenueError.response?.data || revenueError.message);
+                // We don't want to fail the order status update if revenue creation fails
+                // Just log the error and continue
+            }
+        }
 
         res.status(200).json({
             message: "Order status updated successfully",

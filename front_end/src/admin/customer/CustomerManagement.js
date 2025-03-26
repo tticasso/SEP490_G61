@@ -21,6 +21,9 @@ const CustomerManagement = () => {
     inactive: false
   });
 
+  // New state for role filter
+  const [roleFilter, setRoleFilter] = useState('all');
+
   // Sort state
   const [sortOption, setSortOption] = useState('');
 
@@ -68,15 +71,120 @@ const CustomerManagement = () => {
     setSortOption(e.target.value);
   };
 
+  // Handle role filter change
+  const handleRoleFilterChange = (e) => {
+    setRoleFilter(e.target.value);
+    setCurrentPage(1); // Reset to first page when filtering
+  };
+
+  // Format roles correctly
+  const formatRoles = (roles) => {
+    if (!roles || !Array.isArray(roles)) return 'Thành viên';
+    
+    // Known role ID mapping (from the screenshot)
+    // These will need to be updated with the actual role IDs from your database
+    const roleIdMap = {
+      // Admin role IDs
+      "67c9c76c03bef5536ed80246": "Quản trị viên",
+      // Seller role IDs
+      "67c9eae4bd4e8f0bd03344b6": "Người bán",
+      // Member role IDs
+      "67c74b6d60a991d7575a0b34": "Thành viên"
+    };
+    
+    // Format and normalize each role
+    const formattedRoles = roles.map(role => {
+      // Handle ObjectID string references
+      if (typeof role === 'string' && role.length === 24) {
+        // Check if we have this ID in our mapping
+        if (roleIdMap[role]) {
+          return roleIdMap[role];
+        }
+      }
+      
+      // Handle object format (with name property)
+      if (typeof role === 'object' && role !== null) {
+        // Handle when role is directly populated with the actual role object
+        if (role.name) {
+          if (role.name === 'ADMIN') return 'Quản trị viên';
+          if (role.name === 'SELLER') return 'Người bán';
+          if (role.name === 'MEMBER') return 'Thành viên';
+        }
+        
+        // Handle when role is populated but has an _id instead of a name
+        if (role._id && typeof role._id === 'string' && roleIdMap[role._id]) {
+          return roleIdMap[role._id];
+        }
+      }
+      
+      // Handle string format with role name (not ID)
+      if (typeof role === 'string') {
+        if (role.includes('ADMIN')) return 'Quản trị viên';
+        if (role.includes('SELLER')) return 'Người bán';
+        if (role.includes('MEMBER')) return 'Thành viên';
+      }
+      
+      return 'Thành viên'; // Default to Member for unknown roles
+    });
+    
+    // Filter out null values and remove duplicates
+    const uniqueRoles = [...new Set(formattedRoles.filter(role => role !== null))];
+    
+    return uniqueRoles.join(', ');
+  };
+
+  // Check if a user has a specific role
+  const userHasRole = (user, roleToCheck) => {
+    if (!user.roles || !Array.isArray(user.roles)) return false;
+    
+    // Known role ID mapping
+    const roleIdMap = {
+      "admin": ["67c9c76c03bef5536ed80246"], // Admin role IDs
+      "seller": ["67c9eae4bd4e8f0bd03344b6"], // Seller role IDs
+      "member": ["67c74b6d60a991d7575a0b34"] // Member role IDs
+    };
+    
+    // Get the role IDs to check against
+    const roleIdsToCheck = roleIdMap[roleToCheck] || [];
+    
+    // Check if any of the user's roles match our criteria
+    return user.roles.some(role => {
+      // Check for string ID
+      if (typeof role === 'string' && roleIdsToCheck.includes(role)) {
+        return true;
+      }
+      
+      // Check for object with name
+      if (typeof role === 'object' && role !== null) {
+        if (role.name && role.name.includes(roleToCheck.toUpperCase())) {
+          return true;
+        }
+        
+        // Check for object with _id
+        if (role._id && typeof role._id === 'string' && roleIdsToCheck.includes(role._id)) {
+          return true;
+        }
+      }
+      
+      return false;
+    });
+  };
+
   // Apply filters and sort to users
   const getFilteredAndSortedUsers = () => {
     // Apply filters first
     let result = [...users];
     
+    // Status filter
     if (filter.active) {
       result = result.filter(user => user.status === true);
     } else if (filter.inactive) {
       result = result.filter(user => user.status === false);
+    }
+    
+    // Role filter
+    if (roleFilter !== 'all') {
+      result = result.filter(user => userHasRole(user, roleFilter));
     }
     
     // Apply search
@@ -125,23 +233,6 @@ const CustomerManagement = () => {
   // Handle pagination
   const goToPage = (page) => {
     setCurrentPage(page);
-  };
-
-  // Format roles
-  const formatRoles = (roles) => {
-    if (!roles || !Array.isArray(roles)) return 'Thành viên';
-    return roles.map(role => {
-      if (typeof role === 'object' && role.name) {
-        if (role.name === 'ADMIN') return 'Quản trị viên';
-        if (role.name === 'SELLER') return 'Người bán';
-        return 'Thành viên';
-      }
-      
-      const roleName = typeof role === 'string' ? role : '';
-      if (roleName.includes('ADMIN')) return 'Quản trị viên';
-      if (roleName.includes('SELLER')) return 'Người bán';
-      return 'Thành viên';
-    }).join(', ');
   };
 
   // Format date
@@ -351,6 +442,21 @@ const CustomerManagement = () => {
             <Plus size={18} className="mr-1" />
             Thêm người dùng mới
           </button>
+          
+          {/* Role filter - New addition */}
+          <div className="mr-4">
+            <select 
+              className="border border-gray-300 rounded-md px-3 py-2 bg-white"
+              value={roleFilter}
+              onChange={handleRoleFilterChange}
+            >
+              <option value="all">Tất cả vai trò</option>
+              <option value="admin">Quản trị viên</option>
+              <option value="seller">Người bán</option>
+              <option value="member">Thành viên</option>
+            </select>
+          </div>
+          
           <div className="mr-4">
             <select 
               className="border border-gray-300 rounded-md px-3 py-2 bg-white"

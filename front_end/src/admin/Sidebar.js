@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart2, Package, Grid, ShoppingBag, Users, Truck, HelpCircle, Settings, ChevronDown, ArrowRight, Tag, LogOut } from 'lucide-react';
+import { BarChart2, Package, Grid, ShoppingBag, Users, Truck, HelpCircle, Settings, ChevronDown, ArrowRight, Tag, LogOut, DollarSign } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthService from '../services/AuthService';
 
@@ -52,6 +52,17 @@ const Sidebar = () => {
       { id: 'shippingManagement', label: 'Phương thức vận chuyển', path: '/admin/shippings' },
       { id: 'addShipping', label: 'Thêm phương thức vận chuyển', path: '/admin/add-shipping' }
     ]},
+    { 
+      id: 'revenue', 
+      icon: <DollarSign size={20} />, 
+      label: 'Quản lý doanh thu', 
+      hasSubmenu: true, 
+      submenus: [
+        { id: 'revenueDashboard', label: 'Bảng điều khiển doanh thu', path: '/admin/revenue/dashboard' },
+        { id: 'shopPayments', label: 'Thanh toán cửa hàng', path: '/admin/revenue/shop-payments' },
+        { id: 'paymentBatches', label: 'Đợt thanh toán', path: '/admin/revenue/payment-batches' }
+      ]
+    },
     { id: 'support', icon: <HelpCircle size={20} />, label: 'Hỗ trợ', hasSubmenu: false, path: '/admin/support' },
     { id: 'settings', icon: <Settings size={20} />, label: 'Cài đặt', hasSubmenu: false, path: '/admin/settings' },
   ];

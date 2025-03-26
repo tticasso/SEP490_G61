@@ -8,6 +8,178 @@ const mongoose = require('mongoose');
 const moment = require('moment');
 const createHttpError = require('http-errors');
 
+
+
+// Get system revenue overview statistics
+const getSystemRevenueOverview = async (req, res) => {
+    try {
+        const { period = 'all' } = req.query;
+        
+        // Build date filter
+        let dateFilter = {};
+        
+        if (period !== 'all') {
+            const now = new Date();
+            let startOfPeriod;
+            
+            switch (period) {
+                case 'today':
+                    startOfPeriod = new Date(now.setHours(0, 0, 0, 0));
+                    break;
+                case 'week':
+                    const day = now.getDay();
+                    startOfPeriod = new Date(now.setDate(now.getDate() - day));
+                    startOfPeriod.setHours(0, 0, 0, 0);
+                    break;
+                case 'month':
+                    startOfPeriod = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                case 'year':
+                    startOfPeriod = new Date(now.getFullYear(), 0, 1);
+                    break;
+                case 'last30':
+                    startOfPeriod = new Date(now.setDate(now.getDate() - 30));
+                    break;
+                default:
+                    startOfPeriod = new Date(now.setDate(now.getDate() - 30));
+            }
+            
+            dateFilter.transaction_date = { $gte: startOfPeriod };
+        }
+        
+        // Get overall statistics
+        const overallStats = await ShopRevenue.aggregate([
+            { $match: dateFilter },
+            {
+                $group: {
+                    _id: null,
+                    total_revenue: { $sum: "$total_amount" },
+                    total_commission: { $sum: "$commission_amount" },
+                    total_shop_earnings: { $sum: "$shop_earning" },
+                    paid_to_shops: { 
+                        $sum: { $cond: [{ $eq: ["$is_paid", true] }, "$shop_earning", 0] } 
+                    },
+                    unpaid_to_shops: { 
+                        $sum: { $cond: [{ $eq: ["$is_paid", false] }, "$shop_earning", 0] } 
+                    },
+                    orders_count: { $sum: 1 }
+                }
+            }
+        ]);
+        
+        // Get revenue by shop category
+        const shopCategoryRevenue = await ShopRevenue.aggregate([
+            { $match: dateFilter },
+            { 
+                $lookup: {
+                    from: 'shops',
+                    localField: 'shop_id',
+                    foreignField: '_id',
+                    as: 'shop_info'
+                }
+            },
+            { $unwind: "$shop_info" },
+            {
+                $group: {
+                    _id: "$shop_info.category",
+                    total_revenue: { $sum: "$total_amount" },
+                    total_commission: { $sum: "$commission_amount" },
+                    shops_count: { $addToSet: "$shop_id" },
+                    orders_count: { $sum: 1 }
+                }
+            },
+            { 
+                $project: {
+                    category: "$_id",
+                    total_revenue: 1,
+                    total_commission: 1,
+                    shops_count: { $size: "$shops_count" },
+                    orders_count: 1,
+                    avg_order_value: { $divide: ["$total_revenue", "$orders_count"] }
+                }
+            },
+            { $sort: { total_revenue: -1 } }
+        ]);
+        
+        // Get revenue trend (last 6 months)
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        
+        const revenueTrend = await ShopRevenue.aggregate([
+            { 
+                $match: { 
+                    transaction_date: { $gte: sixMonthsAgo } 
+                } 
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: "$transaction_date" },
+                        month: { $month: "$transaction_date" }
+                    },
+                    total_revenue: { $sum: "$total_amount" },
+                    total_commission: { $sum: "$commission_amount" },
+                    orders_count: { $sum: 1 }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    year_month: { 
+                        $concat: [
+                            { $toString: "$_id.year" }, 
+                            "-", 
+                            { $toString: { $cond: [{ $lt: ["$_id.month", 10] }, { $concat: ["0", { $toString: "$_id.month" }] }, { $toString: "$_id.month" }] } }
+                        ]
+                    },
+                    total_revenue: 1,
+                    total_commission: 1,
+                    commission_percentage: { 
+                        $multiply: [
+                            { $divide: ["$total_commission", "$total_revenue"] }, 
+                            100
+                        ] 
+                    },
+                    orders_count: 1
+                }
+            },
+            { $sort: { year_month: 1 } }
+        ]);
+        
+        // Format the response
+        const response = {
+            period,
+            summary: overallStats.length > 0 ? {
+                total_revenue: overallStats[0].total_revenue,
+                total_commission: overallStats[0].total_commission,
+                total_shop_earnings: overallStats[0].total_shop_earnings,
+                paid_to_shops: overallStats[0].paid_to_shops,
+                unpaid_to_shops: overallStats[0].unpaid_to_shops,
+                orders_count: overallStats[0].orders_count,
+                platform_revenue_percentage: (overallStats[0].total_commission / overallStats[0].total_revenue * 100).toFixed(2) + '%',
+                avg_order_value: (overallStats[0].total_revenue / overallStats[0].orders_count).toFixed(2)
+            } : {
+                total_revenue: 0,
+                total_commission: 0,
+                total_shop_earnings: 0,
+                paid_to_shops: 0,
+                unpaid_to_shops: 0,
+                orders_count: 0,
+                platform_revenue_percentage: '0%',
+                avg_order_value: '0'
+            },
+            revenue_by_shop_category: shopCategoryRevenue,
+            revenue_trend: revenueTrend
+        };
+        
+        res.status(200).json(response);
+        
+    } catch (error) {
+        console.error("Error getting system revenue overview:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // Create revenue record when an order is delivered
 const createRevenueRecord = async (req, res) => {
     try {
@@ -727,7 +899,8 @@ const shopRevenueController = {
     getPaymentBatchDetails,
     getAllPaymentBatches,
     getPlatformRevenue,
-    getShopsPaymentSummary
+    getShopsPaymentSummary,
+    getSystemRevenueOverview  
 };
 
 module.exports = shopRevenueController;

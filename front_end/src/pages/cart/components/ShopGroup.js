@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import CartItem from './CartItem';
 import dongho from '../../../assets/dongho.png';
+import ApiService from '../../../services/ApiService';
 
 const ShopGroup = ({
     shop,
@@ -14,6 +15,40 @@ const ShopGroup = ({
     removeItem,
     getItemPrice
 }) => {
+    // Thêm state để lưu trữ thông tin shop sau khi fetch
+    const [shopInfo, setShopInfo] = useState({
+        shop_id: shop.shop_id,
+        shop_name: shop.shop_name,
+        shop_image: shop.shop_image
+    });
+    const [loading, setLoading] = useState(false);
+
+    // Fetch thông tin shop nếu cần
+    useEffect(() => {
+        const fetchShopDetails = async () => {
+            // Chỉ fetch khi cần thiết (needFetch = true và shop_id không phải 'unknown')
+            if (shop.needFetch && shop.shop_id !== 'unknown') {
+                setLoading(true);
+                try {
+                    const response = await ApiService.get(`/shops/public/${shop.shop_id}`);
+                    if (response) {
+                        setShopInfo({
+                            shop_id: shop.shop_id,
+                            shop_name: response.name || shop.shop_name,
+                            shop_image: response.logo || shop.shop_image
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error fetching shop details for ${shop.shop_id}:`, error);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        };
+
+        fetchShopDetails();
+    }, [shop.shop_id, shop.needFetch]);
+
     const isAllSelected = areAllShopItemsSelected();
     
     return (
@@ -27,22 +62,28 @@ const ShopGroup = ({
                         onChange={() => handleSelectAllShopItems(isAllSelected)}
                     />
                     <div 
-                        onClick={() => window.location.href = `/shop-detail/${shop.shop_id}`} 
+                        onClick={() => window.location.href = `/shop-detail/${shopInfo.shop_id}`} 
                         className="h-14 w-14 rounded-full overflow-hidden cursor-pointer ml-2"
                     >
-                        <img
-                            src={shop.shop_image || dongho}
-                            alt={shop.shop_name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => { e.target.src = dongho }}
-                        />
+                        {loading ? (
+                            <div className="h-full w-full flex items-center justify-center bg-gray-200">
+                                <span className="animate-pulse">...</span>
+                            </div>
+                        ) : (
+                            <img
+                                src={shopInfo.shop_image || dongho}
+                                alt={shopInfo.shop_name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.target.src = dongho }}
+                            />
+                        )}
                     </div>
                 </div>
                 <p 
-                    onClick={() => window.location.href = `/shop-detail/${shop.shop_id}`} 
+                    onClick={() => window.location.href = `/shop-detail/${shopInfo.shop_id}`} 
                     className='cursor-pointer font-medium'
                 >
-                    {shop.shop_name}
+                    {loading ? 'Đang tải...' : shopInfo.shop_name}
                 </p>
             </div>
 

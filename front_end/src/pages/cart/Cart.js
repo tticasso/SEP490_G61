@@ -296,6 +296,7 @@ const Cart = () => {
                         shopName = item.product_id.shop_id.name || 'Cửa hàng';
                         shopImage = item.product_id.shop_id.logo || '';
                     } else {
+                        // Khi shop_id chỉ là ID, gán ID và đánh dấu cần fetch thêm thông tin
                         shopId = item.product_id.shop_id;
                     }
                 }
@@ -305,7 +306,9 @@ const Cart = () => {
                         shop_id: shopId,
                         shop_name: shopName,
                         shop_image: shopImage,
-                        items: []
+                        items: [],
+                        // Flag để ShopGroup component biết cần fetch thông tin shop hay không
+                        needFetch: typeof item.product_id.shop_id !== 'object'
                     };
                 }
 
@@ -313,13 +316,15 @@ const Cart = () => {
             } else if (item.shop_id) {
                 // Trường hợp item trực tiếp có shop_id
                 const shopId = typeof item.shop_id === 'object' ? (item.shop_id._id || item.shop_id.id) : item.shop_id;
+                const needFetch = typeof item.shop_id !== 'object';
 
                 if (!groups[shopId]) {
                     groups[shopId] = {
                         shop_id: shopId,
                         shop_name: item.shop_name || 'Cửa hàng',
                         shop_image: item.shop_image || '',
-                        items: []
+                        items: [],
+                        needFetch: needFetch
                     };
                 }
 
@@ -331,7 +336,8 @@ const Cart = () => {
                         shop_id: 'unknown',
                         shop_name: 'Cửa hàng không xác định',
                         shop_image: '',
-                        items: []
+                        items: [],
+                        needFetch: false
                     };
                 }
 

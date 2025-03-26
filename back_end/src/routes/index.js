@@ -20,6 +20,7 @@ const UserStatusRouter = require('./user-status.routes')
 const ProductVariantRouter = require('./product-variant.routes');
 const ProductAttributeRouter = require('./product-attribute.routes');
 const GeminiRouter = require('./gemini.routes');
+const PayOsRouter = require('./payos.routes')
 const ShopRevenueRouter = require('./shop-revenue.routes');
 module.exports = {
     AuthRouter,
@@ -44,5 +45,6 @@ module.exports = {
     ProductVariantRouter,
     ProductAttributeRouter,
     GeminiRouter,
+    PayOsRouter ,
     ShopRevenueRouter
 }

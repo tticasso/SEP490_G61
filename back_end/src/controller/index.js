@@ -19,6 +19,7 @@ const userStatusController = require('./user-status.controller')
 const productVariantController = require('./product-variant.controller')
 const productAttributeController = require('./product-attribute.controller');
 const geminiController = require('./gemini.controller')
+const payosController = require('./payOs.controller')
 const shopRevenueController = require('./shop-revenue.controller')
 module.exports = {
     authController,
@@ -42,5 +43,6 @@ module.exports = {
     productVariantController,
     productAttributeController,
     geminiController,
+    payosController,
     shopRevenueController
 }

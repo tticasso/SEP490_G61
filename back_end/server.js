@@ -32,6 +32,7 @@ const { AuthRouter,
   ProductVariantRouter,
   ProductAttributeRouter,
   GeminiRouter,
+    PayOsRouter ,
   ShopRevenueRouter
 } = require('./src/routes');
 
@@ -68,7 +69,8 @@ app.use(morgan("dev"));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/gemini', GeminiRouter);
-
+app.use('/api/payment', PaymentRouter);
+app.use('/api/payos', PayOsRouter);
 // Đảm bảo thư mục uploads tồn tại
 const uploadDirs = [
   path.join(__dirname, 'uploads'),
@@ -131,7 +133,7 @@ app.use((err, req, res, next) => {
 const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
-    origin: ['http://localhost:3000', 'http://localhost:9999'],// Đảm bảo đây là domain của frontend
+    origin: '*', // Đảm bảo đây là domain của frontend
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token'],
     credentials: true

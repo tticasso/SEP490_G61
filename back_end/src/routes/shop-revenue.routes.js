@@ -68,4 +68,10 @@ ShopRevenueRouter.get(
     shopRevenueController.getShopsPaymentSummary
 );
 
+ShopRevenueRouter.get(
+    "/system/overview",
+    [VerifyJwt.verifyToken, VerifyJwt.isAdmin],
+    shopRevenueController.getSystemRevenueOverview
+);
+
 module.exports = ShopRevenueRouter;

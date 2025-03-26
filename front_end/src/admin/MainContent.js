@@ -20,6 +20,11 @@ import AddCouponForm from './coupon/AddCoupon';
 import EditCouponForm from './coupon/EditCoupon';
 import logo from '../assets/logo.png'
 import StoreRequestsPage from './store/StoreRequestsPage';
+import RevenueDashboard from './revenue/RevenueDashboard';
+import ShopPaymentList from './revenue/ShopPaymentList';
+import PaymentBatchList from './revenue/PaymentBatchList';
+import ShopPaymentDetail from './revenue/ShopPaymentDetail';
+import PaymentBatchDetail from './revenue/PaymentBatchDetail';
 
 // Main Content Component
 const MainContent = () => {
@@ -83,6 +88,12 @@ const MainContent = () => {
 
           <Route path="/payments" element={<PaymentManagement />} />
           <Route path="/add-payment" element={<AddPayment />} />
+
+          <Route path="/revenue/dashboard" element={<RevenueDashboard />} />
+          <Route path="/revenue/shop-payments" element={<ShopPaymentList />} />
+          <Route path="/revenue/shop-payment/:id" element={<ShopPaymentDetail />} />
+          <Route path="/revenue/payment-batches" element={<PaymentBatchList />} />
+          <Route path="/revenue/payment-batch/:id" element={<PaymentBatchDetail />} />
 
           <Route path="/support" element={<div className="p-6">Nội dung Hỗ trợ</div>} />
           <Route path="/settings" element={<div className="p-6">Nội dung Cài đặt</div>} />

@@ -228,10 +228,20 @@ const AddProduct = () => {
       const formData = new FormData();
       formData.append('image', imageFile);
       
+      console.log('Uploading image file:', imageFile.name, imageFile.size, imageFile.type);
+      
       const uploadedImage = await ApiService.uploadFile('/upload/product-image', formData);
-      return uploadedImage.url; // Assuming API returns the URL to the uploaded image
+      
+      console.log('Upload response:', uploadedImage);
+      
+      if (uploadedImage && uploadedImage.url) {
+        return uploadedImage.url;
+      } else {
+        console.error('Invalid response:', uploadedImage);
+        throw new Error('URL hình ảnh không hợp lệ');
+      }
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error('Error in uploadImage function:', error);
       throw new Error('Không thể tải lên hình ảnh sản phẩm');
     }
   };
@@ -295,6 +305,7 @@ const AddProduct = () => {
         created_by: currentUser?.id || 'sample-user',
         updated_by: currentUser?.id || 'sample-user',
       };
+      console.log("dữ liệu trước khi gửi", productData);
       
       let response;
       try {

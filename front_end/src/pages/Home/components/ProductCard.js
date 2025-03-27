@@ -51,7 +51,7 @@ const ProductCard = ({
                     }}
                 >
                     <button className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-4 rounded-md font-medium text-sm">
-                        Chọn Biến Thể
+                        Mua sản phẩm
                     </button>
                 </div>
             )}

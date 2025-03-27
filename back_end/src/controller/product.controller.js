@@ -4,18 +4,18 @@ const Product = db.product;
 const Category = db.categories;
 const Brand = db.brand;
 const Shop = db.shop;
-const { uploadProductImage, removeFile } = require("../services/upload.service");
+const { uploadProductThumbnail, removeFile } = require("../services/upload.service");
 
 // Middleware to handle file upload for product
 const handleProductImageUpload = (req, res, next) => {
-    uploadProductImage(req, res, function (err) {
+    uploadProductThumbnail(req, res, function (err) {
         if (err) {
             return res.status(400).json({
-                message: "Image upload failed",
+                message: "Tải lên hình ảnh thất bại",
                 error: err.message
             });
         }
-        // File uploaded successfully, continue
+        // File đã được tải lên thành công, tiếp tục
         next();
     });
 };
@@ -129,11 +129,12 @@ const createProduct = async (req, res) => {
             is_delete,
             is_active,
             created_by,
-            updated_by
+            updated_by,
+            thumbnail
         } = req.body;
 
         // Get thumbnail path from file upload
-        const thumbnail = req.file ? req.file.path.replace(/\\/g, '/') : null;
+        // const thumbnail = req.file ? req.file.path.replace(/\\/g, '/') : null;
 
         // Kiểm tra xem danh mục và thương hiệu có tồn tại không
         const categoryExists = await Category.find({ _id: { $in: category_id } });

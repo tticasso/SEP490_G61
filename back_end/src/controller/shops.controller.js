@@ -44,7 +44,9 @@ const createShop = async (req, res, next) => {
             description,
             website,
             nation_id,
-            province_id
+            province_id,
+            logo,
+            image_cover
         } = req.body;
 
         // Xác thực các trường bắt buộc
@@ -86,6 +88,8 @@ const createShop = async (req, res, next) => {
             nation_id: nation_id || null,
             province_id: province_id || null,
             status: "pending", // Mặc định là pending để admin duyệt
+            logo: logo || null,
+            image_cover: image_cover || null
         });
 
         const savedShop = await newShop.save();

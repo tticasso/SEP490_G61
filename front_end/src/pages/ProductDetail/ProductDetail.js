@@ -39,6 +39,23 @@ const ProductDetail = () => {
     const hasVariants = variants.length > 0;
     const isOutOfStock = selectedVariant && selectedVariant.stock !== undefined && selectedVariant.stock <= 0;
 
+    const getImagePath = (imgPath) => {
+        if (!imgPath) return "";
+        // Kiểm tra nếu imgPath đã là URL đầy đủ
+        if (imgPath.startsWith('http')) return imgPath;
+        // Kiểm tra nếu imgPath là đường dẫn tương đối
+        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        
+        // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
+        if (imgPath.includes('shops')) {
+            const fileName = imgPath.split("\\").pop();
+            return `http://localhost:9999/uploads/shops/${fileName}`;
+        }
+        
+        // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
+        const fileName = imgPath.split("\\").pop();
+        return `http://localhost:9999/uploads/products/${fileName}`;
+    };
 
     // Check if user is logged in
     const isLoggedIn = AuthService.isLoggedIn();
@@ -66,6 +83,11 @@ const ProductDetail = () => {
                     throw new Error("Không tìm thấy thông tin sản phẩm");
                 }
 
+                // Xử lý đường dẫn ảnh cho sản phẩm
+                if (productData.thumbnail) {
+                    productData.thumbnail = getImagePath(productData.thumbnail);
+                }
+
                 setProduct(productData);
 
                 // Fetch product variants
@@ -74,10 +96,16 @@ const ProductDetail = () => {
                     console.log("Variants data:", variantsData);
 
                     if (variantsData && variantsData.length > 0) {
-                        setVariants(variantsData);
+                        // Xử lý đường dẫn ảnh cho các biến thể
+                        const processedVariants = variantsData.map(variant => ({
+                            ...variant,
+                            images: variant.images?.map(img => getImagePath(img)) || []
+                        }));
+                        
+                        setVariants(processedVariants);
 
                         // Find default variant or use the first one
-                        const defaultVariant = variantsData.find(v => v.is_default) || variantsData[0];
+                        const defaultVariant = processedVariants.find(v => v.is_default) || processedVariants[0];
                         setSelectedVariant(defaultVariant);
 
                         // Set variant images if available
@@ -118,6 +146,17 @@ const ProductDetail = () => {
 
             // Fetch shop data
             const shopData = await ApiService.get(`/shops/public/${shopId}`, false);
+            
+            // Xử lý ảnh logo và ảnh bìa cho shop
+            if (shopData) {
+                if (shopData.logo) {
+                    shopData.logo = getImagePath(shopData.logo);
+                }
+                if (shopData.image_cover) {
+                    shopData.image_cover = getImagePath(shopData.image_cover);
+                }
+            }
+            
             setShopData(shopData);
 
             // Fetch shop owner data if available
@@ -190,8 +229,14 @@ const ProductDetail = () => {
                         }
                     })
                     .slice(0, 5); // Get up to 5 similar products
+                
+                // Xử lý đường dẫn ảnh cho các sản phẩm tương tự
+                const productsWithImages = filtered.map(product => ({
+                    ...product,
+                    thumbnail: getImagePath(product.thumbnail)
+                }));
 
-                setSimilarProducts(filtered);
+                setSimilarProducts(productsWithImages);
             }
         } catch (similarError) {
             console.error("Error fetching similar products:", similarError);
@@ -221,7 +266,6 @@ const ProductDetail = () => {
     };
 
     // Add to cart function
-    // Cập nhật phần addToCart trong ProductDetail.js
     const addToCart = async () => {
         if (!isLoggedIn) {
             window.location.href = "/login";
@@ -530,9 +574,9 @@ const ProductDetail = () => {
     const images = variantImages.length > 0
         ? variantImages
         : [
-            product.thumbnail || dongho,
+            getImagePath(product.thumbnail) || dongho,
             // Add fallback images if the product doesn't have multiple images
-            ...Array(5).fill(product.thumbnail || dongho)
+            ...Array(5).fill(getImagePath(product.thumbnail) || dongho)
         ];
 
     return (

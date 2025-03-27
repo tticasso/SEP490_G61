@@ -14,6 +14,7 @@ import FilterDisplay from './components/FilterDisplay';
 import ProductModal from './components/ProductModal';
 import ProductVariantSelector from '../../components/ProductVariantSelector'
 
+
 const Categories = () => {
     // State cho dữ liệu từ API
     const [products, setProducts] = useState([]);
@@ -232,7 +233,23 @@ const Categories = () => {
             }, 3000);
         }
     };
-
+    const getImagePath = (imgPath) => {
+        if (!imgPath) return "";
+        // Kiểm tra nếu imgPath đã là URL đầy đủ
+        if (imgPath.startsWith('http')) return imgPath;
+        // Kiểm tra nếu imgPath là đường dẫn tương đối
+        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        
+        // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
+        if (imgPath.includes('shops')) {
+            const fileName = imgPath.split("\\").pop();
+            return `http://localhost:9999/uploads/shops/${fileName}`;
+        }
+        
+        // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
+        const fileName = imgPath.split("\\").pop();
+        return `http://localhost:9999/uploads/products/${fileName}`;
+    };
     // Lọc sản phẩm dựa trên bộ lọc đã chọn
     const filteredProducts = products.filter(product => {
         // Lọc theo danh mục
@@ -497,7 +514,7 @@ const Categories = () => {
                                     <img
                                         src={selectedVariant && selectedVariant.images && selectedVariant.images.length > 0 
                                             ? selectedVariant.images[0] 
-                                            : (selectedProduct.thumbnail)}
+                                            : (getImagePath(selectedProduct.thumbnail))}
                                         alt={selectedProduct.name}
                                         className="w-full h-auto rounded object-cover"
                                     />
@@ -518,7 +535,7 @@ const Categories = () => {
                                             <>
                                                 <div className="border border-gray-300 p-1 w-16 h-16 flex-shrink-0">
                                                     <img
-                                                        src={selectedProduct.thumbnail}
+                                                        src={getImagePath(selectedProduct.thumbnail)}
                                                         alt="Thumbnail"
                                                         className="w-full h-full object-cover"
                                                     />

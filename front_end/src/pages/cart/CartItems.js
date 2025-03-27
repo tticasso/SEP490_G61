@@ -66,13 +66,33 @@ const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
     };
     
     // Xác định hình ảnh hiển thị: hình của variant (nếu có) hoặc hình của sản phẩm
-    const getDisplayImage = () => {
-        if (variantDetail && variantDetail.images && variantDetail.images.length > 0) {
-            return variantDetail.images[0];
+    const getImagePath = (imgPath) => {
+        if (!imgPath) return defaultImage;
+        // Kiểm tra nếu imgPath đã là URL đầy đủ
+        if (imgPath.startsWith('http')) return imgPath;
+        // Kiểm tra nếu imgPath là đường dẫn tương đối
+        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        
+        // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
+        if (imgPath.includes('shops')) {
+            const fileName = imgPath.split("\\").pop();
+            return `http://localhost:9999/uploads/shops/${fileName}`;
         }
         
-        return productInfo.thumbnail || productInfo.image || defaultImage;
+        // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
+        const fileName = imgPath.split("\\").pop();
+        return `http://localhost:9999/uploads/products/${fileName}`;
     };
+    
+    // Cập nhật phương thức getDisplayImage
+    const getDisplayImage = () => {
+        if (variantDetail && variantDetail.images && variantDetail.images.length > 0) {
+            return getImagePath(variantDetail.images[0]);
+        }
+        
+        return getImagePath(productInfo.thumbnail || productInfo.image || defaultImage);
+    };
+    
     
     // Hiển thị các thuộc tính của variant
     const renderVariantAttributes = () => {

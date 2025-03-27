@@ -11,7 +11,8 @@ import {
   FileText,
   CreditCard,
   AlertCircle,
-  Loader
+  Loader,
+  X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ApiService from '../services/ApiService';
@@ -37,6 +38,16 @@ const ShopRegistration = () => {
     identityCardImage: null, // Không có trong model nhưng cần cho quá trình xác minh
     businessLicense: null    // Không có trong model nhưng cần cho quá trình xác minh
   });
+
+  // Thêm state cho file và preview
+  const [logoFile, setLogoFile] = useState(null);
+  const [coverFile, setCoverFile] = useState(null);
+  const [identityFile, setIdentityFile] = useState(null);
+  const [licenseFile, setLicenseFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [coverPreview, setCoverPreview] = useState(null);
+  const [identityPreview, setIdentityPreview] = useState(null);
+  const [licensePreview, setLicensePreview] = useState(null);
 
   // State quản lý các bước đăng ký
   const [currentStep, setCurrentStep] = useState(1);
@@ -114,14 +125,95 @@ const ShopRegistration = () => {
     }
   };
 
-  // Xử lý upload file
+  // Xử lý upload file - Cập nhật để thêm preview
   const handleFileChange = (e) => {
     const { name, files } = e.target;
+    if (!files[0]) return;
+    
+    const file = files[0];
+    const previewUrl = URL.createObjectURL(file);
+    
+    // Cập nhật file và preview tương ứng
+    switch (name) {
+      case 'logo':
+        setLogoFile(file);
+        setLogoPreview(previewUrl);
+        break;
+      case 'image_cover':
+        setCoverFile(file);
+        setCoverPreview(previewUrl);
+        break;
+      case 'identityCardImage':
+        setIdentityFile(file);
+        setIdentityPreview(previewUrl);
+        break;
+      case 'businessLicense':
+        setLicenseFile(file);
+        setLicensePreview(previewUrl);
+        break;
+      default:
+        break;
+    }
+    
+    // Cập nhật formData
     setFormData(prev => ({
       ...prev,
-      [name]: files[0]
+      [name]: file
     }));
   };
+
+  // Xử lý xóa ảnh preview
+  const handleRemoveImage = (fieldName) => {
+    switch (fieldName) {
+      case 'logo':
+        setLogoFile(null);
+        setLogoPreview(null);
+        break;
+      case 'image_cover':
+        setCoverFile(null);
+        setCoverPreview(null);
+        break;
+      case 'identityCardImage':
+        setIdentityFile(null);
+        setIdentityPreview(null);
+        break;
+      case 'businessLicense':
+        setLicenseFile(null);
+        setLicensePreview(null);
+        break;
+      default:
+        break;
+    }
+    
+    // Cập nhật formData
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: null
+    }));
+  };
+
+  // Function upload ảnh shop
+  const uploadShopImage = async (file, imageType) => {
+    if (!file) return null;
+    
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('type', imageType); // Thêm tham số để phân biệt loại ảnh
+      
+      const uploadedImage = await ApiService.uploadFile('/upload/shop-image', formData);
+      
+      if (uploadedImage && uploadedImage.url) {
+        return uploadedImage.url;
+      } else {
+        throw new Error('URL hình ảnh không hợp lệ');
+      }
+    } catch (error) {
+      throw new Error(`Không thể tải lên hình ảnh: ${error.message}`);
+    }
+  };
+  
+  
 
   // Xử lý chuyển bước
   const handleNextStep = () => {
@@ -176,136 +268,7 @@ const ShopRegistration = () => {
     }
   };
 
-  // Helper function để upload file trực tiếp với ApiService
-  const uploadFile = async (url, formData) => {
-    try {
-      const token = AuthService.getToken();
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'x-access-token': token
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { message: errorText };
-        }
-        throw new Error(errorData.message || 'Upload failed');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('File upload error:', error);
-      throw error;
-    }
-  };
-
-  // Upload shop images (logo & image_cover)
-  const uploadShopImages = async (shopId) => {
-    try {
-      const uploadPromises = [];
-
-      // Upload logo
-      if (formData.logo) {
-        const logoFormData = new FormData();
-        logoFormData.append('image', formData.logo);
-        logoFormData.append('field', 'logo');
-
-        const logoUpload = uploadFile(
-          `${ApiService.API_URL}/shops/upload/${shopId}`,
-          logoFormData
-        );
-
-        uploadPromises.push(logoUpload);
-      }
-
-      // Upload image_cover
-      if (formData.image_cover) {
-        const coverFormData = new FormData();
-        coverFormData.append('image', formData.image_cover);
-        coverFormData.append('field', 'image_cover');
-
-        const coverUpload = uploadFile(
-          `${ApiService.API_URL}/shops/upload/${shopId}`,
-          coverFormData
-        );
-
-        uploadPromises.push(coverUpload);
-      }
-
-      // Wait for all uploads to complete
-      await Promise.all(uploadPromises);
-
-    } catch (error) {
-      console.error('Error uploading shop images:', error);
-      throw new Error('Không thể tải lên hình ảnh cửa hàng');
-    }
-  };
-
-  // Upload documents (identityCardImage & businessLicense)
-  const uploadDocuments = async () => {
-    try {
-      // Skip if no documents to upload
-      if (!formData.identityCardImage && !formData.businessLicense) {
-        return;
-      }
-
-      const documentsFormData = new FormData();
-
-      if (formData.identityCardImage) {
-        documentsFormData.append('identityCardImage', formData.identityCardImage);
-      }
-
-      if (formData.businessLicense) {
-        documentsFormData.append('businessLicense', formData.businessLicense);
-      }
-
-      await uploadFile(
-        `${ApiService.API_URL}/documents/upload`,
-        documentsFormData
-      );
-
-    } catch (error) {
-      console.error('Error uploading documents:', error);
-      throw new Error('Không thể tải lên giấy tờ xác minh');
-    }
-  };
-
-  // Save shop categories
-  const saveShopCategories = async (shopId) => {
-    try {
-      const token = AuthService.getToken();
-      const response = await fetch(
-        `${ApiService.API_URL}/shop-categories/${shopId}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-access-token': token
-          },
-          body: JSON.stringify({ categoryIds: selectedCategories })
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save shop categories');
-      }
-    } catch (error) {
-      console.error('Error saving shop categories:', error);
-      throw new Error('Không thể lưu danh mục sản phẩm');
-    }
-  };
-
-  // Xử lý submit form - FIXED VERSION
-  // This is the fixed handleSubmit function with extensive token debugging
-
+  // Xử lý submit form - Cập nhật để tích hợp uploadImage
   const handleSubmit = async () => {
     if (!AuthService.isLoggedIn()) {
       setError('Bạn cần đăng nhập để thực hiện chức năng này');
@@ -329,7 +292,51 @@ const ShopRegistration = () => {
         throw new Error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
       }
 
-      // 1. Tạo shop mới
+      // 1. Upload logo nếu có
+      let logoUrl = null;
+      if (logoFile) {
+        try {
+          logoUrl = await uploadShopImage(logoFile, 'logo');
+        } catch (err) {
+          console.error("Lỗi upload logo:", err);
+          throw new Error("Không thể tải lên logo: " + err.message);
+        }
+      }
+      
+      // 2. Upload ảnh bìa nếu có
+      let coverUrl = null;
+      if (coverFile) {
+        try {
+          coverUrl = await uploadShopImage(coverFile, 'cover');
+        } catch (err) {
+          console.error("Lỗi upload ảnh bìa:", err);
+          throw new Error("Không thể tải lên ảnh bìa: " + err.message);
+        }
+      }
+      
+      // 3. Upload CMND/CCCD nếu có
+      let identityUrl = null;
+      if (identityFile) {
+        try {
+          identityUrl = await uploadShopImage(identityFile, 'identity');
+        } catch (err) {
+          console.error("Lỗi upload CMND/CCCD:", err);
+          throw new Error("Không thể tải lên CMND/CCCD: " + err.message);
+        }
+      }
+      
+      // 4. Upload giấy phép kinh doanh nếu có
+      let licenseUrl = null;
+      if (licenseFile) {
+        try {
+          licenseUrl = await uploadShopImage(licenseFile, 'license');
+        } catch (err) {
+          console.error("Lỗi upload giấy phép:", err);
+          throw new Error("Không thể tải lên giấy phép kinh doanh: " + err.message);
+        }
+      }
+
+      // 5. Tạo shop mới với URL hình ảnh
       const shopData = {
         name: formData.name,
         username: formData.username,
@@ -340,81 +347,48 @@ const ShopRegistration = () => {
         description: formData.description || '',
         website: formData.website || '',
         nation_id: formData.nation_id || null,
-        province_id: formData.province_id || null
+        province_id: formData.province_id || null,
+        logo: logoUrl,
+        image_cover: coverUrl,
+        identity_card_image: identityUrl,
+        business_license: licenseUrl
       };
 
       console.log("Sending request to create shop with data:", shopData);
-      console.log("API URL:", `${ApiService.API_URL}/shops/create`);
-      console.log("Using token header:", { 'x-access-token': token });
-
-      // Make the request with explicit debugging
-      const response = await fetch(`${ApiService.API_URL}/shops/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token
-        },
-        body: JSON.stringify(shopData)
-      });
-
-      console.log("Response status:", response.status);
-      console.log("Response status text:", response.statusText);
-
-      // Handle 401 Unauthorized
-      if (response.status === 401) {
-        console.error('Authentication failed - token invalid or expired');
-
-        // Attempt to get full error details
-        const errorText = await response.text();
-        console.error('Full error response:', errorText);
-
-        // Clear user data and force re-login
-        AuthService.logout();
-        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      
+      // Gọi API tạo shop
+      const response = await ApiService.post('/shops/create', shopData);
+      console.log("Shop creation successful:", response);
+      
+      // Lấy shopId
+      const shopId = response.shop._id;
+      
+      // 6. Lưu danh mục cửa hàng
+      try {
+        await ApiService.post(`/shop-categories/${shopId}`, { categoryIds: selectedCategories });
+      } catch (err) {
+        console.error("Error saving shop categories:", err);
+        // Không throw lỗi, vì shop đã được tạo thành công
       }
 
-      // Handle other errors
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => {
-          return { message: `Server error: ${response.status} ${response.statusText}` };
-        });
-        console.error('Error response data:', errorData);
-        throw new Error(errorData.message || `Lỗi server: ${response.status}`);
-      }
-
-      // Parse successful response
-      const data = await response.json();
-      console.log("Shop creation successful:", data);
-      const shopId = data.shop._id;
-
-      // Rest of your function for uploading images, documents, etc.
-      // ...
-
-      // QUAN TRỌNG: Cập nhật thông tin người dùng sau khi tạo cửa hàng
-      // Sẽ lấy role SELLER mới từ server
+      // 7. Cập nhật thông tin người dùng
       try {
         console.log("Refreshing user info to get updated roles...");
         await AuthService.refreshUserInfo();
         console.log("User info refreshed successfully");
       } catch (refreshError) {
         console.error("Failed to refresh user info:", refreshError);
-        // Tiếp tục xử lý ngay cả khi không thể làm mới thông tin người dùng
       }
 
       setSuccess(true);
 
-      // Làm mới trang/chuyển hướng để Header được cập nhật
+      // 8. Chuyển hướng sau khi đăng ký thành công
       setTimeout(() => {
-        // Option 1: Chuyển hướng đến trang chính để làm mới toàn bộ ứng dụng
-        // window.location.href = '/shop/my-shop';
-
-        // Option 2: Sử dụng navigate để chuyển hướng nhưng không load lại trang
         navigate('/shop/my-shop');
       }, 3000);
 
     } catch (error) {
       console.error('Error in shop registration:', error);
-
       setError(error.message || 'Có lỗi xảy ra khi đăng ký cửa hàng');
 
       if (error.message.includes('đăng nhập') ||
@@ -505,7 +479,7 @@ const ShopRegistration = () => {
     );
   };
 
-  // Render step 2: Thông tin cửa hàng
+  // Render step 2: Thông tin cửa hàng (Cập nhật phần upload ảnh)
   const renderShopInfo = () => {
     return (
       <div className="mt-8">
@@ -649,43 +623,89 @@ const ShopRegistration = () => {
           <h3 className="text-lg font-medium mb-4">Tải lên hình ảnh</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Logo Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Logo cửa hàng</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                <Upload className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
+              <div 
+                className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer"
+                onClick={() => document.getElementById('logo-upload').click()}
+              >
+                {logoPreview ? (
+                  <div className="relative">
+                    <img 
+                      src={logoPreview} 
+                      alt="Logo preview" 
+                      className="max-h-48 mx-auto mb-2"
+                    />
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveImage('logo');
+                      }}
+                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                    >
+                      <X size={16} />
+                    </button>
+                    <p className="text-sm text-gray-500">Nhấp để thay đổi</p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
+                  </>
+                )}
                 <input
+                  id="logo-upload"
                   type="file"
                   name="logo"
                   onChange={handleFileChange}
-                  className="w-full mt-2"
+                  className="hidden"
                   accept="image/*"
                 />
-                {formData.logo && (
-                  <div className="mt-2 text-sm text-green-600">
-                    Đã chọn: {formData.logo.name}
-                  </div>
-                )}
               </div>
             </div>
 
+            {/* Image Cover Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ảnh bìa cửa hàng</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                <Upload className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
+              <div 
+                className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer"
+                onClick={() => document.getElementById('cover-upload').click()}
+              >
+                {coverPreview ? (
+                  <div className="relative">
+                    <img 
+                      src={coverPreview} 
+                      alt="Cover preview" 
+                      className="max-h-48 mx-auto mb-2"
+                    />
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveImage('image_cover');
+                      }}
+                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                    >
+                      <X size={16} />
+                    </button>
+                    <p className="text-sm text-gray-500">Nhấp để thay đổi</p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
+                  </>
+                )}
                 <input
+                  id="cover-upload"
                   type="file"
                   name="image_cover"
                   onChange={handleFileChange}
-                  className="w-full mt-2"
+                  className="hidden"
                   accept="image/*"
                 />
-                {formData.image_cover && (
-                  <div className="mt-2 text-sm text-green-600">
-                    Đã chọn: {formData.image_cover.name}
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -694,7 +714,7 @@ const ShopRegistration = () => {
     );
   };
 
-  // Render step 3: Giấy tờ và xác nhận
+  // Render step 3: Giấy tờ và xác nhận (Cập nhật phần upload giấy tờ)
   const renderDocuments = () => {
     return (
       <div className="mt-8">
@@ -702,44 +722,90 @@ const ShopRegistration = () => {
         <p className="text-gray-600 mb-6">Để đảm bảo tính xác thực, vui lòng tải lên các giấy tờ sau</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {/* Identity Card Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Ảnh CMND/CCCD (mặt trước và sau) *</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-              <Upload className="mx-auto text-gray-400 mb-2" />
-              <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
+            <div 
+              className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer"
+              onClick={() => document.getElementById('identity-upload').click()}
+            >
+              {identityPreview ? (
+                <div className="relative">
+                  <img 
+                    src={identityPreview} 
+                    alt="Identity preview" 
+                    className="max-h-48 mx-auto mb-2"
+                  />
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveImage('identityCardImage');
+                    }}
+                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                  >
+                    <X size={16} />
+                  </button>
+                  <p className="text-sm text-gray-500">Nhấp để thay đổi</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className="mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
+                </>
+              )}
               <input
+                id="identity-upload"
                 type="file"
                 name="identityCardImage"
                 onChange={handleFileChange}
-                className="w-full mt-2"
+                className="hidden"
                 accept="image/*"
                 required
               />
-              {formData.identityCardImage && (
-                <div className="mt-2 text-sm text-green-600">
-                  Đã chọn: {formData.identityCardImage.name}
-                </div>
-              )}
             </div>
           </div>
 
+          {/* Business License Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Giấy phép kinh doanh (nếu có)</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-              <Upload className="mx-auto text-gray-400 mb-2" />
-              <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
+            <div 
+              className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer"
+              onClick={() => document.getElementById('license-upload').click()}
+            >
+              {licensePreview ? (
+                <div className="relative">
+                  <img 
+                    src={licensePreview} 
+                    alt="License preview" 
+                    className="max-h-48 mx-auto mb-2"
+                  />
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveImage('businessLicense');
+                    }}
+                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                  >
+                    <X size={16} />
+                  </button>
+                  <p className="text-sm text-gray-500">Nhấp để thay đổi</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className="mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
+                </>
+              )}
               <input
+                id="license-upload"
                 type="file"
                 name="businessLicense"
                 onChange={handleFileChange}
-                className="w-full mt-2"
+                className="hidden"
                 accept="image/*,.pdf"
               />
-              {formData.businessLicense && (
-                <div className="mt-2 text-sm text-green-600">
-                  Đã chọn: {formData.businessLicense.name}
-                </div>
-              )}
             </div>
           </div>
         </div>

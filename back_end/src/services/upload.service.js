@@ -18,10 +18,10 @@ const createDirs = () => {
     });
 };
 
-// Initialize directories
+// Khởi tạo thư mục
 createDirs();
 
-// Configure storage for product images
+// Cấu hình lưu trữ cho hình ảnh sản phẩm
 const productStorage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, 'uploads/products/');
@@ -33,7 +33,7 @@ const productStorage = multer.diskStorage({
     }
 });
 
-// Configure storage for variant images
+// Cấu hình lưu trữ cho hình ảnh biến thể
 const variantStorage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, 'uploads/variants/');
@@ -45,7 +45,7 @@ const variantStorage = multer.diskStorage({
     }
 });
 
-// File filter - only accept image files
+// Bộ lọc file - chỉ chấp nhận file hình ảnh
 const fileFilter = (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -54,29 +54,39 @@ const fileFilter = (req, file, cb) => {
     if (extname && mimetype) {
         return cb(null, true);
     } else {
-        cb(new Error('Only image files are allowed!'), false);
+        cb(new Error('Chỉ chấp nhận file hình ảnh!'), false);
     }
 };
 
-// Create upload instance for product (single image)
+// Tạo instance upload cho sản phẩm (một hình ảnh)
+// Đổi từ 'thumbnail' sang 'image' để khớp với frontend
 const uploadProductImage = multer({
     storage: productStorage,
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB limit
+        fileSize: 5 * 1024 * 1024 // Giới hạn 5MB
+    },
+    fileFilter: fileFilter
+}).single('image');
+
+// Tạo instance upload cho sản phẩm với trường 'thumbnail' (để tương thích ngược)
+const uploadProductThumbnail = multer({
+    storage: productStorage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // Giới hạn 5MB
     },
     fileFilter: fileFilter
 }).single('thumbnail');
 
-// Create upload instance for variant (multiple images)
+// Tạo instance upload cho biến thể (nhiều hình ảnh)
 const uploadVariantImages = multer({
     storage: variantStorage,
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB limit
+        fileSize: 5 * 1024 * 1024 // Giới hạn 5MB
     },
     fileFilter: fileFilter
-}).array('images', 5); // Maximum 5 images per variant
+}).array('images', 5); // Tối đa 5 hình ảnh cho mỗi biến thể
 
-// Helper to remove old file
+// Hàm trợ giúp để xóa file cũ
 const removeFile = (filePath) => {
     // Skip file deletion on Vercel
     if (isVercel) {
@@ -86,10 +96,10 @@ const removeFile = (filePath) => {
 
     // Check if filePath is a URL (not local file)
     if (filePath && filePath.startsWith('http')) {
-        return; // Skip deleting remote URLs
+        return; // Bỏ qua việc xóa URL từ xa
     }
 
-    // Only attempt to delete if filePath is valid and exists
+    // Chỉ cố gắng xóa nếu filePath hợp lệ và tồn tại
     if (filePath && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
     }
@@ -97,6 +107,7 @@ const removeFile = (filePath) => {
 
 module.exports = {
     uploadProductImage,
+    uploadProductThumbnail,
     uploadVariantImages,
     removeFile
 };

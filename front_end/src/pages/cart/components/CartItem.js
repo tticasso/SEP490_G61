@@ -11,17 +11,36 @@ const CartItem = ({
     getItemPrice 
 }) => {
     // Lấy hình ảnh dựa trên biến thể hoặc sản phẩm
+    const getImagePath = (imgPath) => {
+        if (!imgPath) return dongho;
+        // Kiểm tra nếu imgPath đã là URL đầy đủ
+        if (imgPath.startsWith('http')) return imgPath;
+        // Kiểm tra nếu imgPath là đường dẫn tương đối
+        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        
+        // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
+        if (imgPath.includes('shops')) {
+            const fileName = imgPath.split("\\").pop();
+            return `http://localhost:9999/uploads/shops/${fileName}`;
+        }
+        
+        // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
+        const fileName = imgPath.split("\\").pop();
+        return `http://localhost:9999/uploads/products/${fileName}`;
+    };
+    
+    // Cập nhật phương thức getItemImage
     const getItemImage = () => {
         // Kiểm tra nếu có variant_id và variant_id là object
         if (item.variant_id && typeof item.variant_id === 'object') {
             if (item.variant_id.images && item.variant_id.images.length > 0) {
-                return item.variant_id.images[0];
+                return getImagePath(item.variant_id.images[0]);
             }
         }
         
         // Fallback to product image
         if (item.product_id && typeof item.product_id === 'object') {
-            return item.product_id.thumbnail || item.product_id.image || dongho;
+            return getImagePath(item.product_id.thumbnail || item.product_id.image || dongho);
         }
         
         return dongho;

@@ -1,0 +1,18 @@
+{
+    "version": 2,
+    "builds": [
+      {
+        "src": "back_end/server.js",
+        "use": "@vercel/node"
+      }
+    ],
+    "routes": [
+      {
+        "src": "/(.*)",
+        "dest": "/back_end/server.js"
+      }
+    ],
+    "env": {
+      "NODE_ENV": "production"
+    }
+  }

@@ -13,7 +13,11 @@ import {
 import Sidebar from './Sidebar';
 import ApiService from '../services/ApiService';
 import AuthService from '../services/AuthService';
-
+const getImagePath = (imgPath) => {
+  if (!imgPath) return "";
+  const fileName = imgPath.split("\\").pop();
+  return `http://localhost:9999/uploads/products/${fileName}`;
+};
 // Product Details Modal Component
 const ProductDetailsModal = ({ product, onClose }) => {
   const [loading, setLoading] = useState(true);
@@ -185,7 +189,7 @@ const ProductDetailsModal = ({ product, onClose }) => {
                 <div className="border rounded-md p-2 h-80 flex items-center justify-center">
                   {productDetails.thumbnail ? (
                     <img 
-                      src={productDetails.thumbnail} 
+                      src={getImagePath(productDetails.thumbnail)} 
                       alt={productDetails.name} 
                       className="max-h-full max-w-full object-contain"
                       onError={(e) => {
@@ -1568,78 +1572,7 @@ const ProductList = () => {
         console.error('Error fetching data:', err);
         setError('Không thể tải dữ liệu sản phẩm. Vui lòng thử lại sau.');
         
-        // For demo purposes, use sample data if API fails
-        setProducts([
-          {
-            id: 1,
-            _id: 1,
-            name: 'Apple iPhone 15 Plus 128GB',
-            stock: 35,
-            price: 27790000,
-            sold: 0,
-            slug: 'apple-iphone-15-plus-128gb',
-            description: 'Điện thoại iPhone 15 Plus với bộ nhớ 128GB',
-            detail: 'Chi tiết về sản phẩm iPhone 15 Plus',
-            weight: 220,
-            condition: 'new',
-            type: 'single',
-            is_active: true,
-            is_hot: true,
-            is_feature: false,
-            is_delete: false,
-            thumbnail: '/api/placeholder/200/200',
-            createdAt: new Date('2024-01-15'),
-            category_id: ['phone'],
-            brand_id: 'apple',
-            category: 'Điện thoại'
-          },
-          {
-            id: 2,
-            _id: 2,
-            name: 'Sữa rửa mặt CERAVE cho da dầu da mụn và Da Khô nhạy cảm 236ml',
-            stock: 26,
-            price: 105000,
-            sold: 0,
-            slug: 'sua-rua-mat-cerave',
-            description: 'Sữa rửa mặt dành cho da dầu và mụn',
-            detail: 'Chi tiết về sản phẩm sữa rửa mặt',
-            weight: 236,
-            condition: 'new',
-            type: 'single',
-            is_active: true,
-            is_hot: false,
-            is_feature: true,
-            is_delete: false,
-            thumbnail: '/api/placeholder/200/200',
-            createdAt: new Date('2024-02-20'),
-            category_id: ['skincare'],
-            brand_id: 'cerave',
-            category: 'Chăm sóc da'
-          },
-          {
-            id: 3,
-            _id: 3,
-            name: 'Sữa Chống Nắng Cực Mạnh Sunplay Super Block SPF81 PA++++ 70Gr',
-            stock: 54,
-            price: 148000,
-            sold: 0,
-            slug: 'sua-chong-nang-sunplay',
-            description: 'Sữa chống nắng SPF 81',
-            detail: 'Chi tiết về sản phẩm sữa chống nắng',
-            weight: 70,
-            condition: 'new',
-            type: 'single',
-            is_active: true,
-            is_hot: false,
-            is_feature: false,
-            is_delete: false,
-            thumbnail: '/api/placeholder/200/200',
-            createdAt: new Date('2024-03-10'),
-            category_id: ['skincare'],
-            brand_id: 'sunplay',
-            category: 'Chăm sóc da'
-          }
-        ]);
+       
       } finally {
         // Cập nhật loading chỉ khi component vẫn mounted
         if (isMounted) {
@@ -1734,6 +1667,7 @@ const ProductList = () => {
       setLoading(false);
     }
   }, []);
+ 
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
@@ -1912,7 +1846,7 @@ const ProductList = () => {
                         <div className="flex items-center">
                           <div className="w-12 h-12 mr-4 flex-shrink-0 bg-gray-200 rounded overflow-hidden">
                             <img 
-                              src={product.thumbnail || "/api/placeholder/50/50"} 
+                              src={getImagePath(product.thumbnail)} 
                               alt={product.name} 
                               className="w-full h-full object-cover"
                               onError={(e) => {

@@ -47,6 +47,17 @@ const MyShop = () => {
   const [logoPreview, setLogoPreview] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
 
+  // Hàm lấy đường dẫn ảnh
+  const getImagePath = (imgPath) => {
+    if (!imgPath) return "";
+    // Kiểm tra nếu đường dẫn đã là URL đầy đủ
+    if (imgPath.startsWith('http')) return imgPath;
+    
+    // Xử lý đường dẫn từ backend
+    const fileName = imgPath.split("\\").pop().split("/").pop();
+    return `http://localhost:9999/uploads/shops/${fileName}`;
+  };
+
   useEffect(() => {
     // Kiểm tra xem người dùng đã đăng nhập chưa
     if (!AuthService.isLoggedIn()) {
@@ -313,9 +324,13 @@ const MyShop = () => {
         <div className="relative h-64 rounded-lg overflow-hidden mb-6 bg-gray-100">
           {(shop.image_cover || coverPreview) ? (
             <img
-              src={coverPreview || `${process.env.REACT_APP_API_URL || 'http://localhost:9999'}${shop.image_cover}`}
+              src={coverPreview || getImagePath(shop.image_cover)}
               alt={`${shop.name} cover`}
               className="w-full h-full object-cover"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "/api/placeholder/800/300";
+              }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400">
@@ -348,9 +363,13 @@ const MyShop = () => {
                   <div className="relative h-24 w-24 rounded-lg overflow-hidden border bg-white flex-shrink-0 mr-6">
                     {shop.logo ? (
                       <img
-                        src={`${process.env.REACT_APP_API_URL || 'http://localhost:9999'}${shop.logo}`}
+                        src={getImagePath(shop.logo)}
                         alt={`${shop.name} logo`}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = "/api/placeholder/50/50";
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
@@ -405,9 +424,13 @@ const MyShop = () => {
                   <div className="relative h-24 w-24 rounded-lg overflow-hidden border bg-white flex-shrink-0 mr-6">
                     {(logoPreview || shop.logo) ? (
                       <img
-                        src={logoPreview || `${process.env.REACT_APP_API_URL || 'http://localhost:9999'}${shop.logo}`}
+                        src={logoPreview || getImagePath(shop.logo)}
                         alt={`${shop.name} logo`}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = "/api/placeholder/50/50";
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">

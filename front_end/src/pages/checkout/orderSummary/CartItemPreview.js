@@ -11,6 +11,23 @@ import defaultImage from '../../../assets/khautrang5d.jpg';
  * @param {Object} item - The cart item to display
  */
 const CartItemPreview = ({ item }) => {
+    const getImagePath = (imgPath) => {
+        if (!imgPath) return defaultImage;
+        // Kiểm tra nếu imgPath đã là URL đầy đủ
+        if (imgPath.startsWith('http')) return imgPath;
+        // Kiểm tra nếu imgPath là đường dẫn tương đối
+        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        
+        // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
+        if (imgPath.includes('shops')) {
+            const fileName = imgPath.split("\\").pop();
+            return `http://localhost:9999/uploads/shops/${fileName}`;
+        }
+        
+        // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
+        const fileName = imgPath.split("\\").pop();
+        return `http://localhost:9999/uploads/products/${fileName}`;
+    };
     // Get product data safely from item object
     const product = item.product_id || {};
     const productName = product.name || "Product";
@@ -19,9 +36,11 @@ const CartItemPreview = ({ item }) => {
     const variant = item.variant_id && typeof item.variant_id === 'object' ? item.variant_id : null;
     
     // Get the correct image (variant image first, then product image)
-    const productImage = variant && variant.images && variant.images.length > 0 
-        ? variant.images[0] 
-        : (product.image || product.thumbnail);
+    const productImage = getImagePath(
+        (variant && variant.images && variant.images.length > 0) 
+            ? variant.images[0] 
+            : (product.image || product.thumbnail || defaultImage)
+    );
     
     // Get the correct price (variant price first, then product price)
     const price = variant && variant.price 

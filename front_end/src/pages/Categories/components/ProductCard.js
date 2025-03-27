@@ -17,6 +17,23 @@ const ProductCard = ({
     // Phải kiểm tra từ backend hoặc dựa vào cấu trúc dữ liệu của bạn
     // Ví dụ: có thể sử dụng trường has_variants hoặc variants_count nếu có
     const hasVariants = product.has_variants || product.variants_count > 0 || false;
+    const getImagePath = (imgPath) => {
+        if (!imgPath) return "";
+        // Kiểm tra nếu imgPath đã là URL đầy đủ
+        if (imgPath.startsWith('http')) return imgPath;
+        // Kiểm tra nếu imgPath là đường dẫn tương đối
+        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        
+        // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
+        if (imgPath.includes('shops')) {
+            const fileName = imgPath.split("\\").pop();
+            return `http://localhost:9999/uploads/shops/${fileName}`;
+        }
+        
+        // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
+        const fileName = imgPath.split("\\").pop();
+        return `http://localhost:9999/uploads/products/${fileName}`;
+    };
 
     return (
         <div
@@ -47,7 +64,7 @@ const ProductCard = ({
             <div className={`${viewMode === 'grid' ? 'flex flex-col' : 'flex items-center'} relative`}>
                 <div className="relative">
                     <img
-                        src={product.thumbnail || dongho}
+                        src={getImagePath(product.thumbnail) || dongho}
                         alt={product.name}
                         className={`
                             object-cover 

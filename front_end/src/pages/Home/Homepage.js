@@ -46,7 +46,16 @@ const TroocEcommerce = () => {
         { src: image4, alt: "Banner 4" },
         { src: image5, alt: "Banner 5" },
     ];
-
+    const getImagePath = (imgPath) => {
+        if (!imgPath) return "";
+        // Kiểm tra nếu imgPath đã là URL đầy đủ
+        if (imgPath.startsWith('http')) return imgPath;
+        // Kiểm tra nếu imgPath là đường dẫn tương đối
+        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        // Trường hợp imgPath là đường dẫn từ backend
+        const fileName = imgPath.split("\\").pop();
+        return `http://localhost:9999/uploads/products/${fileName}`;
+    };
     // Get current user information
     const { currentUser, isLoggedIn } = useAuth();
     const userId = currentUser?.id || currentUser?._id || "";
@@ -59,22 +68,31 @@ const TroocEcommerce = () => {
 
                 // Lấy danh sách sản phẩm
                 const productsData = await ApiService.get('/product', false);
-                setProducts(productsData);
+
+                // Xử lý đường dẫn ảnh cho tất cả sản phẩm
+                const productsWithImages = productsData.map(product => ({
+                    ...product,
+                    thumbnail: getImagePath(product.thumbnail),
+                    // Nếu có các hình ảnh khác thì xử lý tương tự
+                    // images: product.images?.map(img => getImagePath(img))
+                }));
+
+                setProducts(productsWithImages);
 
                 // Lấy danh sách danh mục
                 const categoriesData = await ApiService.get('/categories', false);
                 setCategories(categoriesData);
 
-                // Lọc sản phẩm mới (5 sản phẩm mới nhất dựa vào created_at)
-                const sortedByDate = [...productsData].sort((a, b) =>
+                // Lọc sản phẩm mới - sử dụng productsWithImages thay vì productsData
+                const sortedByDate = [...productsWithImages].sort((a, b) =>
                     new Date(b.created_at) - new Date(a.created_at)
                 );
                 setNewProducts(sortedByDate.slice(0, 5));
 
-                // Lọc sản phẩm đề xuất
-                const featuredProducts = productsData.filter(product => product.is_feature);
-                const hotProducts = productsData.filter(product => product.is_hot);
-                const sortedBySold = [...productsData].sort((a, b) => b.sold - a.sold);
+                // Lọc sản phẩm đề xuất - sử dụng productsWithImages thay vì productsData
+                const featuredProducts = productsWithImages.filter(product => product.is_feature);
+                const hotProducts = productsWithImages.filter(product => product.is_hot);
+                const sortedBySold = [...productsWithImages].sort((a, b) => b.sold - a.sold);
 
                 // Kết hợp các sản phẩm đặc biệt, loại bỏ trùng lặp
                 const combined = [...featuredProducts, ...hotProducts, ...sortedBySold];
@@ -216,6 +234,7 @@ const TroocEcommerce = () => {
 
     // Handle opening product modal
     const handleProductClick = (product) => {
+        
         setSelectedProduct(product);
         setShowProductModal(true);
         setProductQuantity(1); // Reset quantity when opening modal
@@ -277,9 +296,9 @@ const TroocEcommerce = () => {
                                 {/* Updated CategorySidebar with clickable categories */}
                                 <div className="w-1/5 bg-white">
                                     <div className="space-y-2 pt-3 pb-3 pl-3 pr-5">
-                                        {categories.slice(0,6).map((category) => (
-                                            <div 
-                                                key={category._id} 
+                                        {categories.slice(0, 6).map((category) => (
+                                            <div
+                                                key={category._id}
                                                 className="p-3 border-b border-black cursor-pointer hover:bg-gray-100 transition-colors"
                                                 onClick={() => window.location.href = `/categories?category=${category._id}`}
                                             >
@@ -288,7 +307,7 @@ const TroocEcommerce = () => {
                                         ))}
                                     </div>
                                 </div>
-                                
+
                                 {/* Image Slider replacing single image */}
                                 <div className='w-4/5 h-80'> {/* Added fixed height */}
                                     <ImageSlider images={bannerImages} />

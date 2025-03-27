@@ -10,7 +10,10 @@ const config = require('./src/config/auth.config');
 require('dotenv').config();
 
 
-const { AuthRouter,
+
+const {
+  AuthRouter,
+  UploadRouter,
   UserRouter,
   RoleRouter,
   CategoriesRouter,
@@ -68,6 +71,7 @@ app.use(morgan("dev"));
 // Cấu hình static files cho uploads - đặt trước các routes
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+
 app.use('/api/gemini', GeminiRouter);
 app.use('/api/payment', PaymentRouter);
 app.use('/api/payos', PayOsRouter);
@@ -75,7 +79,8 @@ app.use('/api/payos', PayOsRouter);
 const uploadDirs = [
   path.join(__dirname, 'uploads'),
   path.join(__dirname, 'uploads/shops'),
-  path.join(__dirname, 'uploads/documents')
+  path.join(__dirname, 'uploads/documents'),
+  path.join(__dirname, 'uploads/products')
 ];
 
 uploadDirs.forEach(dir => {
@@ -116,6 +121,9 @@ app.use('/api/product-attribute', ProductAttributeRouter);
 app.use('/api/conversation', ConversationRouter);
 app.use('/api/revenue', ShopRevenueRouter);
 // Kiểm soát các lỗi trong Express web server
+app.use('/api/upload', UploadRouter);
+app.use('/uploads/products', express.static('./uploads/products'));
+app.use('/uploads/shops', express.static('./uploads/shops'));
 app.use(async (req, res, next) => {
   next(httpErrors.NotFound());
 });
@@ -280,6 +288,7 @@ async function updateUserOnlineStatus(userId, isOnline) {
     console.error('Error updating user status:', error);
   }
 }
+
 
 // Thay đổi app.listen thành server.listen
 if (process.env.NODE_ENV !== 'production') {

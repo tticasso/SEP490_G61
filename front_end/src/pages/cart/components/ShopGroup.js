@@ -22,6 +22,23 @@ const ShopGroup = ({
         shop_image: shop.shop_image
     });
     const [loading, setLoading] = useState(false);
+    const getImagePath = (imgPath) => {
+        if (!imgPath) return "";
+        // Kiểm tra nếu imgPath đã là URL đầy đủ
+        if (imgPath.startsWith('http')) return imgPath;
+        // Kiểm tra nếu imgPath là đường dẫn tương đối
+        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        
+        // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
+        if (imgPath.includes('shops')) {
+            const fileName = imgPath.split("\\").pop();
+            return `http://localhost:9999/uploads/shops/${fileName}`;
+        }
+        
+        // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
+        const fileName = imgPath.split("\\").pop();
+        return `http://localhost:9999/uploads/products/${fileName}`;
+    };
 
     // Fetch thông tin shop nếu cần
     useEffect(() => {
@@ -71,7 +88,7 @@ const ShopGroup = ({
                             </div>
                         ) : (
                             <img
-                                src={shopInfo.shop_image || dongho}
+                                src={getImagePath(shopInfo.shop_image) || dongho}
                                 alt={shopInfo.shop_name}
                                 className="w-full h-full object-cover"
                                 onError={(e) => { e.target.src = dongho }}

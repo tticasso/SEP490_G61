@@ -82,7 +82,7 @@ class ApiService {
     }
   }
 
-  // Phương thức Upload File (mới thêm)
+  // Phương thức Upload File (đã cập nhật)
   async uploadFile(endpoint, formData, secure = true) {
     try {
       // Chỉ thêm token, không thêm Content-Type vì sẽ được tự động thiết lập bởi fetch khi sử dụng FormData
@@ -94,15 +94,26 @@ class ApiService {
           headers['x-access-token'] = token;
         }
       }
-
+  
+      // In ra đường dẫn để debug
+      console.log("Uploading to URL:", `${API_URL}${endpoint}`);
+      
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers,
         body: formData
       });
       
+      // Kiểm tra nếu response không ok (status không phải 2xx)
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", response.status, errorText);
+        throw new Error(`HTTP error! Status: ${response.status}, Detail: ${errorText}`);
+      }
+      
       return this.handleResponse(response);
     } catch (error) {
+      console.error("Upload error in service:", error);
       return this.handleError(error);
     }
   }

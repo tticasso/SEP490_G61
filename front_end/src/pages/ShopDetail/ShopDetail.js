@@ -6,6 +6,25 @@ import ShopDetailTabs from './component/ShopDetailTabs';
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 
+// Utility function to get the correct image path
+const getImagePath = (imgPath) => {
+    if (!imgPath) return "";
+    // Kiểm tra nếu imgPath đã là URL đầy đủ
+    if (imgPath.startsWith('http')) return imgPath;
+    // Kiểm tra nếu imgPath là đường dẫn tương đối
+    if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+    
+    // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
+    if (imgPath.includes('shops')) {
+        const fileName = imgPath.split("\\").pop();
+        return `http://localhost:9999/uploads/shops/${fileName}`;
+    }
+    
+    // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
+    const fileName = imgPath.split("\\").pop();
+    return `http://localhost:9999/uploads/products/${fileName}`;
+};
+
 const ShopDetail = () => {
     const [viewMode, setViewMode] = useState('grid');
     const [sortOption, setSortOption] = useState('Đặc sắc');
@@ -36,6 +55,17 @@ const ShopDetail = () => {
 
                 // Fetch shop details using the public API endpoint
                 const shopData = await ApiService.get(`/shops/public/${shopId}`, false);
+                
+                // Xử lý đường dẫn ảnh logo và ảnh bìa của shop
+                if (shopData) {
+                    if (shopData.logo) {
+                        shopData.logo = getImagePath(shopData.logo);
+                    }
+                    if (shopData.image_cover) {
+                        shopData.image_cover = getImagePath(shopData.image_cover);
+                    }
+                }
+                
                 setShopDetails(shopData);
 
                 // Fetch shop owner information if shop has user_id
@@ -52,7 +82,14 @@ const ShopDetail = () => {
                 // Fetch products from this shop using the product API
                 try {
                     const productsData = await ApiService.get(`/product/shop/${shopId}`, false);
-                    setShopProducts(productsData);
+                    
+                    // Xử lý đường dẫn ảnh cho các sản phẩm
+                    const productsWithImages = productsData.map(product => ({
+                        ...product,
+                        thumbnail: getImagePath(product.thumbnail)
+                    }));
+                    
+                    setShopProducts(productsWithImages);
                 } catch (productsError) {
                     console.error("Error fetching shop products:", productsError);
                     setShopProducts([]);
@@ -257,7 +294,8 @@ const ShopDetail = () => {
         soldProduct: shopDetails.total_sold || 0,
         joinedDay: joinInfo.days,
         phoneNumber: shopDetails.phone || 'Không có số điện thoại',
-        profileImage: shopDetails.logo || donghoAvatar
+        profileImage: shopDetails.logo || donghoAvatar,
+        coverImage: shopDetails.image_cover // Thêm ảnh bìa nếu có
     };
 
     const productCategories = categories.length > 0
@@ -274,67 +312,85 @@ const ShopDetail = () => {
     return (
         <div className='bg-[#E7E9EA] pb-10'>
             <div className="mx-auto max-w-7xl pt-10">
-                {/* Shop Header */}
-                <div className="flex gap-4 items-center bg-white p-4 rounded-lg shadow-md mb-4">
-                    <div className='mr-6 flex gap-4'>
-                        <img
-                            src={shopInfo.profileImage}
-                            alt={shopInfo.name}
-                            className="w-20 h-20 rounded-full "
-                        />
-                        <div>
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <h1 className="text-2xl font-bold">{shopInfo.name}</h1>
-                                    <p className="text-gray-600">@{shopInfo.name}</p>
-                                    <p>{shopInfo.followers} Người theo dõi</p>
+                {/* Shop Header with Cover Image */}
+                <div className="bg-white rounded-lg shadow-md mb-4 overflow-hidden">
+                    {/* Thêm phần hiển thị ảnh bìa nếu có */}
+                    {shopInfo.coverImage && (
+                        <div className="w-full h-48 relative">
+                            <img 
+                                src={shopInfo.coverImage} 
+                                alt={`${shopInfo.name} cover`} 
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                    )}
+                    
+                    {/* Shop Information */}
+                    <div className="flex gap-4 items-center p-4">
+                        <div className='mr-6 flex gap-4'>
+                            <img
+                                src={shopInfo.profileImage}
+                                alt={shopInfo.name}
+                                className="w-20 h-20 rounded-full object-cover"
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = donghoAvatar;
+                                }}
+                            />
+                            <div>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h1 className="text-2xl font-bold">{shopInfo.name}</h1>
+                                        <p className="text-gray-600">@{shopInfo.name}</p>
+                                        <p>{shopInfo.followers} Người theo dõi</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="mt-2 grid grid-cols-3 gap-4 text-sm text-gray-600">
-                        <div className="mt-2 text-sm text-gray-600">
-                            <div className='mb-4 flex gap-4 items-center'>
-                                <p> {shopInfo.email}</p>
-                                <button onClick={handleStartChat} className="bg-purple-200 px-4 py-2 rounded-full">
-                                    Nhắn tin
-                                </button>
-                            </div>
-
-                            <div className='flex gap-6 items-center'>
-                                <div className='flex items-center'>
-                                    <p><Flame /></p>
-                                    <p>
-                                        {shopInfo.products} Sản phẩm
-                                    </p>
+                        <div className="mt-2 grid grid-cols-3 gap-4 text-sm text-gray-600">
+                            <div className="mt-2 text-sm text-gray-600">
+                                <div className='mb-4 flex gap-4 items-center'>
+                                    <p> {shopInfo.email}</p>
+                                    <button onClick={handleStartChat} className="bg-purple-200 px-4 py-2 rounded-full">
+                                        Nhắn tin
+                                    </button>
                                 </div>
-                                <button 
-                                    className={`px-4 py-2 rounded-full flex items-center justify-center ${
-                                        isFollowing 
-                                            ? "bg-red-100 text-red-500 hover:bg-red-200" 
-                                            : "bg-blue-100 text-blue-500 hover:bg-blue-200"
-                                    } ${followLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-                                    onClick={handleFollowShop}
-                                    disabled={followLoading}
-                                >
-                                    {followLoading ? (
-                                        <span className="inline-block h-4 w-4 border-2 border-current border-r-transparent rounded-full animate-spin mr-2"></span>
-                                    ) : null}
-                                    {isFollowing ? "Bỏ Theo Dõi" : "Theo Dõi"}
-                                </button>
-                            </div>
-                        </div>
-                        <div className=''>
-                            <p className='mb-2'>Địa chỉ: {shopInfo.address}</p>
 
-                            <p className='mb-2'>Số điện thoại: {shopInfo.phoneNumber}</p>
-                            <p>Email: {shopInfo.email}</p>
-                        </div>
-                        <div>
-                            <p className='mb-2'>Sản phẩm đã bán: {shopInfo.soldProduct}</p>
-                            <p className='mb-2'>Tham gia: {shopInfo.joinedDaysAgo} ngày trước</p>
-                            <p>Thời gian hoạt động: 24/7</p>
+                                <div className='flex gap-6 items-center'>
+                                    <div className='flex items-center'>
+                                        <p><Flame /></p>
+                                        <p>
+                                            {shopInfo.products} Sản phẩm
+                                        </p>
+                                    </div>
+                                    <button 
+                                        className={`px-4 py-2 rounded-full flex items-center justify-center ${
+                                            isFollowing 
+                                                ? "bg-red-100 text-red-500 hover:bg-red-200" 
+                                                : "bg-blue-100 text-blue-500 hover:bg-blue-200"
+                                        } ${followLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                                        onClick={handleFollowShop}
+                                        disabled={followLoading}
+                                    >
+                                        {followLoading ? (
+                                            <span className="inline-block h-4 w-4 border-2 border-current border-r-transparent rounded-full animate-spin mr-2"></span>
+                                        ) : null}
+                                        {isFollowing ? "Bỏ Theo Dõi" : "Theo Dõi"}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className=''>
+                                <p className='mb-2'>Địa chỉ: {shopInfo.address}</p>
+
+                                <p className='mb-2'>Số điện thoại: {shopInfo.phoneNumber}</p>
+                                <p>Email: {shopInfo.email}</p>
+                            </div>
+                            <div>
+                                <p className='mb-2'>Sản phẩm đã bán: {shopInfo.soldProduct}</p>
+                                <p className='mb-2'>Tham gia: {shopInfo.joinedDaysAgo} ngày trước</p>
+                                <p>Thời gian hoạt động: 24/7</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -401,6 +457,10 @@ const ShopDetail = () => {
                                         src={product.thumbnail || dongho}
                                         alt={product.name}
                                         className={`${viewMode === 'grid' ? 'w-full h-48 object-cover' : 'w-24 h-24 object-cover'} rounded-lg`}
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = dongho;
+                                        }}
                                     />
                                     {product.is_hot && (
                                         <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded">

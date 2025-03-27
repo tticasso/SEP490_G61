@@ -22,7 +22,7 @@ const AddressSection = ({
     return (
         <>
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Delivery Address</h2>
+                <h2 className="text-xl font-bold">Địa chỉ giao hàng </h2>
                 {!loading && (
                     <button
                         onClick={handleRefreshAddresses}

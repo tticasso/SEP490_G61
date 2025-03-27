@@ -2,7 +2,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-
+const isVercel = process.env.VERCEL === '1';
 // Create upload directories if they don't exist
 const createDirs = () => {
     const dirs = [
@@ -78,6 +78,12 @@ const uploadVariantImages = multer({
 
 // Helper to remove old file
 const removeFile = (filePath) => {
+    // Skip file deletion on Vercel
+    if (isVercel) {
+        console.log('Skipping file deletion on Vercel:', filePath);
+        return;
+    }
+
     // Check if filePath is a URL (not local file)
     if (filePath && filePath.startsWith('http')) {
         return; // Skip deleting remote URLs

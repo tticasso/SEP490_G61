@@ -1,15 +1,16 @@
+// Update back_end/src/config/db.config.js
 const mongoose = require('mongoose');
-mongoose.Promise = global.Promise
+const connectToDatabase = require('../utils/mongodb');
+
+mongoose.Promise = global.Promise;
 
 const connectDB = async () => {
-  await mongoose.connect(process.env.MONGO_URI, {
-    dbName: process.env.DB_NAME
-  })
-    .then(() => console.log('Connect successfully'))
-    .catch(err => {
-      console.error(err.message)
-      process.exit();
-    })
+  try {
+    await connectToDatabase();
+  } catch (error) {
+    console.error('Database connection error:', error.message);
+    // Don't call process.exit() in serverless environments
+  }
 };
 
 module.exports = connectDB;

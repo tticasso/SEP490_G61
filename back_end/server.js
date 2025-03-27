@@ -32,7 +32,7 @@ const { AuthRouter,
   ProductVariantRouter,
   ProductAttributeRouter,
   GeminiRouter,
-    PayOsRouter ,
+  PayOsRouter,
   ShopRevenueRouter
 } = require('./src/routes');
 
@@ -131,109 +131,113 @@ app.use((err, req, res, next) => {
 
 // Tạo server HTTP từ ứng dụng Express
 const server = http.createServer(app);
-const io = socketIO(server, {
-  cors: {
-    origin: '*', // Đảm bảo đây là domain của frontend
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token'],
-    credentials: true
-  }
-});
+if (process.env.NODE_ENV !== 'production') {
+  // Initialize Socket.IO (only in non-production environments)
+  const io = socketIO(server, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token'],
+      credentials: true
+    }
+  });
 
+  // Socket handlers...
+  io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
 
+    // Authenticate user using token from query params
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      socket.disconnect();
+      return console.log('User not authenticated');
+    }
 
-// Socket.IO - Xử lý kết nối từ client
+    try {
+      // Verify token
+      const decoded = jwt.verify(token, config.secret);
+      socket.userId = decoded.id;
+      console.log('Authenticated user:', socket.userId);
+
+      // Join user to their room
+      socket.join(`user-${socket.userId}`);
+
+      // Cập nhật trạng thái thành online
+      updateUserOnlineStatus(socket.userId, true);
+
+      // Handle conversation joining
+      socket.on('join-conversation', (conversationId) => {
+        socket.join(`conversation-${conversationId}`);
+        console.log(`User ${socket.userId} joined conversation ${conversationId}`);
+      });
+
+      // Handle new message
+      socket.on('send-message', async (data) => {
+        try {
+          const { conversationId, content } = data;
+
+          // Save message to database
+          const newMessage = new db.message({
+            conversation_id: conversationId,
+            sender_id: socket.userId,
+            content: content,
+            created_at: new Date()
+          });
+
+          await newMessage.save();
+
+          // Update conversation last message
+          await db.conversation.findByIdAndUpdate(
+            conversationId,
+            {
+              last_message: content,
+              last_message_time: new Date()
+            }
+          );
+
+          // Broadcast message to all users in this conversation
+          io.to(`conversation-${conversationId}`).emit('new-message', {
+            _id: newMessage._id,
+            conversation_id: conversationId,
+            sender_id: socket.userId,
+            content: content,
+            created_at: newMessage.created_at,
+            is_read: false
+          });
+        } catch (error) {
+          console.error('Error sending message:', error);
+        }
+      });
+
+      // Handle typing status
+      socket.on('typing', ({ conversationId, isTyping }) => {
+        socket.to(`conversation-${conversationId}`).emit('user-typing', {
+          userId: socket.userId,
+          conversationId,
+          isTyping
+        });
+      });
+
+      // Handle disconnect
+      socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+        // Cập nhật trạng thái thành offline
+        updateUserOnlineStatus(socket.userId, false);
+      });
+
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      socket.disconnect();
+    }
+  });
+} else {
+  console.log('Socket.IO disabled in production environment');
+}
 // Thêm UserStatus model cho trạng thái online
 const UserStatus = require('./src/models/user-status.model');
 
 // Cập nhật phần Socket.IO trong server.js
-io.on('connection', (socket) => {
-  console.log('New client connected:', socket.id);
 
-  // Authenticate user using token from query params
-  const token = socket.handshake.auth.token;
-  if (!token) {
-    socket.disconnect();
-    return console.log('User not authenticated');
-  }
-
-  try {
-    // Verify token
-    const decoded = jwt.verify(token, config.secret);
-    socket.userId = decoded.id;
-    console.log('Authenticated user:', socket.userId);
-
-    // Join user to their room
-    socket.join(`user-${socket.userId}`);
-
-    // Cập nhật trạng thái thành online
-    updateUserOnlineStatus(socket.userId, true);
-
-    // Handle conversation joining
-    socket.on('join-conversation', (conversationId) => {
-      socket.join(`conversation-${conversationId}`);
-      console.log(`User ${socket.userId} joined conversation ${conversationId}`);
-    });
-
-    // Handle new message
-    socket.on('send-message', async (data) => {
-      try {
-        const { conversationId, content } = data;
-
-        // Save message to database
-        const newMessage = new db.message({
-          conversation_id: conversationId,
-          sender_id: socket.userId,
-          content: content,
-          created_at: new Date()
-        });
-
-        await newMessage.save();
-
-        // Update conversation last message
-        await db.conversation.findByIdAndUpdate(
-          conversationId,
-          {
-            last_message: content,
-            last_message_time: new Date()
-          }
-        );
-
-        // Broadcast message to all users in this conversation
-        io.to(`conversation-${conversationId}`).emit('new-message', {
-          _id: newMessage._id,
-          conversation_id: conversationId,
-          sender_id: socket.userId,
-          content: content,
-          created_at: newMessage.created_at,
-          is_read: false
-        });
-      } catch (error) {
-        console.error('Error sending message:', error);
-      }
-    });
-
-    // Handle typing status
-    socket.on('typing', ({ conversationId, isTyping }) => {
-      socket.to(`conversation-${conversationId}`).emit('user-typing', {
-        userId: socket.userId,
-        conversationId,
-        isTyping
-      });
-    });
-
-    // Handle disconnect
-    socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
-      // Cập nhật trạng thái thành offline
-      updateUserOnlineStatus(socket.userId, false);
-    });
-
-  } catch (error) {
-    console.error('Token verification failed:', error);
-    socket.disconnect();
-  }
-});
 
 // Hàm cập nhật trạng thái người dùng
 async function updateUserOnlineStatus(userId, isOnline) {
@@ -278,7 +282,16 @@ async function updateUserOnlineStatus(userId, isOnline) {
 }
 
 // Thay đổi app.listen thành server.listen
-server.listen(process.env.PORT || 9999, process.env.HOST_NAME || 'localhost', () => {
-  console.log(`Server is running at: http://${process.env.HOST_NAME || 'localhost'}:${process.env.PORT || 9999}`);
+if (process.env.NODE_ENV !== 'production') {
+  // Only use traditional server in development
+  server.listen(process.env.PORT || 9999, process.env.HOST_NAME || 'localhost', () => {
+    console.log(`Server is running at: http://${process.env.HOST_NAME || 'localhost'}:${process.env.PORT || 9999}`);
+    db.connectDB();
+  });
+} else {
+  // For production (Vercel), just connect to DB
   db.connectDB();
-});
+}
+
+// Add this line for Vercel serverless deployment
+module.exports = server;

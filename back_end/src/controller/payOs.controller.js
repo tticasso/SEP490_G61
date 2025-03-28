@@ -87,8 +87,8 @@ class PayOsController {
         orderCode: transactionCode,
         amount: order.total_price,
         description: `PAYOS${lastSevenDigits}`, // Mô tả ngắn gọn không quá 25 ký tự
-        returnUrl: `${process.env.FRONTEND_URL}/payment/success?orderCode=${transactionCode}`,
-        cancelUrl: `${process.env.FRONTEND_URL}/payment/cancel?orderCode=${transactionCode}`,
+        returnUrl: `${process.env.FRONTEND_URL}/`,
+        cancelUrl: `${process.env.FRONTEND_URL}/categories`,
         items: items,
       };
 

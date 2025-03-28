@@ -60,14 +60,6 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(cors({
-  // Cho phép truy cập từ cả localhost:3000 và IP cụ thể
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://sep-490-g61-5jgl.vercel.app/'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token']
-}));
-
 // Bổ sung middleware kiểm soát hoạt động của Web server
 app.use(bodyParser.json());
 app.use(morgan("dev"));

@@ -22,6 +22,7 @@ import {
 import ApiService from '../services/ApiService';
 import AuthService from '../services/AuthService';
 import Sidebar from './Sidebar'; // Import Sidebar component
+import { BE_API_URL } from '../config/config';
 
 const MyShop = () => {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ const MyShop = () => {
     
     // Xử lý đường dẫn từ backend
     const fileName = imgPath.split("\\").pop().split("/").pop();
-    return `http://localhost:9999/uploads/shops/${fileName}`;
+    return `${BE_API_URL}/uploads/shops/${fileName}`;
   };
 
   useEffect(() => {

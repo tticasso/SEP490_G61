@@ -45,6 +45,10 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
+const corsOrigins = process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['http://localhost:3000'];
+const corsMethods = process.env.CORS_METHODS ? process.env.CORS_METHODS.split(',') : ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'];
+const corsHeaders = process.env.CORS_HEADERS ? process.env.CORS_HEADERS.split(',') : ['Content-Type', 'Authorization', 'x-access-token'];
+
 // Khởi tạo Express trước khi dùng app.use()
 const app = express();
 
@@ -137,15 +141,22 @@ app.use((err, req, res, next) => {
   });
 });
 
+app.use(cors({
+  origin: corsOrigins,
+  credentials: true,
+  methods: corsMethods,
+  allowedHeaders: corsHeaders
+}));
+
 // Tạo server HTTP từ ứng dụng Express
 const server = http.createServer(app);
 if (process.env.NODE_ENV !== 'production') {
   // Initialize Socket.IO (only in non-production environments)
   const io = socketIO(server, {
     cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token'],
+      origin: corsOrigins, // Sử dụng cùng cấu hình với Express
+      methods: corsMethods,
+      allowedHeaders: corsHeaders,
       credentials: true
     }
   });

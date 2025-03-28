@@ -123,26 +123,91 @@ class PayOsController {
     }
 
     // Xử lý webhook từ PayOs
-    // Trong hàm handleWebhook
-    async handleWebhook(req, res, next) {
-        try {
-            // Phản hồi ngay lập tức để client không bị timeout
-            res.status(200).json({ success: true, message: 'Webhook received' });
-            
-            // Sau đó xử lý webhook trong background
-            this.processWebhookAsync(req.headers, req.body).catch(err => {
-                console.error('Background webhook processing error:', err);
-            });
-        } catch (error) {
-            console.error('PayOs webhook error:', error);
-            // Phản hồi lỗi nếu có vấn đề ngay từ đầu
-            if (!res.headersSent) {
-                res.status(500).json({ success: false, message: 'Internal server error' });
-            }
+async handleWebhook(req, res, next) {
+    try {
+        // Log dữ liệu webhook để debug
+        console.log('Webhook received. Headers:', req.headers);
+        console.log('Webhook body:', JSON.stringify(req.body));
+        
+        // Trả về response thành công ngay lập tức để tránh timeout
+        res.status(200).json({ success: true });
+        
+        // Xử lý webhook trong background
+        this.processWebhookData(req.body).catch(error => {
+            console.error('Error processing webhook data:', error);
+        });
+    } catch (error) {
+        console.error('PayOs webhook error:', error);
+        // Nếu headers chưa được gửi, trả về lỗi
+        if (!res.headersSent) {
+            next(error);
         }
     }
+}
+
+// Phương thức để xử lý dữ liệu webhook (được gọi từ handleWebhook)
+async processWebhookData(webhookData) {
+    try {
+        // Kiểm tra webhookData có cấu trúc đúng không
+        if (!webhookData || !webhookData.data) {
+            console.error('Invalid webhook data structure');
+            return;
+        }
+        
+        // Lấy thông tin từ webhook data
+        const { 
+            orderCode, 
+            amount, 
+            description, 
+            transactionDateTime,
+            counterAccountName,
+            reference
+        } = webhookData.data;
+        
+        console.log(`Processing payment for order: ${orderCode}, amount: ${amount}, reference: ${reference}`);
+        
+        // Tìm đơn hàng theo orderCode (được lưu trong order_payment_id)
+        const order = await Order.findOne({ order_payment_id: orderCode.toString() });
+        
+        if (!order) {
+            console.error(`Order not found for orderCode: ${orderCode}`);
+            return;
+        }
+        
+        console.log(`Found order: ${order._id} with current status: ${order.status_id}`);
+        
+        // Kiểm tra xem transaction đã thành công hay chưa dựa trên code
+        if (webhookData.code === "00" && webhookData.success === true) {
+            // Cập nhật trạng thái đơn hàng thành 'processing' (đã thanh toán)
+            order.status_id = 'processing';
+            order.updated_at = new Date();
+            
+            // Lưu thêm thông tin giao dịch nếu cần
+            order.payment_details = {
+                transactionTime: transactionDateTime,
+                paymentReference: reference,
+                payerName: counterAccountName,
+                amount: amount
+            };
+            
+            console.log(`Updating order ${order._id} status to 'processing'`);
+        } else if (webhookData.code !== "00" || webhookData.success !== true) {
+            // Trường hợp thanh toán thất bại
+            order.status_id = 'payment_failed';
+            order.updated_at = new Date();
+            console.log(`Updating order ${order._id} status to 'payment_failed'`);
+        }
+        
+        // Lưu thay đổi vào database
+        await order.save();
+        console.log(`Order ${order._id} updated successfully`);
+        
+    } catch (error) {
+        console.error('Error processing webhook data:', error);
+    }
+}
     
-    // Hàm xử lý webhook riêng biệt
+    // Thêm phương thức processWebhookAsync vào class PayOsController
     async processWebhookAsync(headers, body) {
         try {
             console.log('Processing webhook. Headers:', headers);

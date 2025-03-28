@@ -3,6 +3,7 @@ import { SendHorizontal, Paperclip, Smile } from 'lucide-react';
 import donghoAvatar from '../../../assets/donghoAvatar.jpg';
 import ApiService from '../../../services/ApiService';
 import AuthService from '../../../services/AuthService';
+import { BE_API_URL } from '../../../config/config';
 import { io } from 'socket.io-client';
 
 // Event bus để thông báo tin nhắn mới cho toàn ứng dụng
@@ -53,7 +54,7 @@ const Message = () => {
     if (!token) return;
 
     // Kết nối Socket.IO
-    socketRef.current = io('https://trooc.kaine.fun', {
+    socketRef.current = io(BE_API_URL, {
       auth: { token }
     });
 

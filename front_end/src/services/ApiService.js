@@ -1,8 +1,9 @@
 // src/services/ApiService.js
 
+import { BE_API_URL } from '../config/config';
 import AuthService from './AuthService';
 
-const API_URL = "https://trooc.kaine.fun/api";
+const API_URL = `${BE_API_URL}/api`;
 
 class ApiService {
   constructor() {

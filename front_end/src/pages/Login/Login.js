@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import { BE_API_URL } from "../../config/config";
 
 const LoginPage = () => {
     const [formData, setFormData] = useState({
@@ -79,7 +80,7 @@ const LoginPage = () => {
 
     // Function to handle Google authentication redirect
     const handleGoogleRedirect = () => {
-        window.location.href = "https://trooc.kaine.fun/api/auth/google";
+        window.location.href = `${BE_API_URL}/api/auth/google`;
     };
 
     const processGoogleAuthData = (userDataEncoded) => {

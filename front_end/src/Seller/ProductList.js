@@ -13,10 +13,11 @@ import {
 import Sidebar from './Sidebar';
 import ApiService from '../services/ApiService';
 import AuthService from '../services/AuthService';
+import { BE_API_URL } from '../../src/config/config';
 const getImagePath = (imgPath) => {
   if (!imgPath) return "";
   const fileName = imgPath.split("\\").pop();
-  return `http://localhost:9999/uploads/products/${fileName}`;
+  return `${BE_API_URL}/uploads/products/${fileName}`;
 };
 // Product Details Modal Component
 const ProductDetailsModal = ({ product, onClose }) => {

@@ -19,6 +19,8 @@ import ProductModal from './components/ProductModal';
 import ProductSection from './components/ProductSection';
 import ImageSlider from './components/ImageSlider'; // Import ImageSlider component
 
+import { BE_API_URL } from '../../config/config';
+
 const TroocEcommerce = () => {
     const [hoveredProduct, setHoveredProduct] = useState(null);
     const [showProductModal, setShowProductModal] = useState(false);
@@ -51,10 +53,10 @@ const TroocEcommerce = () => {
         // Kiểm tra nếu imgPath đã là URL đầy đủ
         if (imgPath.startsWith('http')) return imgPath;
         // Kiểm tra nếu imgPath là đường dẫn tương đối
-        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        if (imgPath.startsWith('/uploads')) return `${BE_API_URL}${imgPath}`;
         // Trường hợp imgPath là đường dẫn từ backend
         const fileName = imgPath.split("\\").pop();
-        return `http://localhost:9999/uploads/products/${fileName}`;
+        return `${BE_API_URL}/uploads/products/${fileName}`;
     };
     // Get current user information
     const { currentUser, isLoggedIn } = useAuth();

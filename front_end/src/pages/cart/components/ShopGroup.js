@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import CartItem from './CartItem';
 import dongho from '../../../assets/dongho.png';
 import ApiService from '../../../services/ApiService';
+import { BE_API_URL } from '../../../config/config';
 
 const ShopGroup = ({
     shop,
@@ -27,17 +28,17 @@ const ShopGroup = ({
         // Kiểm tra nếu imgPath đã là URL đầy đủ
         if (imgPath.startsWith('http')) return imgPath;
         // Kiểm tra nếu imgPath là đường dẫn tương đối
-        if (imgPath.startsWith('/uploads')) return `http://localhost:9999${imgPath}`;
+        if (imgPath.startsWith('/uploads')) return `${BE_API_URL}${imgPath}`;
         
         // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
         if (imgPath.includes('shops')) {
             const fileName = imgPath.split("\\").pop();
-            return `http://localhost:9999/uploads/shops/${fileName}`;
+            return `${BE_API_URL}/uploads/shops/${fileName}`;
         }
         
         // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
         const fileName = imgPath.split("\\").pop();
-        return `http://localhost:9999/uploads/products/${fileName}`;
+        return `${BE_API_URL}/uploads/products/${fileName}`;
     };
 
     // Fetch thông tin shop nếu cần

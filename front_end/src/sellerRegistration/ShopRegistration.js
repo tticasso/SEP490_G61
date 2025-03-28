@@ -6,8 +6,6 @@ import {
   Info,
   Package,
   MapPin,
-  Phone,
-  Mail,
   FileText,
   CreditCard,
   AlertCircle,

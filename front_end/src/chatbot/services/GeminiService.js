@@ -1,5 +1,7 @@
 // SEP490_G61/front_end/src/chatbot/services/GeminiService.js
 
+import { BE_API_URL } from '../../config/config';
+
 /**
  * Service để gọi API Gemini từ backend
  */
@@ -8,7 +10,7 @@ export const sendMessageToGemini = async (messageHistory) => {
       console.log('====== Gửi yêu cầu đến Gemini ======');
       
       // Thay đổi URL để gọi đúng backend API
-      const apiUrl = 'https://trooc.kaine.fun/api/gemini/chat';
+      const apiUrl = `${BE_API_URL}/api/gemini/chat`;
       
       // In ra thông tin gửi đi để debug
       console.log("Gửi yêu cầu đến:", apiUrl);

@@ -1,6 +1,7 @@
 // src/services/AuthService.js
+import { BE_API_URL } from '../config/config';
 
-const API_URL = "https://trooc.kaine.fun/api";
+const API_URL = `${BE_API_URL}/api`;
 
 class AuthService {
     // Đăng nhập

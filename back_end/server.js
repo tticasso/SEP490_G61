@@ -9,8 +9,6 @@ const jwt = require('jsonwebtoken');
 const config = require('./src/config/auth.config');
 require('dotenv').config();
 
-
-
 const {
   AuthRouter,
   UploadRouter,

@@ -100,3 +100,68 @@
         expect(res.json).toHaveBeenCalledWith(createdUser);
         expect(next).not.toHaveBeenCalled();
       });
+
+    // Successfully authenticates a user with valid email and password
+    it('should return user data and token when credentials are valid', async () => {
+      // Mock dependencies
+      const mockUser = {
+        _id: 'user123',
+        email: 'test@example.com',
+        password: 'hashedPassword',
+        roles: [
+          { name: 'admin' },
+          { name: 'user' }
+        ]
+      };
+  
+      const mockReq = {
+        body: {
+          email: 'test@example.com',
+          password: 'correctPassword'
+        }
+      };
+  
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+  
+      const mockNext = jest.fn();
+  
+      // Mock User.findOne
+      User.findOne = jest.fn().mockReturnValue({
+        populate: jest.fn().mockResolvedValue(mockUser)
+      });
+  
+      // Mock bcrypt.compareSync
+      bcrypt.compareSync = jest.fn().mockReturnValue(true);
+  
+      // Mock jwt.sign
+      const mockToken = 'generated-jwt-token';
+      jwt.sign = jest.fn().mockReturnValue(mockToken);
+  
+      // Call the function
+      await signIn(mockReq, mockRes, mockNext);
+  
+      // Assertions
+      expect(User.findOne).toHaveBeenCalledWith({ email: 'test@example.com' });
+      expect(bcrypt.compareSync).toHaveBeenCalledWith('correctPassword', 'hashedPassword');
+      expect(jwt.sign).toHaveBeenCalledWith(
+        { id: 'user123' },
+        config.secret,
+        {
+          algorithm: 'HS256',
+          expiresIn: config.jwtExpiration
+        }
+      );
+  
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        id: 'user123',
+        email: 'test@example.com',
+        accessToken: mockToken,
+        roles: ['ROLE_admin', 'ROLE_user']
+      });
+  
+      expect(mockNext).not.toHaveBeenCalled();
+    });

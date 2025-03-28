@@ -254,49 +254,47 @@ async processWebhookData(webhookData) {
         try {
             const { transactionCode } = req.params;
             console.log('Checking payment status for transaction:', transactionCode);
-
+    
+            // Đặt timeout cho quá trình kiểm tra
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Request timeout')), 5000)
+            );
+    
             // Tìm đơn hàng theo transaction_code (được lưu trong order_payment_id)
-            const order = await Order.findOne({ order_payment_id: transactionCode.toString() });
-
+            const orderPromise = Order.findOne({ order_payment_id: transactionCode.toString() });
+            
+            // Sử dụng Promise.race để tránh treo nếu DB quá lâu
+            const order = await Promise.race([orderPromise, timeoutPromise]);
+    
             if (!order) {
                 console.log('Order not found for transaction code:', transactionCode);
                 throw httpErrors.NotFound('Không tìm thấy đơn hàng với mã giao dịch này');
             }
-
+    
             console.log('Found order:', order._id);
-
-            let paymentStatus;
+    
+            let paymentStatus = { status: 'UNKNOWN' };
+            
             try {
-                // Gọi API PayOS để kiểm tra trạng thái thanh toán
-                paymentStatus = await payOS.getPaymentLinkInfoByOrderCode(parseInt(transactionCode));
-                console.log('PayOS payment status:', paymentStatus);
-            } catch (payosError) {
-                console.error('Error getting payment status from PayOS:', payosError);
-                
-                // Nếu không lấy được từ PayOS, sử dụng thông tin từ cơ sở dữ liệu
+                // Không gọi PayOS API nếu đang gặp vấn đề với nó
+                // Chỉ dùng thông tin từ database
                 paymentStatus = {
                     status: order.status_id === 'processing' ? 'PAID' : 
                             order.status_id === 'cancelled' ? 'CANCELLED' : 'PENDING'
                 };
                 console.log('Using local payment status:', paymentStatus);
+            } catch (payosError) {
+                console.error('Error getting payment status from PayOS:', payosError);
+                paymentStatus = {
+                    status: order.status_id === 'processing' ? 'PAID' : 
+                            order.status_id === 'cancelled' ? 'CANCELLED' : 'PENDING'
+                };
             }
-
-            // Cập nhật trạng thái đơn hàng dựa vào kết quả từ PayOs
-            if (paymentStatus.status === 'PAID' && order.status_id !== 'processing') {
-                order.status_id = 'processing';
-                order.updated_at = new Date();
-                await order.save();
-            } else if ((paymentStatus.status === 'CANCELLED' || paymentStatus.status === 'FAILED') 
-                       && order.status_id !== 'cancelled') {
-                order.status_id = 'cancelled';
-                order.updated_at = new Date();
-                await order.save();
-            }
-
+    
             // Lấy số lượng items từ chi tiết đơn hàng
             const orderDetails = await OrderDetail.find({ order_id: order._id });
             const itemCount = orderDetails ? orderDetails.length : 0;
-
+    
             res.status(200).json({
                 success: true,
                 data: {
@@ -315,7 +313,9 @@ async processWebhookData(webhookData) {
             });
         } catch (error) {
             console.error('Check payment status error:', error);
-            next(error);
+            if (!res.headersSent) {
+                next(error);
+            }
         }
     }
 }

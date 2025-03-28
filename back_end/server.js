@@ -9,6 +9,8 @@ const jwt = require('jsonwebtoken');
 const config = require('./src/config/auth.config');
 require('dotenv').config();
 
+
+
 const {
   AuthRouter,
   UploadRouter,
@@ -58,6 +60,14 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(cors({
+  // Cho phép truy cập từ cả localhost:3000 và IP cụ thể
+  origin: corsOrigins,
+  credentials: true,
+  methods: corsMethods,
+  allowedHeaders: corsHeaders
+}));
+
 // Bổ sung middleware kiểm soát hoạt động của Web server
 app.use(bodyParser.json());
 app.use(morgan("dev"));
@@ -131,22 +141,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.use(cors({
-  origin: corsOrigins,
-  credentials: true,
-  methods: corsMethods,
-  allowedHeaders: corsHeaders
-}));
-
 // Tạo server HTTP từ ứng dụng Express
 const server = http.createServer(app);
 if (process.env.NODE_ENV !== 'production') {
   // Initialize Socket.IO (only in non-production environments)
   const io = socketIO(server, {
     cors: {
-      origin: corsOrigins, // Sử dụng cùng cấu hình với Express
-      methods: corsMethods,
-      allowedHeaders: corsHeaders,
+      origin: '*',
+      methods: ['GET', 'POST'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token'],
       credentials: true
     }
   });

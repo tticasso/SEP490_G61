@@ -385,7 +385,7 @@ const CheckoutPage = () => {
         const checkServerStatus = async () => {
             try {
                 // Check if server is running by calling a simple API
-                const response = await fetch("http://localhost:9999/api/auth/check", {
+                const response = await fetch("https://trooc.kaine.fun/api/auth/check", {
                     method: 'GET'
                 });
                 console.log("Server status:", response.status);
@@ -411,7 +411,7 @@ const CheckoutPage = () => {
 
                 for (const endpoint of endpoints) {
                     try {
-                        const resp = await fetch(`http://localhost:9999/api${endpoint}`, {
+                        const resp = await fetch(`https://trooc.kaine.fun/api${endpoint}`, {
                             method: 'GET',
                             headers: {
                                 'Content-Type': 'application/json',

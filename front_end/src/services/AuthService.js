@@ -1,6 +1,6 @@
 // src/services/AuthService.js
 
-const API_URL = "http://localhost:9999/api";
+const API_URL = "https://trooc.kaine.fun/api";
 
 class AuthService {
     // Đăng nhập

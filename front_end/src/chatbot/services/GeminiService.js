@@ -8,7 +8,7 @@ export const sendMessageToGemini = async (messageHistory) => {
       console.log('====== Gửi yêu cầu đến Gemini ======');
       
       // Thay đổi URL để gọi đúng backend API
-      const apiUrl = 'http://localhost:9999/api/gemini/chat';
+      const apiUrl = 'https://trooc.kaine.fun/api/gemini/chat';
       
       // In ra thông tin gửi đi để debug
       console.log("Gửi yêu cầu đến:", apiUrl);

@@ -53,7 +53,7 @@ const Message = () => {
     if (!token) return;
 
     // Kết nối Socket.IO
-    socketRef.current = io('http://localhost:9999', {
+    socketRef.current = io('https://trooc.kaine.fun', {
       auth: { token }
     });
 

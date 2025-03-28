@@ -79,7 +79,7 @@ const LoginPage = () => {
 
     // Function to handle Google authentication redirect
     const handleGoogleRedirect = () => {
-        window.location.href = "http://localhost:9999/api/auth/google";
+        window.location.href = "https://trooc.kaine.fun/api/auth/google";
     };
 
     const processGoogleAuthData = (userDataEncoded) => {

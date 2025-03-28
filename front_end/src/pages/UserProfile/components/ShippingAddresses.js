@@ -197,7 +197,7 @@ const ShippingAddresses = () => {
     const checkServerStatus = async () => {
       try {
         // Kiểm tra server có đang chạy không bằng cách gọi API đơn giản
-        const response = await fetch("http://localhost:9999/api/auth/check", {
+        const response = await fetch("https://trooc.kaine.fun/api/auth/check", {
           method: 'GET'
         });
         console.log("Server status:", response.status);
@@ -224,7 +224,7 @@ const ShippingAddresses = () => {
         
         for (const endpoint of endpoints) {
           try {
-            const resp = await fetch(`http://localhost:9999/api${endpoint}`, {
+            const resp = await fetch(`https://trooc.kaine.fun/api${endpoint}`, {
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',
@@ -469,7 +469,7 @@ const ShippingAddresses = () => {
   // Kiểm tra xem API endpoint có tồn tại không
   const checkEndpointExists = async (endpoint) => {
     try {
-      const response = await fetch(`http://localhost:9999/api${endpoint}`, {
+      const response = await fetch(`https://trooc.kaine.fun/api${endpoint}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

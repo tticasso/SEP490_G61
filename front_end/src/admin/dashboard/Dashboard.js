@@ -41,7 +41,7 @@ const Dashboard = () => {
             // Fetch pending orders
             const ordersResponse = await ApiService.get('/order/list');
             // Filter pending orders
-            const pending = ordersResponse.filter(order => order.status_id === 'pending')
+            const pending = ordersResponse.filter(order => order.order_status === 'pending')
                 .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
                 .slice(0, 5);
             setPendingOrders(pending);

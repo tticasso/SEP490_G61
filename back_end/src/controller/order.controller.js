@@ -372,7 +372,8 @@ const createOrder = async (req, res) => {
             discount_amount: discountAmount,
             shipping_cost: shippingCost, // Add this field to store shipping cost
             user_address_id,
-            original_price: originalPrice
+            original_price: originalPrice,
+            payment_status: 'pending'
         });
 
         // Đảm bảo giá không âm
@@ -450,24 +451,24 @@ const createOrder = async (req, res) => {
 const updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status_id } = req.body;
+        const { order_status } = req.body;
 
         const order = await Order.findById(id);
         if (!order) {
             return res.status(404).json({ message: "Order not found" });
         }
 
-        order.status_id = status_id;
+        order.order_status = order_status;
 
         // If order is delivered, update the delivery timestamp
-        if (status_id === 'delivered') {
+        if (order_status === 'delivered') {
             order.order_delivered_at = new Date();
         }
 
         await order.save();
 
         // If order has been delivered, create a revenue record
-        if (status_id === 'delivered') {
+        if (order_status === 'delivered') {
             try {
                 // Create revenue record internally
                 const axios = require('axios');
@@ -522,14 +523,14 @@ const cancelOrder = async (req, res) => {
         }
 
         // Chỉ hủy đơn hàng khi đang ở trạng thái chờ xử lý hoặc đang xử lý
-        if (order.status_id !== 'pending' && order.status_id !== 'processing') {
+        if (order.order_status !== 'pending' && order.order_status !== 'processing') {
             return res.status(400).json({
                 message: "Cannot cancel order that has been shipped or delivered"
             });
         }
 
         // Cập nhật trạng thái đơn hàng
-        order.status_id = 'cancelled';
+        order.order_status = 'cancelled';
         await order.save();
 
         // Hoàn trả tồn kho
@@ -612,21 +613,21 @@ const getOrderStatistics = async (req, res) => {
         const totalOrders = await Order.countDocuments({ is_delete: false });
 
         // Số đơn hàng theo trạng thái
-        const pendingOrders = await Order.countDocuments({ status_id: 'pending', is_delete: false });
-        const processingOrders = await Order.countDocuments({ status_id: 'processing', is_delete: false });
-        const shippedOrders = await Order.countDocuments({ status_id: 'shipped', is_delete: false });
-        const deliveredOrders = await Order.countDocuments({ status_id: 'delivered', is_delete: false });
-        const cancelledOrders = await Order.countDocuments({ status_id: 'cancelled', is_delete: false });
+        const pendingOrders = await Order.countDocuments({ order_status: 'pending', is_delete: false });
+        const processingOrders = await Order.countDocuments({ order_status: 'processing', is_delete: false });
+        const shippedOrders = await Order.countDocuments({ order_status: 'shipped', is_delete: false });
+        const deliveredOrders = await Order.countDocuments({ order_status: 'delivered', is_delete: false });
+        const cancelledOrders = await Order.countDocuments({ order_status: 'cancelled', is_delete: false });
 
         // Tổng doanh thu
         const revenue = await Order.aggregate([
-            { $match: { status_id: 'delivered', is_delete: false } },
+            { $match: { order_status: 'delivered', is_delete: false } },
             { $group: { _id: null, total: { $sum: "$total_price" } } }
         ]);
 
         // Tổng tiền giảm giá
         const discountTotal = await Order.aggregate([
-            { $match: { status_id: 'delivered', is_delete: false } },
+            { $match: { order_status: 'delivered', is_delete: false } },
             {
                 $group: {
                     _id: null,

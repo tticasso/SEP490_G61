@@ -198,7 +198,7 @@ const createRevenueRecord = async (req, res) => {
         }
 
         // Check if order is delivered
-        if (order.status_id !== 'delivered') {
+        if (order.order_status !== 'delivered') {
             return res.status(400).json({ message: "Only delivered orders can generate revenue" });
         }
 

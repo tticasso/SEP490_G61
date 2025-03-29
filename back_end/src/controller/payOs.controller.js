@@ -106,7 +106,7 @@ class PayOsController {
       // Cập nhật đơn hàng với thông tin thanh toán
       order.order_payment_id = transactionCode.toString(); // Lưu transactionCode vào order_payment_id
       order.payment_method = "payos";
-      order.payment_status = "pending";
+      order.status_id = "pending";
       await order.save();
 
       // Chuyển hướng người dùng đến trang thanh toán của PayOS
@@ -172,13 +172,13 @@ class PayOsController {
         }
 
         console.log(
-          `Found order: ${order._id} with current status: ${order.payment_status}`
+          `Found order: ${order._id} with current status: ${order.status_id}`
         );
 
         // Kiểm tra xem transaction đã thành công hay chưa dựa trên code
         if (webhookData.code === "00" && webhookData.success === true) {
           // Cập nhật trạng thái đơn hàng thành 'processing' (đã thanh toán)
-          order.payment_status = "processing";
+          order.status_id = "processing";
           order.updated_at = new Date();
 
           // Lưu thêm thông tin giao dịch nếu cần
@@ -192,7 +192,7 @@ class PayOsController {
           console.log(`Updating order ${order._id} status to 'processing'`);
         } else if (webhookData.code !== "00" || webhookData.success !== true) {
           // Trường hợp thanh toán thất bại
-          order.payment_status = "payment_failed";
+          order.status_id = "payment_failed";
           order.updated_at = new Date();
           console.log(`Updating order ${order._id} status to 'payment_failed'`);
         }
@@ -247,13 +247,13 @@ class PayOsController {
   //       }
 
   //       console.log(
-  //         `Found order: ${order._id} with current status: ${order.payment_status}`
+  //         `Found order: ${order._id} with current status: ${order.status_id}`
   //       );
 
   //       // Kiểm tra xem transaction đã thành công hay chưa dựa trên code
   //       if (webhookData.code === "00" && webhookData.success === true) {
   //         // Cập nhật trạng thái đơn hàng thành 'processing' (đã thanh toán)
-  //         order.payment_status = "processing";
+  //         order.status_id = "processing";
   //         order.updated_at = new Date();
 
   //         // Lưu thêm thông tin giao dịch nếu cần
@@ -267,7 +267,7 @@ class PayOsController {
   //         console.log(`Updating order ${order._id} status to 'processing'`);
   //       } else if (webhookData.code !== "00" || webhookData.success !== true) {
   //         // Trường hợp thanh toán thất bại
-  //         order.payment_status = "payment_failed";
+  //         order.status_id = "payment_failed";
   //         order.updated_at = new Date();
   //         console.log(`Updating order ${order._id} status to 'payment_failed'`);
   //       }
@@ -307,16 +307,16 @@ class PayOsController {
       }
 
       console.log(
-        `Found order ${order._id} with current status ${order.payment_status}`
+        `Found order ${order._id} with current status ${order.status_id}`
       );
 
       // Nếu thanh toán thành công, cập nhật thêm thông tin
       if (status === "PAID") {
-        order.payment_status = "processing"; // Chuyển đơn hàng sang trạng thái đang xử lý
+        order.status_id = "processing"; // Chuyển đơn hàng sang trạng thái đang xử lý
         order.updated_at = new Date();
         console.log(`Updated order ${order._id} status to processing`);
       } else if (status === "CANCELLED" || status === "FAILED") {
-        order.payment_status = "cancelled";
+        order.status_id = "cancelled";
         order.updated_at = new Date();
         console.log(`Updated order ${order._id} status to cancelled`);
       }
@@ -363,9 +363,9 @@ class PayOsController {
         // Chỉ dùng thông tin từ database
         paymentStatus = {
           status:
-            order.payment_status === "processing"
+            order.status_id === "processing"
               ? "PAID"
-              : order.payment_status === "cancelled"
+              : order.status_id === "cancelled"
                 ? "CANCELLED"
                 : "PENDING",
         };
@@ -374,9 +374,9 @@ class PayOsController {
         console.error("Error getting payment status from PayOS:", payosError);
         paymentStatus = {
           status:
-            order.payment_status === "processing"
+            order.status_id === "processing"
               ? "PAID"
-              : order.payment_status === "cancelled"
+              : order.status_id === "cancelled"
                 ? "CANCELLED"
                 : "PENDING",
         };
@@ -391,7 +391,7 @@ class PayOsController {
         data: {
           order: {
             id: order._id,
-            status: order.payment_status,
+            status: order.status_id,
             total: order.total_price || 0,
             items: itemCount,
           },

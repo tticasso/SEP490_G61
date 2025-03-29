@@ -4,6 +4,8 @@ const Shop = db.shop;
 const User = db.user;
 const nodemailer = require('nodemailer');
 require('dotenv').config();
+const { cloudinary, removeFile } = require("../services/upload.service");
+
 // Lấy tất cả cửa hàng
 const getAllShops = async (req, res, next) => {
     try {
@@ -173,6 +175,15 @@ const deleteShop = async (req, res, next) => {
         const shop = await Shop.findById(req.params.id);
         if (!shop || shop.is_active === 0) {
             throw createHttpError.NotFound("Shop not found");
+        }
+
+        // Xóa logo và image_cover từ Cloudinary nếu có
+        if (shop.logo && shop.logo.includes('cloudinary')) {
+            await removeFile(shop.logo);
+        }
+
+        if (shop.image_cover && shop.image_cover.includes('cloudinary')) {
+            await removeFile(shop.image_cover);
         }
 
         shop.is_active = 0; // Thay đổi trạng thái thành không hoạt động
@@ -363,25 +374,39 @@ const uploadShopImage = async (req, res, next) => {
 
         const shop = await Shop.findById(shopId);
         if (!shop || shop.is_active === 0) {
+            // Xóa file vừa upload nếu shop không tồn tại
+            if (req.file.path) {
+                await removeFile(req.file.path);
+            }
             throw createHttpError.NotFound("Shop not found");
         }
 
-        // Lấy đường dẫn tương đối của file
-        const filePath = `/uploads/shops/${req.file.filename}`;
+        // Xóa file cũ trên Cloudinary nếu đã tồn tại
+        if (shop[field] && shop[field].includes('cloudinary')) {
+            await removeFile(shop[field]);
+        }
 
-        // Cập nhật shop với đường dẫn file
-        shop[field] = filePath;
+        // Lấy URL đầy đủ từ Cloudinary
+        const cloudinaryUrl = req.file.path;
+
+        // Cập nhật shop với URL Cloudinary
+        shop[field] = cloudinaryUrl;
         shop.updated_at = Date.now();
         await shop.save();
 
         res.status(200).json({
             message: "Image uploaded successfully",
-            [field]: filePath
+            [field]: cloudinaryUrl
         });
     } catch (error) {
+        // Xóa file vừa upload nếu có lỗi
+        if (req.file && req.file.path) {
+            await removeFile(req.file.path);
+        }
         next(error);
     }
 };
+
 const unlockShop = async (req, res, next) => {
     try {
         // Use findById without checking is_active status
@@ -389,15 +414,15 @@ const unlockShop = async (req, res, next) => {
         if (!shop) {
             throw createHttpError.NotFound("Shop not found");
         }
-        
+
         // Set is_active to 1 (unlocked)
         shop.is_active = 1;
         shop.updated_at = Date.now();
         await shop.save();
-        
-        res.status(200).json({ 
-            message: "Shop unlocked successfully", 
-            shop 
+
+        res.status(200).json({
+            message: "Shop unlocked successfully",
+            shop
         });
     } catch (error) {
         if (error.name === 'CastError') {

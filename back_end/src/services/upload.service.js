@@ -2,46 +2,35 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const isVercel = process.env.VERCEL === '1';
-// Create upload directories if they don't exist
-const createDirs = () => {
-    const dirs = [
-        './uploads',
-        './uploads/products',
-        './uploads/variants'
-    ];
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
-    dirs.forEach(dir => {
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-    });
-};
-
-// Khởi tạo thư mục
-createDirs();
+// Cấu hình Cloudinary
+cloudinary.config({
+    cloud_name: 'dv1abtnj5',
+    api_key: '754815476927242',
+    api_secret: "qknWjrBcEbsCpdWWUX2Ris8s2O8"
+});
 
 // Cấu hình lưu trữ cho hình ảnh sản phẩm
-const productStorage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/products/');
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
-        cb(null, 'product-' + uniqueSuffix + ext);
+const productStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'trooc/products',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        transformation: [{ width: 1000, crop: 'limit' }], // Giới hạn kích thước
+        resource_type: 'auto'
     }
 });
 
 // Cấu hình lưu trữ cho hình ảnh biến thể
-const variantStorage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/variants/');
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
-        cb(null, 'variant-' + uniqueSuffix + ext);
+const variantStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'trooc/variants',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        transformation: [{ width: 1000, crop: 'limit' }], // Giới hạn kích thước
+        resource_type: 'auto'
     }
 });
 
@@ -59,7 +48,6 @@ const fileFilter = (req, file, cb) => {
 };
 
 // Tạo instance upload cho sản phẩm (một hình ảnh)
-// Đổi từ 'thumbnail' sang 'image' để khớp với frontend
 const uploadProductImage = multer({
     storage: productStorage,
     limits: {
@@ -86,22 +74,29 @@ const uploadVariantImages = multer({
     fileFilter: fileFilter
 }).array('images', 5); // Tối đa 5 hình ảnh cho mỗi biến thể
 
-// Hàm trợ giúp để xóa file cũ
-const removeFile = (filePath) => {
-    // Skip file deletion on Vercel
-    if (isVercel) {
-        console.log('Skipping file deletion on Vercel:', filePath);
-        return;
-    }
+// Hàm trợ giúp để xóa file từ Cloudinary
+const removeFile = async (fileUrl) => {
+    if (!fileUrl) return;
 
-    // Check if filePath is a URL (not local file)
-    if (filePath && filePath.startsWith('http')) {
-        return; // Bỏ qua việc xóa URL từ xa
-    }
+    try {
+        // Nếu là URL Cloudinary
+        if (fileUrl.includes('cloudinary')) {
+            // Trích xuất public_id từ URL
+            const splitUrl = fileUrl.split('/');
+            const folderWithFilename = splitUrl.slice(splitUrl.indexOf('trooc')).join('/');
+            const publicId = folderWithFilename.split('.')[0]; // Loại bỏ phần mở rộng
 
-    // Chỉ cố gắng xóa nếu filePath hợp lệ và tồn tại
-    if (filePath && fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+            // Xóa file từ Cloudinary
+            await cloudinary.uploader.destroy(publicId);
+            console.log(`Đã xóa file từ Cloudinary: ${publicId}`);
+        }
+        // Nếu là file cục bộ (cho tương thích ngược)
+        else if (fileUrl.startsWith('/uploads/') && fs.existsSync('.' + fileUrl)) {
+            fs.unlinkSync('.' + fileUrl);
+            console.log(`Đã xóa file cục bộ: ${fileUrl}`);
+        }
+    } catch (error) {
+        console.error('Lỗi khi xóa file:', error);
     }
 };
 
@@ -109,5 +104,6 @@ module.exports = {
     uploadProductImage,
     uploadProductThumbnail,
     uploadVariantImages,
-    removeFile
+    removeFile,
+    cloudinary // Export cloudinary để có thể sử dụng ở nơi khác nếu cần
 };

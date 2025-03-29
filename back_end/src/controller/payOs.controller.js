@@ -178,7 +178,7 @@ class PayOsController {
         // Kiểm tra xem transaction đã thành công hay chưa dựa trên code
         if (webhookData.code === "00" && webhookData.success === true) {
           // Cập nhật trạng thái đơn hàng thành 'processing' (đã thanh toán)
-          order.status_id = "processing";
+          order.status_id = "paid";
           order.updated_at = new Date();
 
           // Lưu thêm thông tin giao dịch nếu cần

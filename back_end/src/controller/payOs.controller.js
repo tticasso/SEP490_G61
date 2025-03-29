@@ -35,7 +35,6 @@ class PayOsController {
       if (!orderDetails || orderDetails.length === 0) {
         throw httpErrors.NotFound("Không tìm thấy chi tiết đơn hàng");
       }
-
       // Tạo mã giao dịch duy nhất
       function generateTransactionCodeFromOrderId(orderId) {
         // Lấy timestamp hiện tại (số giây)
@@ -107,7 +106,7 @@ class PayOsController {
       // Cập nhật đơn hàng với thông tin thanh toán
       order.order_payment_id = transactionCode.toString(); // Lưu transactionCode vào order_payment_id
       order.payment_method = "payos";
-      order.status_id = "pending";
+      order.payment_status = "pending";
       await order.save();
 
       // Chuyển hướng người dùng đến trang thanh toán của PayOS
@@ -173,13 +172,13 @@ class PayOsController {
         }
 
         console.log(
-          `Found order: ${order._id} with current status: ${order.status_id}`
+          `Found order: ${order._id} with current status: ${order.payment_status}`
         );
 
         // Kiểm tra xem transaction đã thành công hay chưa dựa trên code
         if (webhookData.code === "00" && webhookData.success === true) {
           // Cập nhật trạng thái đơn hàng thành 'processing' (đã thanh toán)
-          order.status_id = "processing";
+          order.payment_status = "processing";
           order.updated_at = new Date();
 
           // Lưu thêm thông tin giao dịch nếu cần
@@ -193,7 +192,7 @@ class PayOsController {
           console.log(`Updating order ${order._id} status to 'processing'`);
         } else if (webhookData.code !== "00" || webhookData.success !== true) {
           // Trường hợp thanh toán thất bại
-          order.status_id = "payment_failed";
+          order.payment_status = "payment_failed";
           order.updated_at = new Date();
           console.log(`Updating order ${order._id} status to 'payment_failed'`);
         }
@@ -248,13 +247,13 @@ class PayOsController {
   //       }
 
   //       console.log(
-  //         `Found order: ${order._id} with current status: ${order.status_id}`
+  //         `Found order: ${order._id} with current status: ${order.payment_status}`
   //       );
 
   //       // Kiểm tra xem transaction đã thành công hay chưa dựa trên code
   //       if (webhookData.code === "00" && webhookData.success === true) {
   //         // Cập nhật trạng thái đơn hàng thành 'processing' (đã thanh toán)
-  //         order.status_id = "processing";
+  //         order.payment_status = "processing";
   //         order.updated_at = new Date();
 
   //         // Lưu thêm thông tin giao dịch nếu cần
@@ -268,7 +267,7 @@ class PayOsController {
   //         console.log(`Updating order ${order._id} status to 'processing'`);
   //       } else if (webhookData.code !== "00" || webhookData.success !== true) {
   //         // Trường hợp thanh toán thất bại
-  //         order.status_id = "payment_failed";
+  //         order.payment_status = "payment_failed";
   //         order.updated_at = new Date();
   //         console.log(`Updating order ${order._id} status to 'payment_failed'`);
   //       }
@@ -308,16 +307,16 @@ class PayOsController {
       }
 
       console.log(
-        `Found order ${order._id} with current status ${order.status_id}`
+        `Found order ${order._id} with current status ${order.payment_status}`
       );
 
       // Nếu thanh toán thành công, cập nhật thêm thông tin
       if (status === "PAID") {
-        order.status_id = "processing"; // Chuyển đơn hàng sang trạng thái đang xử lý
+        order.payment_status = "processing"; // Chuyển đơn hàng sang trạng thái đang xử lý
         order.updated_at = new Date();
         console.log(`Updated order ${order._id} status to processing`);
       } else if (status === "CANCELLED" || status === "FAILED") {
-        order.status_id = "cancelled";
+        order.payment_status = "cancelled";
         order.updated_at = new Date();
         console.log(`Updated order ${order._id} status to cancelled`);
       }
@@ -364,22 +363,22 @@ class PayOsController {
         // Chỉ dùng thông tin từ database
         paymentStatus = {
           status:
-            order.status_id === "processing"
+            order.payment_status === "processing"
               ? "PAID"
-              : order.status_id === "cancelled"
-              ? "CANCELLED"
-              : "PENDING",
+              : order.payment_status === "cancelled"
+                ? "CANCELLED"
+                : "PENDING",
         };
         console.log("Using local payment status:", paymentStatus);
       } catch (payosError) {
         console.error("Error getting payment status from PayOS:", payosError);
         paymentStatus = {
           status:
-            order.status_id === "processing"
+            order.payment_status === "processing"
               ? "PAID"
-              : order.status_id === "cancelled"
-              ? "CANCELLED"
-              : "PENDING",
+              : order.payment_status === "cancelled"
+                ? "CANCELLED"
+                : "PENDING",
         };
       }
 
@@ -392,7 +391,7 @@ class PayOsController {
         data: {
           order: {
             id: order._id,
-            status: order.status_id,
+            status: order.payment_status,
             total: order.total_price || 0,
             items: itemCount,
           },

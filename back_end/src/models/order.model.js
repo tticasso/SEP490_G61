@@ -28,6 +28,11 @@ const orderSchema = new Schema({
         enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
         default: 'pending'
     },
+    payment_status: {
+        type: String,
+        enum: ['pending', 'paid'],
+        default: 'pending'
+    },
     // Giá gốc trước khi áp dụng giảm giá
     original_price: {
         type: Number,

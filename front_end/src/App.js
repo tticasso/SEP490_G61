@@ -32,6 +32,7 @@ import { AuthProvider } from './pages/Login/context/AuthContext';
 import ProtectedRoute, { AdminRoute, SellerRoute } from './route/ProtectedRoute';
 import MyShop from './Seller/MyShop';
 import OrderConfirmation from './pages/orderConfirm/OrderConfirmation';
+import PaymentCallback from './pages/checkout/payment/PaymentCallback';
 
 function App() {
   const location = useLocation();
@@ -54,6 +55,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/shop-registration" element={<ShopRegistration />} />
+          <Route path="/payment-callback" element={<PaymentCallback />} />
 
           {/* Protected routes - require authentication */}
           <Route path="/user-profile/*" element={
@@ -61,7 +63,6 @@ function App() {
               <UserProfile />
             </ProtectedRoute>
           } />
-          // Thêm route cho trang OrderConfirmation (khi đặt hàng thành công)
           <Route path="/order-confirmation" element={
             <ProtectedRoute>
               <OrderConfirmation />

@@ -4,6 +4,7 @@ import { Edit, Trash, Plus, Search, Tag, AlertTriangle, ToggleLeft, ToggleRight 
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import { toast } from 'react-toastify';
+import AddCouponModal from './AddCoupon';
 
 const CouponManagement = () => {
   const [coupons, setCoupons] = useState([]);
@@ -15,6 +16,9 @@ const CouponManagement = () => {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmToggleActive, setConfirmToggleActive] = useState(null);
   const [processingId, setProcessingId] = useState(null);
+  
+  // State for add coupon modal
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const userId = AuthService.getCurrentUser()?.id;
 
@@ -52,6 +56,12 @@ const CouponManagement = () => {
     e.preventDefault();
     setCurrentPage(1);
     fetchCoupons();
+  };
+
+  // Handle adding a new coupon
+  const handleAddCoupon = (newCoupon) => {
+    setCoupons(prev => [newCoupon, ...prev]);
+    toast.success('Thêm mã giảm giá thành công');
   };
 
   const handleDelete = async (id) => {
@@ -150,20 +160,24 @@ const CouponManagement = () => {
   };
 
   const formatCouponValue = (value, type) => {
-    return type === 'percentage' ? `${value}%` : `${value.toLocaleString('vi-VN')}đ`;
+    // Kiểm tra giá trị có tồn tại không
+    if (value === undefined || value === null) {
+      return 'N/A';
+    }
+    return type === 'percentage' ? `${value}%` : `${Number(value).toLocaleString('vi-VN')}đ`;
   };
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Quản lý mã giảm giá</h1>
-        <Link
-          to="/admin/add-coupon"
+        <button
+          onClick={() => setShowAddModal(true)}
           className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center"
         >
           <Plus size={18} className="mr-2" />
           Thêm mã giảm giá
-        </Link>
+        </button>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -257,7 +271,7 @@ const CouponManagement = () => {
                               title={coupon.is_active ? 'Vô hiệu hóa' : 'Kích hoạt'}
                               disabled={processingId === coupon._id}
                             >
-                              {coupon.is_active ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                              {coupon.is_active ? <ToggleLeft size={18} /> : <ToggleRight size={18} />}
                             </button>
                             <Link
                               to={`/admin/edit-coupon/${coupon._id}`}
@@ -369,6 +383,14 @@ const CouponManagement = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Add Coupon Modal */}
+      {showAddModal && (
+        <AddCouponModal
+          onClose={() => setShowAddModal(false)}
+          onAdd={handleAddCoupon}
+        />
       )}
     </div>
   );

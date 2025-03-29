@@ -4,6 +4,7 @@ import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import { useNavigate } from 'react-router-dom';
 import EditShippingModal from './modal/EditShippingModal';
+import AddShippingModal from './AddShipping';
 
 const ShippingManagement = () => {
     // State for shipping data
@@ -28,9 +29,10 @@ const ShippingManagement = () => {
     // Selected shippings for bulk actions
     const [selectedShippings, setSelectedShippings] = useState([]);
 
-    // Edit modal state
+    // Modal states
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingShipping, setEditingShipping] = useState(null);
+    const [showAddModal, setShowAddModal] = useState(false);
     
     // User info (assuming you have user info stored in localStorage or similar)
     const [currentUser, setCurrentUser] = useState(null);
@@ -122,7 +124,12 @@ const ShippingManagement = () => {
 
     // Handle add new shipping
     const handleAddNew = () => {
-        navigate('/admin/add-shipping');
+        setShowAddModal(true);
+    };
+
+    // Handle add shipping success
+    const handleAddShipping = (newShipping) => {
+        setShippings([...shippings, newShipping]);
     };
 
     // Handle edit shipping
@@ -466,6 +473,14 @@ const ShippingManagement = () => {
                         setEditingShipping(null);
                     }}
                     onUpdate={handleUpdateShipping}
+                />
+            )}
+
+            {/* Add Shipping Modal */}
+            {showAddModal && (
+                <AddShippingModal 
+                    onClose={() => setShowAddModal(false)}
+                    onAdd={handleAddShipping}
                 />
             )}
         </div>

@@ -3,6 +3,7 @@ import { Trash2, Edit, ChevronLeft, ChevronRight, RefreshCw, Plus } from 'lucide
 import ApiService from '../../services/ApiService';
 import { Link, useNavigate } from 'react-router-dom';
 import EditCategoryModal from './modal/EditCategoryModal';
+import AddCategoryModal from './AddCategory';
 
 const CategoryManagement = () => {
     // State cho dữ liệu danh mục
@@ -35,6 +36,9 @@ const CategoryManagement = () => {
     // Edit modal state
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingCategory, setEditingCategory] = useState(null);
+
+    // Add modal state - Thêm state để hiển thị modal thêm danh mục
+    const [showAddModal, setShowAddModal] = useState(false);
 
     const navigate = useNavigate();
 
@@ -98,9 +102,14 @@ const CategoryManagement = () => {
         setCurrentPage(1);
     };
 
-    // Handle add new category
+    // Handle add new category - Mở modal thêm mới danh mục
     const handleAddNew = () => {
-        navigate('/admin/add-category');
+        setShowAddModal(true);
+    };
+
+    // Handle add category callback - Xử lý khi thêm danh mục thành công
+    const handleAddCategory = (newCategory) => {
+        setCategories([...categories, newCategory]);
     };
 
     // Handle edit category
@@ -443,6 +452,14 @@ const CategoryManagement = () => {
                         setEditingCategory(null);
                     }}
                     onUpdate={handleUpdateCategory}
+                />
+            )}
+
+            {/* Add Category Modal */}
+            {showAddModal && (
+                <AddCategoryModal 
+                    onClose={() => setShowAddModal(false)}
+                    onAdd={handleAddCategory}
                 />
             )}
         </div>

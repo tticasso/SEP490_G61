@@ -62,7 +62,7 @@ const OrderDetail = () => {
             await ApiService.put(`/order/cancel/${id}`);
 
             // Cập nhật state
-            setOrder(prevOrder => ({ ...prevOrder, status_id: 'cancelled' }));
+            setOrder(prevOrder => ({ ...prevOrder, order_status: 'cancelled' }));
 
             setLoading(false);
             alert("Đơn hàng đã được hủy thành công");
@@ -181,7 +181,7 @@ const OrderDetail = () => {
         );
     }
 
-    const statusInfo = getOrderStatusInfo(order.status_id);
+    const statusInfo = getOrderStatusInfo(order.order_status);
 
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-6 my-10">
@@ -271,7 +271,7 @@ const OrderDetail = () => {
                             <ShoppingBag size={20} className="mr-2 text-purple-600" />
                             Sản phẩm ({getTotalItems()})
                         </h2>
-                        {(order.status_id === 'delivered') && (
+                        {(order.order_status === 'delivered') && (
                             <button
                                 onClick={() => navigate(`/review/order/${order._id}`)}
                                 className="px-3 py-1 border border-purple-600 text-purple-600 rounded-md hover:bg-purple-50 text-sm"
@@ -311,7 +311,7 @@ const OrderDetail = () => {
                                             <p className="font-semibold text-purple-700">
                                                 {formatPrice((item.price || (item.product_id?.price || 0)) * item.quantity)}
                                             </p>
-                                            {order.status_id === 'delivered' && (
+                                            {order.order_status === 'delivered' && (
                                                 <button 
                                                     onClick={() => navigate(`/product/${item.product_id?._id}`)}
                                                     className="mt-2 text-sm text-purple-600 hover:text-purple-800"
@@ -365,7 +365,7 @@ const OrderDetail = () => {
             {/* Actions */}
             <div className="flex flex-wrap gap-4 justify-between">
                 <div className="flex gap-2">
-                    {(order.status_id === 'pending' || order.status_id === 'processing') && (
+                    {(order.order_status === 'pending' || order.order_status === 'processing') && (
                         <button
                             onClick={handleCancelOrder}
                             className="px-4 py-2 border border-red-500 text-red-500 rounded-md hover:bg-red-50"
@@ -374,7 +374,7 @@ const OrderDetail = () => {
                         </button>
                     )}
 
-                    {order.status_id === 'shipped' && (
+                    {order.order_status === 'shipped' && (
                         <button
                             className="px-4 py-2 border border-blue-500 text-blue-500 rounded-md hover:bg-blue-50"
                         >
@@ -382,7 +382,7 @@ const OrderDetail = () => {
                         </button>
                     )}
 
-                    {order.status_id === 'delivered' && (
+                    {order.order_status === 'delivered' && (
                         <button
                             onClick={() => navigate(`/review/order/${order._id}`)}
                             className="px-4 py-2 border border-purple-600 text-purple-600 rounded-md hover:bg-purple-50"

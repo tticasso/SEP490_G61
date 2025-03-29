@@ -32,6 +32,7 @@ const CheckoutPage = () => {
     const [cartTotal, setCartTotal] = useState(0);
     const [appliedCoupon, setAppliedCoupon] = useState(null);
     const [discountAmount, setDiscountAmount] = useState(0);
+    const [paymentProcessing, setPaymentProcessing] = useState(false);
     const navigate = useNavigate();
 
     // Get user information from AuthService
@@ -105,8 +106,8 @@ const CheckoutPage = () => {
 
             // If item has a variant_id but it's not a complete object
             if (item.variant_id && (
-                typeof item.variant_id === 'string' || 
-                !item.variant_id.attributes || 
+                typeof item.variant_id === 'string' ||
+                !item.variant_id.attributes ||
                 !item.variant_id.price
             )) {
                 const productId = typeof item.product_id === 'object'
@@ -128,7 +129,7 @@ const CheckoutPage = () => {
                             console.log("Direct variant fetch result:", fullVariant);
                         } catch (variantError) {
                             console.log("Direct variant fetch failed, trying product variants:", variantError);
-                            
+
                             // If direct fetch fails, get all variants for the product
                             const variants = await ApiService.get(`/product-variant/product/${productId}`, false);
                             if (Array.isArray(variants)) {
@@ -158,21 +159,21 @@ const CheckoutPage = () => {
     const calculateSubtotalWithVariants = (items) => {
         const total = items.reduce((total, item) => {
             let itemPrice = 0;
-            
+
             // First check for variant price (highest priority)
             if (item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price) {
                 itemPrice = item.variant_id.price;
                 console.log(`Using variant price for ${item._id}: ${itemPrice}`);
-            } 
+            }
             // Fall back to product price
             else if (item.product_id && typeof item.product_id === 'object') {
                 itemPrice = item.product_id.discounted_price || item.product_id.price || 0;
                 console.log(`Using product price for ${item._id}: ${itemPrice}`);
             }
-            
+
             return total + (itemPrice * item.quantity);
         }, 0);
-        
+
         console.log(`Calculated subtotal with variants: ${total}`);
         return total;
     };
@@ -650,7 +651,7 @@ const CheckoutPage = () => {
         console.log("afterDiscount: ", afterDiscount);
         console.log("selectedShippingMethod: ", selectedShippingMethod);
         console.log("deliveryPrice: ", deliveryPrice);
-        
+
         // Calculate final total including shipping fee
         const finalTotal = afterDiscount + deliveryPrice;
         console.log('Order total calculation:', {
@@ -667,6 +668,7 @@ const CheckoutPage = () => {
     // Enhanced Place Order with improved variant handling
     // In CheckoutPage.js, modify the handlePlaceOrder function to include shipping_cost
 
+    // Enhanced Place Order with improved variant handling and PayOS integration
     const handlePlaceOrder = async () => {
         // Kiểm tra xem có sản phẩm nào hết hàng không
         const outOfStockItems = cartItems.filter(item => {
@@ -775,8 +777,49 @@ const CheckoutPage = () => {
                 if (cartItems.length > 0 && cartItems[0].cart_id) {
                     await ApiService.delete(`/cart/clear/${cartItems[0].cart_id}`);
                 }
+
+                // Kiểm tra phương thức thanh toán VNPay
+                const selectedPaymentMethod = paymentMethods.find(method => method.id === paymentMethod);
+                const isVNPayMethod = selectedPaymentMethod && (
+                    selectedPaymentMethod.name.toLowerCase().includes("vnpay") || 
+                    selectedPaymentMethod.name.toLowerCase().includes("payos")
+                );
+
+                if (isVNPayMethod) {
+                    try {
+                        // Gọi API PayOS để tạo thanh toán
+                        console.log("Creating PayOS payment for order:", response.order._id);
+                        
+                        const paymentResponse = await ApiService.post('/payos/create-payment', {
+                            orderId: response.order._id
+                        });
+
+                        console.log("PayOS payment response:", paymentResponse);
+
+                        if (paymentResponse && paymentResponse.success && paymentResponse.data && paymentResponse.data.paymentUrl) {
+                            // Lưu thông tin thanh toán vào localStorage để sử dụng sau
+                            localStorage.setItem('currentOrderId', response.order._id);
+                            localStorage.setItem('paymentTransactionCode', paymentResponse.data.transactionCode);
+                            
+                            // Chuyển hướng người dùng đến trang thanh toán của PayOS
+                            window.location.href = paymentResponse.data.paymentUrl;
+                            return;
+                        } else {
+                            console.error("Invalid PayOS payment response:", paymentResponse);
+                            throw new Error("Không thể tạo liên kết thanh toán. Vui lòng thử lại sau.");
+                        }
+                    } catch (paymentError) {
+                        console.error("PayOS payment error:", paymentError);
+                        alert(`Lỗi khởi tạo thanh toán: ${paymentError.message || 'Không xác định'}`);
+                        
+                        // Chuyển hướng đến trang xác nhận đơn hàng mặc dù có lỗi thanh toán
+                        window.location.href = `/order-confirmation?orderId=${response.order._id}&paymentError=true`;
+                        return;
+                    }
+                }
     
-                // Redirect to order confirmation page
+                // Nếu không phải thanh toán VNPay hoặc quá trình tạo thanh toán bị lỗi
+                // Chuyển hướng đến trang xác nhận đơn hàng bình thường
                 window.location.href = `/order-confirmation?orderId=${response.order._id}`;
             }
         } catch (error) {
@@ -828,7 +871,8 @@ const CheckoutPage = () => {
         calculateTotal,
         handlePlaceOrder,
         selectedAddress,
-        paymentMethod
+        paymentMethod,
+        paymentError
     };
 
     return (

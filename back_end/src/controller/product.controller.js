@@ -133,33 +133,37 @@ const createProduct = async (req, res) => {
             thumbnail
         } = req.body;
 
-        // Get thumbnail path from file upload
-        // const thumbnail = req.file ? req.file.path.replace(/\\/g, '/') : null;
+        console.log("Received request body:", req.body);
+        
+
+        // Sử dụng URL Cloudinary từ request.file.path
+        // Lưu ý: Trong trường hợp upload qua middleware Cloudinary, file.path sẽ chứa URL đầy đủ
+        const cloudinaryThumbnail = req.file ? req.file.path : thumbnail;
 
         // Kiểm tra xem danh mục và thương hiệu có tồn tại không
         const categoryExists = await Category.find({ _id: { $in: category_id } });
         if (categoryExists.length !== category_id.length) {
-            // If upload failed, remove the uploaded file
-            if (thumbnail) removeFile(thumbnail);
+            // Nếu upload thất bại, xóa file đã upload
+            if (cloudinaryThumbnail && req.file) removeFile(cloudinaryThumbnail);
             return res.status(400).json({ message: "One or more category IDs are invalid" });
         }
 
         const brandExists = await Brand.findById(brand_id);
         if (!brandExists) {
-            if (thumbnail) removeFile(thumbnail);
+            if (cloudinaryThumbnail && req.file) removeFile(cloudinaryThumbnail);
             return res.status(400).json({ message: "Invalid brand ID" });
         }
 
         // Kiểm tra xem cửa hàng có tồn tại không
         const shopExists = await Shop.findById(shop_id);
         if (!shopExists) {
-            if (thumbnail) removeFile(thumbnail);
+            if (cloudinaryThumbnail && req.file) removeFile(cloudinaryThumbnail);
             return res.status(400).json({ message: "Invalid shop ID" });
         }
 
         // Kiểm tra xem người dùng có quyền với cửa hàng này không
         if (req.userId && shopExists.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
-            if (thumbnail) removeFile(thumbnail);
+            if (cloudinaryThumbnail && req.file) removeFile(cloudinaryThumbnail);
             return res.status(403).json({ message: "You don't have permission to add products to this shop" });
         }
 
@@ -173,7 +177,7 @@ const createProduct = async (req, res) => {
             description,
             detail,
             price,
-            thumbnail, // Save the file path
+            thumbnail: cloudinaryThumbnail, // Lưu URL Cloudinary
             meta_title,
             meta_keyword,
             meta_description,
@@ -193,7 +197,7 @@ const createProduct = async (req, res) => {
         await newProduct.save();
         res.status(201).json(newProduct);
     } catch (error) {
-        // If there was an error, clean up any uploaded file
+        // Nếu có lỗi, xóa bất kỳ file đã upload
         if (req.file) {
             removeFile(req.file.path);
         }
@@ -421,13 +425,13 @@ const updateProduct = async (req, res) => {
             meta_description
         } = req.body;
 
-        // Get thumbnail from file upload if exists
-        const thumbnail = req.file ? req.file.path.replace(/\\/g, '/') : null;
+        // Lấy thumbnail từ file upload nếu tồn tại (URL Cloudinary)
+        const newThumbnail = req.file ? req.file.path : null;
 
         // Lấy thông tin sản phẩm hiện tại
         const currentProduct = await Product.findById(req.params.id);
         if (!currentProduct) {
-            if (thumbnail) removeFile(thumbnail);
+            if (newThumbnail) removeFile(newThumbnail);
             return res.status(404).json({ message: "Product not found" });
         }
 
@@ -436,7 +440,7 @@ const updateProduct = async (req, res) => {
         const shop = await Shop.findById(shopToCheck);
 
         if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
-            if (thumbnail) removeFile(thumbnail);
+            if (newThumbnail) removeFile(newThumbnail);
             return res.status(403).json({ message: "You don't have permission to update this product" });
         }
 
@@ -444,7 +448,7 @@ const updateProduct = async (req, res) => {
         if (category_id) {
             const categoryExists = await Category.find({ _id: { $in: category_id } });
             if (categoryExists.length !== category_id.length) {
-                if (thumbnail) removeFile(thumbnail);
+                if (newThumbnail) removeFile(newThumbnail);
                 return res.status(400).json({ message: "One or more category IDs are invalid" });
             }
         }
@@ -452,7 +456,7 @@ const updateProduct = async (req, res) => {
         if (brand_id) {
             const brandExists = await Brand.findById(brand_id);
             if (!brandExists) {
-                if (thumbnail) removeFile(thumbnail);
+                if (newThumbnail) removeFile(newThumbnail);
                 return res.status(400).json({ message: "Invalid brand ID" });
             }
         }
@@ -461,20 +465,20 @@ const updateProduct = async (req, res) => {
         if (shop_id && shop_id !== currentProduct.shop_id.toString()) {
             const shopExists = await Shop.findById(shop_id);
             if (!shopExists) {
-                if (thumbnail) removeFile(thumbnail);
+                if (newThumbnail) removeFile(newThumbnail);
                 return res.status(400).json({ message: "Invalid shop ID" });
             }
 
             // Chỉ admin mới được chuyển sản phẩm sang shop khác
             if (!req.isAdmin) {
-                if (thumbnail) removeFile(thumbnail);
+                if (newThumbnail) removeFile(newThumbnail);
                 return res.status(403).json({ message: "Only admin can transfer products between shops" });
             }
         }
 
-        // If a new thumbnail is uploaded, delete the old one
-        if (thumbnail && currentProduct.thumbnail) {
-            removeFile(currentProduct.thumbnail);
+        // Nếu có thumbnail mới, xóa thumbnail cũ trên Cloudinary
+        if (newThumbnail && currentProduct.thumbnail) {
+            await removeFile(currentProduct.thumbnail);
         }
 
         const updatedProduct = await Product.findByIdAndUpdate(
@@ -488,7 +492,7 @@ const updateProduct = async (req, res) => {
                 ...(description && { description }),
                 ...(detail && { detail }),
                 ...(price && { price }),
-                ...(thumbnail && { thumbnail }), // Update thumbnail if provided
+                ...(newThumbnail && { thumbnail: newThumbnail }), // Cập nhật URL thumbnail từ Cloudinary
                 ...(meta_title && { meta_title }),
                 ...(meta_keyword && { meta_keyword }),
                 ...(meta_description && { meta_description }),
@@ -503,7 +507,7 @@ const updateProduct = async (req, res) => {
 
         res.status(200).json(updatedProduct);
     } catch (error) {
-        // If there was an error, clean up any uploaded file
+        // Nếu có lỗi, xóa bất kỳ file đã upload
         if (req.file) {
             removeFile(req.file.path);
         }
@@ -525,9 +529,9 @@ const deleteProduct = async (req, res) => {
             return res.status(403).json({ message: "You don't have permission to delete this product" });
         }
 
-        // Delete the thumbnail file if it exists
+        // Xóa file thumbnail từ Cloudinary nếu tồn tại
         if (product.thumbnail) {
-            removeFile(product.thumbnail);
+            await removeFile(product.thumbnail);
         }
 
         const deletedProduct = await Product.findByIdAndDelete(req.params.id);

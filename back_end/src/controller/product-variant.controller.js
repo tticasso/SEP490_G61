@@ -88,7 +88,9 @@ const createVariant = async (req, res) => {
         if (!product || product.is_delete) {
             // Clean up uploaded files if any
             if (req.files && req.files.length > 0) {
-                req.files.forEach(file => removeFile(file.path));
+                for (const file of req.files) {
+                    await removeFile(file.path);
+                }
             }
             return res.status(404).json({ message: "Product not found" });
         }
@@ -98,7 +100,9 @@ const createVariant = async (req, res) => {
         if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
             // Clean up uploaded files if any
             if (req.files && req.files.length > 0) {
-                req.files.forEach(file => removeFile(file.path));
+                for (const file of req.files) {
+                    await removeFile(file.path);
+                }
             }
             return res.status(403).json({ message: "You don't have permission to add variants to this product" });
         }
@@ -114,8 +118,8 @@ const createVariant = async (req, res) => {
         // Tạo SKU nếu không được cung cấp
         const generatedSku = sku || generateSku(product.name, parsedAttributes);
 
-        // Get image paths from uploaded files
-        const imagePaths = req.files ? req.files.map(file => file.path.replace(/\\/g, '/')) : [];
+        // Lấy URLs từ Cloudinary
+        const cloudinaryUrls = req.files ? req.files.map(file => file.path) : [];
 
         // Tạo biến thể mới
         const newVariant = new ProductVariant({
@@ -125,7 +129,7 @@ const createVariant = async (req, res) => {
             stock,
             sku: generatedSku,
             attributes: new Map(Object.entries(parsedAttributes || {})),
-            images: imagePaths, // Save the file paths
+            images: cloudinaryUrls, // Lưu URLs Cloudinary
             is_default: is_default || false,
         });
 
@@ -135,7 +139,9 @@ const createVariant = async (req, res) => {
     } catch (error) {
         // Clean up uploaded files if any
         if (req.files && req.files.length > 0) {
-            req.files.forEach(file => removeFile(file.path));
+            for (const file of req.files) {
+                await removeFile(file.path);
+            }
         }
         res.status(500).json({ message: error.message });
     }
@@ -173,7 +179,8 @@ const updateVariant = async (req, res) => {
             stock,
             attributes,
             is_default,
-            is_active
+            is_active,
+            keep_images // Array of Cloudinary URLs to keep
         } = req.body;
 
         // Parse attributes if sent as JSON string
@@ -184,9 +191,23 @@ const updateVariant = async (req, res) => {
             } catch (e) {
                 // Clean up uploaded files if any
                 if (req.files && req.files.length > 0) {
-                    req.files.forEach(file => removeFile(file.path));
+                    for (const file of req.files) {
+                        await removeFile(file.path);
+                    }
                 }
                 return res.status(400).json({ message: "Invalid attributes format" });
+            }
+        }
+
+        // Parse keep_images if needed
+        let imagesToKeep = [];
+        if (keep_images) {
+            try {
+                imagesToKeep = typeof keep_images === 'string'
+                    ? JSON.parse(keep_images)
+                    : keep_images;
+            } catch (e) {
+                return res.status(400).json({ message: "Invalid keep_images format" });
             }
         }
 
@@ -195,7 +216,9 @@ const updateVariant = async (req, res) => {
         if (!variant || variant.is_delete) {
             // Clean up uploaded files if any
             if (req.files && req.files.length > 0) {
-                req.files.forEach(file => removeFile(file.path));
+                for (const file of req.files) {
+                    await removeFile(file.path);
+                }
             }
             return res.status(404).json({ message: "Variant not found" });
         }
@@ -207,7 +230,9 @@ const updateVariant = async (req, res) => {
         if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
             // Clean up uploaded files if any
             if (req.files && req.files.length > 0) {
-                req.files.forEach(file => removeFile(file.path));
+                for (const file of req.files) {
+                    await removeFile(file.path);
+                }
             }
             return res.status(403).json({ message: "You don't have permission to update this variant" });
         }
@@ -220,19 +245,21 @@ const updateVariant = async (req, res) => {
             );
         }
 
-        // Get image paths from uploaded files
-        let newImages = [];
-        if (req.files && req.files.length > 0) {
-            newImages = req.files.map(file => file.path.replace(/\\/g, '/'));
+        // Xử lý hình ảnh
+        let currentImages = variant.images || [];
 
-            // Delete old images if new ones are uploaded
-            if (variant.images && variant.images.length > 0) {
-                variant.images.forEach(imagePath => removeFile(imagePath));
+        // Xóa các hình ảnh không được giữ lại
+        for (const img of currentImages) {
+            if (!imagesToKeep.includes(img)) {
+                await removeFile(img);
             }
         }
 
-        // If we have new images, use them, otherwise keep the existing ones
-        const images = newImages.length > 0 ? newImages : variant.images;
+        // Lấy URLs mới từ Cloudinary
+        const newCloudinaryUrls = req.files ? req.files.map(file => file.path) : [];
+
+        // Kết hợp hình ảnh cũ cần giữ lại và hình ảnh mới
+        const updatedImages = [...imagesToKeep, ...newCloudinaryUrls];
 
         // Cập nhật biến thể
         const updatedVariant = await ProductVariant.findByIdAndUpdate(
@@ -242,7 +269,7 @@ const updateVariant = async (req, res) => {
                 ...(price && { price }),
                 ...(stock !== undefined && { stock }),
                 ...(parsedAttributes && { attributes: new Map(Object.entries(parsedAttributes)) }),
-                ...(newImages.length > 0 && { images }),
+                images: updatedImages, // Cập nhật mảng hình ảnh
                 ...(is_default !== undefined && { is_default }),
                 ...(is_active !== undefined && { is_active }),
                 updated_at: Date.now()
@@ -254,7 +281,9 @@ const updateVariant = async (req, res) => {
     } catch (error) {
         // Clean up uploaded files if any
         if (req.files && req.files.length > 0) {
-            req.files.forEach(file => removeFile(file.path));
+            for (const file of req.files) {
+                await removeFile(file.path);
+            }
         }
         res.status(500).json({ message: error.message });
     }
@@ -295,6 +324,7 @@ const deleteVariant = async (req, res) => {
 
         // Xóa mềm
         variant.is_delete = true;
+        variant.updated_at = Date.now();
         await variant.save();
 
         res.status(200).json({ message: "Variant deleted successfully" });
@@ -448,18 +478,53 @@ const restoreVariant = async (req, res) => {
     }
 };
 
+// Xóa hoàn toàn biến thể, bao gồm cả hình ảnh trên Cloudinary
+const permanentDeleteVariant = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Tìm biến thể hiện tại
+        const variant = await ProductVariant.findById(id);
+        if (!variant) {
+            return res.status(404).json({ message: "Variant not found" });
+        }
+
+        // Kiểm tra quyền (chỉ chủ shop hoặc admin)
+        const product = await Product.findById(variant.product_id);
+        const shop = await Shop.findById(product.shop_id);
+
+        if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
+            return res.status(403).json({ message: "You don't have permission to delete this variant" });
+        }
+
+        // Xóa tất cả hình ảnh của biến thể trên Cloudinary
+        if (variant.images && variant.images.length > 0) {
+            for (const imageUrl of variant.images) {
+                await removeFile(imageUrl);
+            }
+        }
+
+        // Xóa hoàn toàn biến thể từ database
+        await ProductVariant.findByIdAndDelete(id);
+
+        res.status(200).json({ message: "Variant permanently deleted" });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // Bulk soft delete variants
 const bulkSoftDeleteVariants = async (req, res) => {
     try {
         const { variantIds } = req.body;
-        
+
         if (!variantIds || !Array.isArray(variantIds) || variantIds.length === 0) {
             return res.status(400).json({ message: "No variant IDs provided" });
         }
-        
+
         const results = [];
         const errors = [];
-        
+
         // Process variants one by one to validate permissions
         for (const variantId of variantIds) {
             try {
@@ -468,26 +533,26 @@ const bulkSoftDeleteVariants = async (req, res) => {
                     errors.push({ id: variantId, error: "Variant not found" });
                     continue;
                 }
-                
+
                 // Kiểm tra quyền
                 const product = await Product.findById(variant.product_id);
                 if (!product) {
                     errors.push({ id: variantId, error: "Product not found" });
                     continue;
                 }
-                
+
                 const shop = await Shop.findById(product.shop_id);
                 if (!shop) {
                     errors.push({ id: variantId, error: "Shop not found" });
                     continue;
                 }
-                
+
                 // Nếu không phải admin và không phải chủ shop thì không có quyền
                 if (!req.isAdmin && shop.user_id.toString() !== req.userId.toString()) {
                     errors.push({ id: variantId, error: "Permission denied" });
                     continue;
                 }
-                
+
                 // Nếu là biến thể mặc định, kiểm tra xem có biến thể khác không
                 if (variant.is_default) {
                     const variantCount = await ProductVariant.countDocuments({
@@ -495,19 +560,19 @@ const bulkSoftDeleteVariants = async (req, res) => {
                         is_delete: false,
                         _id: { $ne: variantId }
                     });
-                    
+
                     if (variantCount === 0) {
                         // Đây là biến thể duy nhất hoặc biến thể mặc định duy nhất
                         // Cho phép xóa
                     } else {
-                        errors.push({ 
-                            id: variantId, 
-                            error: "Cannot delete default variant. Please set another variant as default first." 
+                        errors.push({
+                            id: variantId,
+                            error: "Cannot delete default variant. Please set another variant as default first."
                         });
                         continue;
                     }
                 }
-                
+
                 // Cập nhật biến thể
                 variant.is_delete = true;
                 variant.updated_at = Date.now();
@@ -517,7 +582,7 @@ const bulkSoftDeleteVariants = async (req, res) => {
                 errors.push({ id: variantId, error: error.message });
             }
         }
-        
+
         res.status(200).json({
             message: `Processed ${results.length} variants successfully`,
             success: results,
@@ -532,14 +597,14 @@ const bulkSoftDeleteVariants = async (req, res) => {
 const bulkRestoreVariants = async (req, res) => {
     try {
         const { variantIds } = req.body;
-        
+
         if (!variantIds || !Array.isArray(variantIds) || variantIds.length === 0) {
             return res.status(400).json({ message: "No variant IDs provided" });
         }
-        
+
         const results = [];
         const errors = [];
-        
+
         // Process variants one by one to validate permissions
         for (const variantId of variantIds) {
             try {
@@ -548,26 +613,26 @@ const bulkRestoreVariants = async (req, res) => {
                     errors.push({ id: variantId, error: "Variant not found" });
                     continue;
                 }
-                
+
                 // Kiểm tra quyền
                 const product = await Product.findById(variant.product_id);
                 if (!product) {
                     errors.push({ id: variantId, error: "Product not found" });
                     continue;
                 }
-                
+
                 const shop = await Shop.findById(product.shop_id);
                 if (!shop) {
                     errors.push({ id: variantId, error: "Shop not found" });
                     continue;
                 }
-                
+
                 // Nếu không phải admin và không phải chủ shop thì không có quyền
                 if (!req.isAdmin && shop.user_id.toString() !== req.userId.toString()) {
                     errors.push({ id: variantId, error: "Permission denied" });
                     continue;
                 }
-                
+
                 // Cập nhật biến thể
                 variant.is_delete = false;
                 variant.updated_at = Date.now();
@@ -577,7 +642,7 @@ const bulkRestoreVariants = async (req, res) => {
                 errors.push({ id: variantId, error: error.message });
             }
         }
-        
+
         res.status(200).json({
             message: `Processed ${results.length} variants successfully`,
             success: results,
@@ -599,6 +664,7 @@ const productVariantController = {
     handleVariantImagesUpload, // Export the middleware for routes,
     softDeleteVariant,
     restoreVariant,
+    permanentDeleteVariant,
     bulkSoftDeleteVariants,
     bulkRestoreVariants
 };

@@ -323,7 +323,7 @@ const AllOrders = () => {
         let response;
         try {
           // First attempt with the original path
-          response = await ApiService.get(`/orders/shop/${shopId}`);
+          response = await ApiService.get(`/order/shop/${shopId}`);
         } catch (endpointError) {
           console.log(`First endpoint failed, trying alternative: ${endpointError}`);
           try {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ApiService from '../../../services/ApiService';
 import { Store, ExternalLink, Trash2 } from 'lucide-react';
 import donghoAvatar from '../../../assets/donghoAvatar.jpg';
+import { BE_API_URL } from '../../../config/config';
 
 const FollowedShops = () => {
   const [followedShops, setFollowedShops] = useState([]);
@@ -11,6 +12,17 @@ const FollowedShops = () => {
   useEffect(() => {
     fetchFollowedShops();
   }, []);
+
+  // Hàm lấy đường dẫn ảnh
+  const getImagePath = (imgPath) => {
+    if (!imgPath) return "";
+    // Kiểm tra nếu đường dẫn đã là URL đầy đủ
+    if (imgPath.startsWith('http')) return imgPath;
+    
+    // Xử lý đường dẫn từ backend
+    const fileName = imgPath.split("\\").pop().split("/").pop();
+    return `${BE_API_URL}/uploads/shops/${fileName}`;
+  };
 
   // Hàm lấy danh sách cửa hàng đã theo dõi
   const fetchFollowedShops = async () => {
@@ -102,11 +114,23 @@ const FollowedShops = () => {
             <div key={shop._id} className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="p-4">
                 <div className="flex items-center">
-                  <img 
-                    src={shop.logo || donghoAvatar} 
-                    alt={shop.name} 
-                    className="w-16 h-16 rounded-full object-cover mr-4"
-                  />
+                  <div className="relative h-16 w-16 rounded-full overflow-hidden border bg-white flex-shrink-0 mr-4">
+                    {shop.logo ? (
+                      <img 
+                        src={getImagePath(shop.logo)} 
+                        alt={shop.name} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = donghoAvatar;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                        <Store size={24} />
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-grow">
                     <h3 className="font-bold text-lg">{shop.name}</h3>
                     <p className="text-sm text-gray-500">

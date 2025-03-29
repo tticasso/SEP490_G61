@@ -4,6 +4,7 @@ import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import { useNavigate } from 'react-router-dom';
 import EditPaymentModal from './modal/EditPaymentModal';
+import AddPaymentModal from './AddPayment';
 
 const PaymentManagement = () => {
     // State for payment data
@@ -30,9 +31,10 @@ const PaymentManagement = () => {
     // Selected payments for bulk actions
     const [selectedPayments, setSelectedPayments] = useState([]);
 
-    // Edit modal state
+    // Modal states
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingPayment, setEditingPayment] = useState(null);
+    const [showAddModal, setShowAddModal] = useState(false);
 
     const navigate = useNavigate();
 
@@ -89,7 +91,12 @@ const PaymentManagement = () => {
 
     // Handle add new payment
     const handleAddNew = () => {
-        navigate('/admin/add-payment');
+        setShowAddModal(true);
+    };
+
+    // Handle add payment success
+    const handleAddPayment = (newPayment) => {
+        setPayments([...payments, newPayment]);
     };
 
     // Handle edit payment
@@ -220,12 +227,6 @@ const PaymentManagement = () => {
                     >
                         Bị tắt ( {payments.filter(p => !p.is_active && !p.is_delete).length} )
                     </button>
-                    <button
-                        className={`${filter.trash ? 'text-blue-600' : ''}`}
-                        onClick={() => setFilter({ all: false, active: false, inactive: false, trash: true })}
-                    >
-                        Thùng rác ( {payments.filter(p => p.is_delete).length} )
-                    </button>
                 </div>
 
                 <div className="flex items-center mt-4">
@@ -241,16 +242,6 @@ const PaymentManagement = () => {
 
             {/* Function bar */}
             <div className="flex justify-between items-center px-6 py-4">
-                <div className="flex items-center">
-                    <div className="text-gray-700 mr-2">Chức năng:</div>
-                    <button
-                        className={`text-pink-500 ${selectedPayments.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                        onClick={handleBulkDelete}
-                        disabled={selectedPayments.length === 0}
-                    >
-                        Thêm vào thùng rác ( {selectedPayments.length} )
-                    </button>
-                </div>
 
                 <div className="flex items-center">
                     <div className="mr-4">
@@ -468,6 +459,14 @@ const PaymentManagement = () => {
                         setEditingPayment(null);
                     }}
                     onUpdate={handleUpdatePayment}
+                />
+            )}
+
+            {/* Add Payment Modal */}
+            {showAddModal && (
+                <AddPaymentModal
+                    onClose={() => setShowAddModal(false)}
+                    onAdd={handleAddPayment}
                 />
             )}
         </div>

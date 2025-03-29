@@ -207,7 +207,7 @@ const Dashboard = () => {
                 <div className="bg-white p-6 rounded-lg shadow-sm">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-lg font-medium">Người đăng ký mới</h2>
-                        <button className="text-blue-500 text-sm">Xem tất cả</button>
+                        <button onClick={() => window.location.href ='/admin/customers'} className="text-blue-500 text-sm">Xem tất cả</button>
                     </div>
                     {newUsers.length > 0 ? (
                         <div>
@@ -240,7 +240,7 @@ const Dashboard = () => {
                 <div className="bg-white p-6 rounded-lg shadow-sm">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-lg font-medium">Đơn hàng mới cần xác nhận</h2>
-                        <button className="text-blue-500 text-sm">Xem tất cả</button>
+                        <button onClick={() => window.location.href ='/admin/orders'} className="text-blue-500 text-sm">Xem tất cả</button>
                     </div>
                     <div className="border-t border-gray-200 mt-4">
                         <div className="grid grid-cols-3 py-3 text-sm font-medium text-gray-600">

@@ -3,6 +3,7 @@ import { Trash2, Edit, ChevronLeft, ChevronRight, RefreshCw, Plus } from 'lucide
 import ApiService from '../../services/ApiService';
 import { Link, useNavigate } from 'react-router-dom';
 import EditBrandModal from './modal/EditBrandModal';
+import AddBrandModal from './AddBrand';
 
 const BrandList = () => {
     // State for brands
@@ -32,9 +33,12 @@ const BrandList = () => {
     // Selected brands for bulk actions
     const [selectedBrands, setSelectedBrands] = useState([]);
 
-    // Modal state
+    // Modal states
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingBrand, setEditingBrand] = useState(null);
+    
+    // Add Brand Modal state
+    const [showAddModal, setShowAddModal] = useState(false);
 
     const navigate = useNavigate();
 
@@ -98,9 +102,14 @@ const BrandList = () => {
         setCurrentPage(1);
     };
 
-    // Handle add new brand
+    // Handle add new brand - Mở modal thêm mới thương hiệu
     const handleAddNew = () => {
-        navigate('/admin/add-brand');
+        setShowAddModal(true);
+    };
+
+    // Handle add brand callback - Xử lý khi thêm thương hiệu thành công
+    const handleAddBrand = (newBrand) => {
+        setBrands([...brands, newBrand]);
     };
 
     // Handle edit brand
@@ -214,8 +223,7 @@ const BrandList = () => {
             
             return cat;
         });
-      
-        console.log("cat: ", categories);
+        
         return categoryNames.join(', ');
     };
 
@@ -458,6 +466,14 @@ const BrandList = () => {
                         setEditingBrand(null);
                     }}
                     onUpdate={handleUpdateBrand}
+                />
+            )}
+
+            {/* Add Brand Modal */}
+            {showAddModal && (
+                <AddBrandModal 
+                    onClose={() => setShowAddModal(false)}
+                    onAdd={handleAddBrand}
                 />
             )}
         </div>

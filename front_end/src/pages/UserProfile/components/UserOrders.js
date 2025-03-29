@@ -61,16 +61,16 @@ const UserOrders = () => {
         try {
             // Đánh dấu đang tải chi tiết đơn hàng này
             setDetailsLoading(prev => ({ ...prev, [orderId]: true }));
-            
+
             // Gọi API để lấy chi tiết đơn hàng
             const response = await ApiService.get(`/order/find/${orderId}`);
-            
+
             // Lưu chi tiết vào state
             setOrderDetails(prev => ({
                 ...prev,
                 [orderId]: response.orderDetails || []
             }));
-            
+
             // Đánh dấu đã tải xong
             setDetailsLoading(prev => ({ ...prev, [orderId]: false }));
         } catch (error) {
@@ -134,7 +134,7 @@ const UserOrders = () => {
     // Lọc đơn hàng theo trạng thái
     const filteredOrders = orders.filter(order => {
         if (filter === 'all') return true;
-        return order.status_id === filter;
+        return order.order_status === filter; // Sử dụng order_status thay vì status_id
     }).filter(order => {
         if (!searchQuery) return true;
         // Tìm kiếm theo ID đơn hàng
@@ -142,8 +142,8 @@ const UserOrders = () => {
     });
 
     // Lấy tên trạng thái
-    const getStatusName = (statusId) => {
-        switch (statusId) {
+    const getStatusName = (orderStatus) => {
+        switch (orderStatus) {
             case 'pending': return 'Chờ xử lý';
             case 'processing': return 'Đang xử lý';
             case 'shipped': return 'Đang giao hàng';
@@ -153,15 +153,70 @@ const UserOrders = () => {
         }
     };
 
-    // Lấy màu trạng thái
-    const getStatusColor = (statusId) => {
+    // Lấy tên trạng thái thanh toán (dựa trên status_id)
+    const getPaymentStatusName = (statusId) => {
         switch (statusId) {
+            case 'paid': return 'Đã thanh toán';
+            case 'pending': return 'Chưa thanh toán';
+            default: return 'Không xác định';
+        }
+    };
+
+
+    // Lấy màu trạng thái đơn hàng
+    const getStatusColor = (orderStatus) => {
+        switch (orderStatus) {
             case 'pending': return 'bg-yellow-100 text-yellow-800';
             case 'processing': return 'bg-blue-100 text-blue-800';
             case 'shipped': return 'bg-indigo-100 text-indigo-800';
             case 'delivered': return 'bg-green-100 text-green-800';
             case 'cancelled': return 'bg-red-100 text-red-800';
             default: return 'bg-gray-100 text-gray-800';
+        }
+    };
+
+    // Lấy màu trạng thái thanh toán
+    const getPaymentStatusColor = (statusId) => {
+        switch (statusId) {
+            case 'paid': return 'bg-green-100 text-green-800';
+            case 'pending': return 'bg-orange-100 text-orange-800';
+            default: return 'bg-gray-100 text-gray-800';
+        }
+    };
+
+    // Kiểm tra xem đơn hàng có phải thanh toán qua VNPay/PayOS không
+    const isOnlinePayment = (order) => {
+        if (!order || !order.payment_method) return false;
+
+        return order.payment_method === "payos" ||
+            (typeof order.payment_id === 'object' &&
+                order.payment_id?.name?.toLowerCase().includes('vnpay'));
+    };
+
+    // Xử lý thanh toán đơn hàng
+    const handlePayOrder = async (orderId) => {
+        try {
+            setLoading(true);
+
+            // Gọi API để tạo payment link mới
+            const response = await ApiService.post('/payos/create-payment', {
+                orderId: orderId
+            });
+
+            if (response && response.success && response.data && response.data.paymentUrl) {
+                // Lưu thông tin thanh toán vào localStorage để sử dụng sau khi thanh toán
+                localStorage.setItem('currentOrderId', orderId);
+                localStorage.setItem('paymentTransactionCode', response.data.transactionCode);
+
+                // Chuyển hướng người dùng đến trang thanh toán
+                window.location.href = response.data.paymentUrl;
+            } else {
+                throw new Error("Không thể tạo liên kết thanh toán");
+            }
+        } catch (error) {
+            console.error("Error creating payment:", error);
+            alert(`Lỗi khởi tạo thanh toán: ${error.message || 'Không xác định'}`);
+            setLoading(false);
         }
     };
 
@@ -291,9 +346,17 @@ const UserOrders = () => {
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                                     <div className="flex items-center mb-2 md:mb-0">
                                         <span className="font-medium mr-2">Đơn hàng #{order.id}</span>
-                                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(order.status_id)}`}>
-                                            {getStatusName(order.status_id)}
+                                        {/* Hiển thị trạng thái đơn hàng */}
+                                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(order.order_status)}`}>
+                                            {getStatusName(order.order_status)}
                                         </span>
+
+                                        {/* Hiển thị trạng thái thanh toán nếu là đơn hàng trực tuyến */}
+                                        {isOnlinePayment(order) && (
+                                            <span className={`ml-2 px-2 py-1 rounded-full text-xs ${getPaymentStatusColor(order.status_id)}`}>
+                                                {getPaymentStatusName(order.status_id)}
+                                            </span>
+                                        )}
                                     </div>
 
                                     <div className="flex items-center text-sm text-gray-600">
@@ -313,7 +376,7 @@ const UserOrders = () => {
                                     {/* Order Items */}
                                     <div className="mb-6">
                                         <h3 className="font-semibold mb-3">Chi tiết sản phẩm</h3>
-                                        
+
                                         {detailsLoading[order._id] ? (
                                             <div className="text-center py-4">
                                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-700 mx-auto"></div>
@@ -392,7 +455,18 @@ const UserOrders = () => {
                                             Xem chi tiết
                                         </button>
 
-                                        {(order.status_id === 'pending' || order.status_id === 'processing') && (
+                                        {/* Nút thanh toán chỉ hiển thị với đơn hàng trực tuyến, trạng thái status_id là 'pending' */}
+                                        {isOnlinePayment(order) && order.status_id === 'pending' && (
+                                            <button
+                                                onClick={() => handlePayOrder(order._id)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                            >
+                                                Thanh toán ngay
+                                            </button>
+                                        )}
+
+                                        {/* Các nút hủy đơn chỉ hiển thị khi order_status là 'pending' hoặc 'processing' */}
+                                        {(order.order_status === 'pending' || order.order_status === 'processing') && (
                                             <button
                                                 onClick={() => handleCancelOrder(order._id)}
                                                 className="px-4 py-2 border border-red-500 text-red-500 rounded-md hover:bg-red-50"
@@ -401,7 +475,8 @@ const UserOrders = () => {
                                             </button>
                                         )}
 
-                                        {order.status_id === 'delivered' && (
+                                        {/* Nút đánh giá chỉ hiển thị khi order_status là 'delivered' */}
+                                        {order.order_status === 'delivered' && (
                                             <button
                                                 onClick={() => window.location.href = `/review/order/${order._id}`}
                                                 className="px-4 py-2 border border-purple-600 text-purple-600 rounded-md hover:bg-purple-50"
@@ -410,20 +485,14 @@ const UserOrders = () => {
                                             </button>
                                         )}
 
-                                        {order.status_id === 'shipped' && (
+                                        {/* Nút theo dõi đơn hàng chỉ hiển thị khi order_status là 'shipped' */}
+                                        {order.order_status === 'shipped' && (
                                             <button
                                                 className="px-4 py-2 border border-green-600 text-green-600 rounded-md hover:bg-green-50"
                                             >
                                                 Theo dõi đơn hàng
                                             </button>
                                         )}
-
-                                        <button
-                                            className="px-4 py-2 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50"
-                                            onClick={() => window.location.href = '/user-profile/messages'}
-                                        >
-                                            Liên hệ hỗ trợ
-                                        </button>
                                     </div>
                                 </div>
                             )}

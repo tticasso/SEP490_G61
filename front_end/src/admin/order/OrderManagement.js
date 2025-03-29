@@ -107,15 +107,15 @@ const OrderManagement = () => {
 
     // Apply filter
     if (filter.pending) {
-      result = result.filter(order => order.status_id === 'pending');
+      result = result.filter(order => order.order_status === 'pending');
     } else if (filter.processing) {
-      result = result.filter(order => order.status_id === 'processing');
+      result = result.filter(order => order.order_status === 'processing');
     } else if (filter.shipped) {
-      result = result.filter(order => order.status_id === 'shipped');
+      result = result.filter(order => order.order_status === 'shipped');
     } else if (filter.delivered) {
-      result = result.filter(order => order.status_id === 'delivered');
+      result = result.filter(order => order.order_status === 'delivered');
     } else if (filter.cancelled) {
-      result = result.filter(order => order.status_id === 'cancelled');
+      result = result.filter(order => order.order_status === 'cancelled');
     }
 
     // Apply search
@@ -198,8 +198,8 @@ const OrderManagement = () => {
   };
 
   // Get status class for display
-  const getStatusClass = (status) => {
-    switch (status) {
+  const getStatusClass = (orderStatus) => {
+    switch (orderStatus) {
       case 'pending':
         return 'bg-yellow-500 text-white';
       case 'processing':
@@ -213,6 +213,28 @@ const OrderManagement = () => {
       default:
         return 'bg-gray-500 text-white';
     }
+  };
+
+  // Hàm mới để lấy màu trạng thái thanh toán
+  const getPaymentStatusClass = (paymentStatus) => {
+    switch (paymentStatus) {
+      case 'paid':
+        return 'bg-green-500 text-white';
+      case 'pending':
+        return 'bg-orange-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
+  // Hàm kiểm tra phương thức thanh toán VNPay
+  const isVNPayPayment = (order) => {
+    if (!order || !order.payment_id || !order.payment_id.name) {
+      return false;
+    }
+
+    const paymentMethod = order.payment_id.name.toLowerCase();
+    return paymentMethod.includes('vnpay') || paymentMethod.includes('vn pay');
   };
 
   // Convert status to Vietnamese
@@ -427,10 +449,10 @@ const OrderManagement = () => {
                         Phương thức thanh toán
                       </th>
                       <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
-                        Mã giảm giá
+                        Trạng thái đơn hàng
                       </th>
                       <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
-                        Trạng thái
+                        Trạng thái thanh toán
                       </th>
                       <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
                         Thời gian đặt hàng
@@ -444,65 +466,65 @@ const OrderManagement = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {currentOrders.length > 0 ? (
-                      currentOrders.map((order) => (
-                        <tr key={order._id} className="hover:bg-gray-50">
-                          <td className="py-4 px-4 text-sm text-gray-900">
-                            {order.id || order._id}
-                          </td>
-                          <td className="py-4 px-4 text-sm text-gray-900">
-                            {order.customer_id?.firstName} {order.customer_id?.lastName || 'Không có tên'}
-                          </td>
-                          <td className="py-4 px-4 text-sm text-gray-900">
-                            {order.shipping_id?.name || 'Không có thông tin'}
-                          </td>
-                          <td className="py-4 px-4 text-sm text-gray-900">
-                            {order.payment_id?.name || 'Không có thông tin'}
-                          </td>
-                          <td className="py-4 px-4 text-sm text-gray-900">
-                            {order.discount_id?.code || order.coupon_id?.code || 'Không áp dụng'}
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className={`px-3 py-1 truncate text-xs font-medium rounded ${getStatusClass(order.status_id)}`}>
-                              {getStatusText(order.status_id)}
+                    {currentOrders.map((order) => (
+                      <tr key={order._id} className="hover:bg-gray-50">
+                        <td className="py-4 px-4 text-sm text-gray-900">
+                          {order.id || order._id}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-900">
+                          {order.customer_id?.firstName} {order.customer_id?.lastName || 'Không có tên'}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-900">
+                          {order.shipping_id?.name || 'Không có thông tin'}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-900">
+                          {order.payment_id?.name || 'Không có thông tin'}
+                        </td>
+                        {/* Trạng thái đơn hàng */}
+                        <td className="py-4 px-4">
+                          <span className={`px-3 py-1 truncate text-xs font-medium rounded ${getStatusClass(order.order_status)}`}>
+                            {getStatusText(order.order_status)}
+                          </span>
+                        </td>
+                        {/* Trạng thái thanh toán */}
+                        <td className="py-4 px-4">
+                          {isVNPayPayment(order) ? (
+                            <span className={`px-3 py-1 truncate text-xs font-medium rounded ${getPaymentStatusClass(order.status_id)}`}>
+                              {order.status_id === 'paid' ? 'ĐÃ THANH TOÁN' : 'CHƯA THANH TOÁN'}
                             </span>
-                          </td>
-                          <td className="py-4 px-4 text-sm text-gray-700">
-                            {formatDate(order.created_at)}
-                          </td>
-                          <td className="py-4 px-4 text-sm text-gray-700 font-medium">
-                            {formatPrice(order.total_price)}
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="flex space-x-3">
-                              <button
-                                className="text-blue-600 hover:text-blue-800"
-                                onClick={() => handleViewOrderDetail(order)}
-                                title="Xem chi tiết"
-                              >
-                                <Eye size={18} />
-                              </button>
+                          ) : (
+                            <span className="text-gray-400 text-xs">Không áp dụng</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-700">
+                          {formatDate(order.created_at)}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-700 font-medium">
+                          {formatPrice(order.total_price)}
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex space-x-3">
+                            <button
+                              className="text-blue-600 hover:text-blue-800"
+                              onClick={() => handleViewOrderDetail(order)}
+                              title="Xem chi tiết"
+                            >
+                              <Eye size={18} />
+                            </button>
 
-                              {order.status_id === 'pending' && (
-                                <button
-                                  className="text-red-600 hover:text-red-800"
-                                  onClick={() => handleCancelOrder(order._id)}
-                                  title="Hủy đơn hàng"
-                                >
-                                  <XCircle size={18} />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="9" className="py-4 px-6 text-center text-gray-500">
-                          Không có đơn hàng nào
+                            {order.order_status === 'pending' && (
+                              <button
+                                className="text-red-600 hover:text-red-800"
+                                onClick={() => handleCancelOrder(order._id)}
+                                title="Hủy đơn hàng"
+                              >
+                                <XCircle size={18} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>

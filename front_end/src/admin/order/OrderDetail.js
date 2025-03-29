@@ -12,24 +12,52 @@ const OrderDetail = ({ orderId, onBack }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [updateError, setUpdateError] = useState(null);
-  
+
   // State for enhanced data
   const [customerData, setCustomerData] = useState(null);
   const [addressData, setAddressData] = useState(null);
   const [productImages, setProductImages] = useState({});
-  
+
   // State for variant data
   const [variantDetails, setVariantDetails] = useState({});
 
+  const [currentOrderStatus, setCurrentOrderStatus] = useState('');
+  const [currentPaymentStatus, setCurrentPaymentStatus] = useState('');
+
+  const [isCodPayment, setIsCodPayment] = useState(false);
+
   // Fetch order data
   useEffect(() => {
+    const fetchOrderData = async () => {
+      try {
+        setLoading(true);
+        const response = await ApiService.get(`/order/find/${orderId}`);
+
+        // Kiểm tra xem có phải thanh toán COD hay không
+        if (response.order.payment_id && response.order.payment_id.name) {
+          const paymentMethod = response.order.payment_id.name.toLowerCase();
+          setIsCodPayment(paymentMethod.includes('cod') || paymentMethod.includes('tiền mặt') || paymentMethod.includes('cash'));
+        }
+
+        setOrderData(response.order);
+        setOrderDetails(response.orderDetails || []);
+        setCurrentOrderStatus(response.order.order_status);
+        setCurrentPaymentStatus(response.order.status_id);
+
+      } catch (error) {
+        console.error("Error fetching order data:", error);
+        setError('Lỗi khi tải dữ liệu đơn hàng: ' + error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchOrderData();
   }, [orderId]);
 
   // Extract customer ID more robustly from orderData
   useEffect(() => {
     if (orderData && orderData.customer_id) {
-      console.log("Customer ID from order:", orderData.customer_id);
       fetchCustomerData(orderData.customer_id);
     }
   }, [orderData]);
@@ -37,7 +65,6 @@ const OrderDetail = ({ orderId, onBack }) => {
   // New effect to fetch address data when user_address_id is available
   useEffect(() => {
     if (orderData && orderData.user_address_id) {
-      console.log("Address ID from order:", orderData.user_address_id);
       fetchAddressData(orderData.user_address_id);
     }
   }, [orderData]);
@@ -55,25 +82,11 @@ const OrderDetail = ({ orderId, onBack }) => {
     try {
       setLoading(true);
       const response = await ApiService.get(`/order/find/${orderId}`);
-      
-      // Debug logs
-      console.log("===== ORDER DATA STRUCTURE =====");
-      console.log("Full order data:", response);
-      console.log("Customer ID:", response.order.customer_id);
-      
-      // Kiểm tra xem customer_id có phải là object hay chỉ là ID
-      if (response.order.customer_id) {
-        console.log("Customer data type:", typeof response.order.customer_id);
-        if (typeof response.order.customer_id === 'object') {
-          console.log("Customer firstName:", response.order.customer_id.firstName);
-          console.log("Customer lastName:", response.order.customer_id.lastName);
-        }
-      }
-      
+
       setOrderData(response.order);
       setOrderDetails(response.orderDetails || []);
-      setCurrentStatus(response.order.status_id);
-      
+      setCurrentStatus(response.order.order_status);
+
     } catch (error) {
       console.error("Error fetching order data:", error);
       setError('Lỗi khi tải dữ liệu đơn hàng: ' + error);
@@ -81,25 +94,20 @@ const OrderDetail = ({ orderId, onBack }) => {
       setLoading(false);
     }
   };
-  
+
   // Fetch customer data
   const fetchCustomerData = async (customerId) => {
     try {
       // Make sure we have a valid ID string, not an object
       const userId = typeof customerId === 'object' ? customerId._id : customerId;
-      
-      // Log the type and value for debugging
-      console.log("Customer ID type:", typeof userId);
-      console.log("Customer ID value:", userId);
-      
+
       if (!userId) {
         console.error("Invalid customer ID:", customerId);
         return;
       }
-      
+
       // The correct endpoint based on user.routes.js is /user/:id
       const response = await ApiService.get(`/user/${userId}`);
-      console.log("Customer data response:", response);
       setCustomerData(response);
     } catch (error) {
       console.error("Error fetching customer data:", error);
@@ -110,22 +118,19 @@ const OrderDetail = ({ orderId, onBack }) => {
   const fetchAddressData = async (addressId) => {
     try {
       const id = typeof addressId === 'object' ? addressId._id : addressId;
-      
-      console.log("Fetching address with ID:", id);
-      
+
       if (!id) {
         console.error("Invalid address ID:", addressId);
         return;
       }
-      
+
       const response = await ApiService.get(`/address/find/${id}`);
-      console.log("Address data response:", response);
       setAddressData(response);
     } catch (error) {
       console.error("Error fetching address data:", error);
     }
   };
-  
+
   // Fetch product details including images
   const fetchProductDetails = async (orderDetails) => {
     try {
@@ -136,33 +141,28 @@ const OrderDetail = ({ orderId, onBack }) => {
         }
         return item.product_id;
       }).filter(id => id); // Filter out any undefined or null IDs
-      
-      console.log("Fetching details for product IDs:", productIds);
-      
+
       if (productIds.length === 0) {
         console.warn("No valid product IDs found in order details");
         return;
       }
-      
-      const productDetailsPromises = productIds.map(productId => 
+
+      const productDetailsPromises = productIds.map(productId =>
         ApiService.get(`/product/${productId}`)
       );
-      
+
       const productDetailsResults = await Promise.allSettled(productDetailsPromises);
-      
+
       const productImagesMap = {};
-      
+
       productDetailsResults.forEach((result, index) => {
         if (result.status === 'fulfilled') {
           const productData = result.value;
-          console.log(`Product ${productIds[index]} details:`, productData);
           productImagesMap[productIds[index]] = productData.thumbnail;
         } else {
           console.error(`Failed to fetch product ${productIds[index]}:`, result.reason);
         }
       });
-      
-      console.log("Product images map:", productImagesMap);
       setProductImages(productImagesMap);
     } catch (error) {
       console.error("Error fetching product details:", error);
@@ -174,62 +174,53 @@ const OrderDetail = ({ orderId, onBack }) => {
     try {
       // Filter items that have variant_id
       const itemsWithVariants = orderDetails.filter(item => item.variant_id);
-      
+
       if (itemsWithVariants.length === 0) {
-        console.log("No items with variants found");
         return;
       }
-      
-      console.log("Items with variants:", itemsWithVariants);
-      
+
       // Process each order item with variant_id
       const variantDetailsMap = {};
-      
+
       for (const item of itemsWithVariants) {
         // Skip if variant_id is already a populated object with attributes
-        if (typeof item.variant_id === 'object' && 
-            item.variant_id !== null && 
-            (item.variant_id.attributes || item.variant_id.name)) {
-          console.log(`Item ${item._id} already has populated variant:`, item.variant_id);
+        if (typeof item.variant_id === 'object' &&
+          item.variant_id !== null &&
+          (item.variant_id.attributes || item.variant_id.name)) {
           variantDetailsMap[item._id] = item.variant_id;
           continue;
         }
-        
+
         // Extract variant ID and product ID
-        const variantId = typeof item.variant_id === 'object' 
-          ? (item.variant_id._id || item.variant_id.id) 
+        const variantId = typeof item.variant_id === 'object'
+          ? (item.variant_id._id || item.variant_id.id)
           : item.variant_id;
-          
-        const productId = typeof item.product_id === 'object' 
+
+        const productId = typeof item.product_id === 'object'
           ? (item.product_id._id || item.product_id.id)
           : item.product_id;
-        
+
         if (!variantId || !productId) {
-          console.log(`Missing variantId or productId for item ${item._id}, skipping`);
           continue;
         }
-        
-        console.log(`Fetching variant ${variantId} for product ${productId}`);
-        
+
+
         try {
           // First try to fetch directly by variant ID
           let variantData = null;
-          
+
           try {
             variantData = await ApiService.get(`/product-variant/${variantId}`);
-            console.log(`Direct variant fetch result for ${variantId}:`, variantData);
           } catch (variantError) {
-            console.log(`Direct variant fetch failed, trying product variants instead:`, variantError);
-            
+
             // If direct fetch fails, try to get all variants for the product and find the right one
             const productVariants = await ApiService.get(`/product-variant/product/${productId}`);
-            
+
             if (Array.isArray(productVariants)) {
               variantData = productVariants.find(v => v._id === variantId);
-              console.log(`Found variant in product variants:`, variantData);
             }
           }
-          
+
           if (variantData) {
             variantDetailsMap[item._id] = variantData;
           }
@@ -237,10 +228,9 @@ const OrderDetail = ({ orderId, onBack }) => {
           console.error(`Error fetching variant for item ${item._id}:`, error);
         }
       }
-      
-      console.log("Variant details map:", variantDetailsMap);
+
       setVariantDetails(variantDetailsMap);
-      
+
     } catch (error) {
       console.error("Error in fetchVariantDetails:", error);
     }
@@ -256,25 +246,24 @@ const OrderDetail = ({ orderId, onBack }) => {
     try {
       setIsUpdating(true);
       setUpdateError(null);
-      
-      // Make sure we're sending the correct status_id format
-      const payload = { status_id: currentStatus };
-      
+
+      // Chỉ gửi cập nhật trạng thái đơn hàng
+      const payload = {
+        order_status: currentOrderStatus
+      };
+
       console.log("Sending update request:", payload);
-      console.log("Update URL:", `/order/status/${orderId}`);
-      
-      // Use PUT method instead of PATCH
+
       const response = await ApiService.put(`/order/status/${orderId}`, payload);
       console.log("Update response:", response);
-      
+
       setUpdateSuccess(true);
       setTimeout(() => setUpdateSuccess(false), 3000);
-      
-      // Give a small delay before refreshing data
+
       setTimeout(() => {
         fetchOrderData(); // Refresh data
       }, 500);
-      
+
     } catch (error) {
       console.error("Update error details:", error);
       setUpdateError(`Lỗi khi cập nhật trạng thái: ${error.message || error}`);
@@ -283,16 +272,73 @@ const OrderDetail = ({ orderId, onBack }) => {
     }
   };
 
+  // Chuyển đổi trạng thái đơn hàng (order_status) sang tiếng Việt
+  const getOrderStatusText = (orderStatus) => {
+    switch (orderStatus) {
+      case 'pending':
+        return 'Chờ xử lý';
+      case 'processing':
+        return 'Đã xác nhận';
+      case 'shipped':
+        return 'Đang vận chuyển';
+      case 'delivered':
+        return 'Giao hàng thành công';
+      case 'cancelled':
+        return 'Đã hủy';
+      default:
+        return orderStatus || 'Không xác định';
+    }
+  };
+
+  // Lấy class CSS cho trạng thái đơn hàng (order_status)
+  const getStatusClass = (orderStatus) => {
+    switch (orderStatus) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'processing':
+        return 'bg-green-100 text-green-800';
+      case 'shipped':
+        return 'bg-blue-100 text-blue-800';
+      case 'delivered':
+        return 'bg-purple-100 text-purple-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Lấy class CSS cho trạng thái thanh toán (status_id)
+  const getPaymentStatusClass = (paymentStatus) => {
+    switch (paymentStatus) {
+      case 'paid':
+        return 'bg-green-100 text-green-800';
+      case 'pending':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Hàm handle order status update
+  const handleOrderStatusUpdate = (e) => {
+    setCurrentOrderStatus(e.target.value);
+  };
+
+  // Hàm handle payment status update
+  const handlePaymentStatusUpdate = (e) => {
+    setCurrentPaymentStatus(e.target.value);
+  };
+
   // Handle cancel order
   const handleCancelOrder = async () => {
     if (window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
       try {
         setIsUpdating(true);
-        
+
         // Use PUT method instead of PATCH for cancelling order as well
         const response = await ApiService.put(`/order/cancel/${orderId}`, {});
-        console.log("Cancel order response:", response);
-        
+
         fetchOrderData(); // Refresh data
       } catch (error) {
         console.error("Cancel order error:", error);
@@ -317,7 +363,7 @@ const OrderDetail = ({ orderId, onBack }) => {
 
   // Convert backend status to Vietnamese
   const getStatusText = (status) => {
-    switch(status) {
+    switch (status) {
       case 'pending':
         return 'Chờ xác nhận';
       case 'processing':
@@ -333,50 +379,32 @@ const OrderDetail = ({ orderId, onBack }) => {
     }
   };
 
-  // Get status class for badge
-  const getStatusClass = (status) => {
-    switch(status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'processing':
-        return 'bg-green-100 text-green-800';
-      case 'shipped':
-        return 'bg-blue-100 text-blue-800';
-      case 'delivered':
-        return 'bg-purple-100 text-purple-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   // Format address for display
   const formatAddress = (address) => {
     if (!address) return 'Địa chỉ không có sẵn';
-    
+
     const parts = [];
     if (address.address_line1) parts.push(address.address_line1);
     if (address.address_line2) parts.push(address.address_line2);
     if (address.city) parts.push(address.city);
     if (address.country) parts.push(address.country);
-    
+
     return parts.join(', ');
   };
 
   // Render variant attributes
   const renderVariantAttributes = (variant) => {
     if (!variant || !variant.attributes) return null;
-    
+
     // Handle different attribute formats
-    const attributes = variant.attributes instanceof Map 
-      ? Object.fromEntries(variant.attributes) 
+    const attributes = variant.attributes instanceof Map
+      ? Object.fromEntries(variant.attributes)
       : variant.attributes;
-    
+
     if (!attributes || Object.keys(attributes).length === 0) {
       return null;
     }
-    
+
     return (
       <div className="flex flex-wrap gap-1 mt-1">
         {Object.entries(attributes).map(([key, value]) => (
@@ -391,18 +419,18 @@ const OrderDetail = ({ orderId, onBack }) => {
   // Get image for an order item, considering variants
   const getItemImage = (item) => {
     // Check if there's a variant with image
-    if (item._id && variantDetails[item._id] && 
-        variantDetails[item._id].images && 
-        variantDetails[item._id].images.length > 0) {
+    if (item._id && variantDetails[item._id] &&
+      variantDetails[item._id].images &&
+      variantDetails[item._id].images.length > 0) {
       return variantDetails[item._id].images[0];
     }
-    
+
     // Fall back to the product image from our product details fetch
     const productId = typeof item.product_id === 'object' ? item.product_id._id : item.product_id;
     if (productId && productImages[productId]) {
       return productImages[productId];
     }
-    
+
     // Last fallback to product image in the item data or default image
     return item.product_id?.image || ShopOwner;
   };
@@ -421,16 +449,16 @@ const OrderDetail = ({ orderId, onBack }) => {
 
   // Tính toán tổng tiền sản phẩm
   const subtotal = orderDetails.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
+
   // Phí vận chuyển
-  const shippingCost = orderData.shipping_id?.price || 0;
-  
+  const shippingCost = orderData.shipping_cost || (orderData.shipping_id?.price || 0);
+
   // Giảm giá (nếu có)
   const discountAmount = orderData.discount_amount || 0;
   const couponAmount = orderData.coupon_amount || 0;
-  
+
   // Tổng thanh toán - sử dụng giá trị từ API hoặc tính toán nếu cần
-  const total = (subtotal + shippingCost - discountAmount - couponAmount);
+  const total = orderData.total_price || (subtotal + shippingCost - discountAmount - couponAmount);
 
   return (
     <div className="flex-1 bg-white">
@@ -445,35 +473,54 @@ const OrderDetail = ({ orderId, onBack }) => {
             <span>Quay lại</span>
           </button>
           <h1 className="text-2xl font-bold text-gray-800">Đơn hàng #{orderData.id}</h1>
-          <span className={`ml-3 px-3 py-1 text-xs font-medium rounded ${getStatusClass(orderData.status_id)}`}>
-            {getStatusText(orderData.status_id)}
+
+          {/* Trạng thái đơn hàng */}
+          <span className={`ml-3 mr-3 px-3 py-1 text-xs font-medium rounded ${getStatusClass(orderData.order_status)}`}>
+            {getOrderStatusText(orderData.order_status)}
           </span>
+
+          {!isCodPayment && (
+            <p className="flex items-center text-sm ml-3 mr-3 px-3 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
+              <span className={orderData.status_id === 'paid' ? 'text-green-500' : 'text-yellow-500'}>
+                {orderData.status_id === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+              </span>
+            </p>
+          )}
+
         </div>
+
         <div className="flex items-center space-x-3">
           {/* Status update controls for non-cancelled orders */}
-          {orderData.status_id !== 'cancelled' && (
+          {orderData.order_status !== 'cancelled' && (
             <>
-              <select
-                className="border border-gray-300 rounded-md px-4 py-2"
-                value={currentStatus}
-                onChange={handleStatusUpdate}
-                disabled={isUpdating}
-              >
-                <option value="pending">Chờ xác nhận</option>
-                <option value="processing">Đã xác nhận</option>
-                <option value="shipped">Đang vận chuyển</option>
-                <option value="delivered">Giao hàng thành công</option>
-              </select>
+              <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+                <div>
+                  <label htmlFor="order-status" className="text-sm text-gray-600 mr-2">Trạng thái đơn hàng:</label>
+                  <select
+                    id="order-status"
+                    className="border border-gray-300 rounded-md px-4 py-2"
+                    value={currentOrderStatus}
+                    onChange={handleOrderStatusUpdate}
+                    disabled={isUpdating}
+                  >
+                    <option value="pending">Chờ xử lý</option>
+                    <option value="processing">Đã xác nhận</option>
+                    <option value="shipped">Đang vận chuyển</option>
+                    <option value="delivered">Giao hàng thành công</option>
+                  </select>
+                </div>
+              </div>
+
               <button
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 onClick={handleUpdate}
-                disabled={isUpdating || currentStatus === orderData.status_id}
+                disabled={isUpdating || currentOrderStatus === orderData.order_status}
               >
                 {isUpdating ? 'Đang cập nhật...' : 'Cập nhật'}
               </button>
-              
+
               {/* Cancel order button (only for pending/processing) */}
-              {(orderData.status_id === 'pending' || orderData.status_id === 'processing') && (
+              {(orderData.order_status === 'pending' || orderData.order_status === 'processing') && (
                 <button
                   className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
                   onClick={handleCancelOrder}
@@ -493,7 +540,7 @@ const OrderDetail = ({ orderId, onBack }) => {
           Cập nhật trạng thái thành công!
         </div>
       )}
-      
+
       {updateError && (
         <div className="mx-6 mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
           {updateError}
@@ -517,21 +564,21 @@ const OrderDetail = ({ orderId, onBack }) => {
           <h2 className="text-xl font-semibold mb-4">Trạng thái đơn hàng</h2>
           <div className="bg-white rounded-md border border-gray-200 p-4">
             <div className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${orderData.status_id !== 'cancelled' ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>1</div>
-              <div className={`flex-1 h-1 ${orderData.status_id === 'pending' || orderData.status_id === 'processing' || orderData.status_id === 'shipped' || orderData.status_id === 'delivered' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${orderData.status_id === 'processing' || orderData.status_id === 'shipped' || orderData.status_id === 'delivered' ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>2</div>
-              <div className={`flex-1 h-1 ${orderData.status_id === 'shipped' || orderData.status_id === 'delivered' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${orderData.status_id === 'shipped' || orderData.status_id === 'delivered' ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>3</div>
-              <div className={`flex-1 h-1 ${orderData.status_id === 'delivered' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${orderData.status_id === 'delivered' ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>4</div>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${orderData.order_status !== 'cancelled' ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>1</div>
+              <div className={`flex-1 h-1 ${orderData.order_status === 'pending' || orderData.order_status === 'processing' || orderData.order_status === 'shipped' || orderData.order_status === 'delivered' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${orderData.order_status === 'processing' || orderData.order_status === 'shipped' || orderData.order_status === 'delivered' ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>2</div>
+              <div className={`flex-1 h-1 ${orderData.order_status === 'shipped' || orderData.order_status === 'delivered' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${orderData.order_status === 'shipped' || orderData.order_status === 'delivered' ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>3</div>
+              <div className={`flex-1 h-1 ${orderData.order_status === 'delivered' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${orderData.order_status === 'delivered' ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>4</div>
             </div>
-            
+
             <div className="flex justify-between mt-2 text-sm">
               <div className="text-center">
-                <p>Chờ xác nhận</p>
+                <p>Chờ xử lý</p>
               </div>
               <div className="text-center">
                 <p>Đã xác nhận</p>
@@ -543,8 +590,8 @@ const OrderDetail = ({ orderId, onBack }) => {
                 <p>Giao hàng Thành công</p>
               </div>
             </div>
-            
-            {orderData.status_id === 'cancelled' && (
+
+            {orderData.order_status === 'cancelled' && (
               <div className="mt-4 p-3 bg-red-100 text-red-700 rounded text-center">
                 Đơn hàng đã bị hủy
               </div>
@@ -555,61 +602,32 @@ const OrderDetail = ({ orderId, onBack }) => {
         {/* Products section - Updated to show variant information */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <ShoppingBag size={20} className="mr-2" />
-            Sản phẩm
+            <CreditCard size={20} className="mr-2" />
+            Thanh toán
           </h2>
-          <div className="bg-white rounded-md border border-gray-200">
-            {orderDetails.map((item) => (
-              <div key={item._id} className="p-4 flex items-start border-b border-gray-200">
-                <img
-                  src={getItemImage(item)}
-                  className="w-24 h-24 object-cover rounded-md mr-4"
-                  alt={item.product_id?.name || 'Sản phẩm'}
-                  onError={(e) => { e.target.src = ShopOwner }}
-                />
-                <div className="flex-grow">
-                  <h3 className="text-md font-medium text-gray-800 mb-1">
-                    {item.product_id?.name || 'Sản phẩm không tên'}
-                  </h3>
-                  
-                  {/* Display variant information if available */}
-                  {item._id && variantDetails[item._id] && (
-                    <div className="mb-2">
-                      {/* Variant name */}
-                      {variantDetails[item._id].name && (
-                        <div className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs inline-block">
-                          {variantDetails[item._id].name}
-                        </div>
-                      )}
-                      
-                      {/* Variant attributes */}
-                      {renderVariantAttributes(variantDetails[item._id])}
-                      
-                      {/* Stock info */}
-                      {variantDetails[item._id].stock !== undefined && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          {variantDetails[item._id].stock > 0 ? (
-                            <span className="text-green-600">Tồn kho: {variantDetails[item._id].stock}</span>
-                          ) : (
-                            <span className="text-red-600">Hết hàng</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="text-gray-600 mb-2">{formatPrice(item.price)} × {item.quantity}</div>
-                  
-                  {/* Hiển thị mô tả sản phẩm */}
-                  {item.product_id?.detail && (
-                    <p className="text-sm text-gray-500">{item.product_id.detail}</p>
-                  )}
-                </div>
-                <div className="text-lg font-semibold text-gray-800">
-                  {formatPrice(item.price * item.quantity)}
-                </div>
+          <div className="bg-white rounded-md border border-gray-200 p-4">
+            <div className="flex items-start mb-4">
+              <div className="bg-gray-100 p-2 rounded-md mr-3">
+                <CreditCard size={20} className="text-gray-600" />
               </div>
-            ))}
+              <div>
+                <h3 className="font-medium text-gray-800">{orderData.payment_id?.name || 'Phương thức thanh toán'}</h3>
+                {!isCodPayment && (
+                  <p className="flex items-center text-sm">
+                    <span className={`inline-block w-2 h-2 rounded-full mr-1 ${orderData.status_id === 'paid' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+                    <span className={orderData.status_id === 'paid' ? 'text-green-500' : 'text-yellow-500'}>
+                      {orderData.status_id === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                    </span>
+                  </p>
+                )}
+
+                {orderData.order_payment_id && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Mã thanh toán: {orderData.order_payment_id}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -717,35 +735,6 @@ const OrderDetail = ({ orderId, onBack }) => {
 
           {/* Right column */}
           <div>
-            {/* Payment method */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <CreditCard size={20} className="mr-2" />
-                Thanh toán
-              </h2>
-              <div className="bg-white rounded-md border border-gray-200 p-4">
-                <div className="flex items-start mb-4">
-                  <div className="bg-gray-100 p-2 rounded-md mr-3">
-                    <CreditCard size={20} className="text-gray-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-800">{orderData.payment_id?.name || 'Phương thức thanh toán'}</h3>
-                    <p className="flex items-center text-sm">
-                      <span className={`inline-block w-2 h-2 rounded-full mr-1 ${orderData.order_payment_id ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
-                      <span className={orderData.order_payment_id ? 'text-green-500' : 'text-yellow-500'}>
-                        {orderData.order_payment_id ? 'Đã thanh toán' : 'Chưa thanh toán'}
-                      </span>
-                    </p>
-                    {orderData.order_payment_id && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Mã thanh toán: {orderData.order_payment_id}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Customer information */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4 flex items-center">

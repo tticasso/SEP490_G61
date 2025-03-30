@@ -42,7 +42,11 @@ const Sidebar = ({ profile }) => {
           <img src={ShopAvatar} className='w-full h-full' alt="Profile" />
         </div>
         <div>
-          <p className="font-semibold">{profile.lastName} {profile.firstName}</p>
+          <p className="font-semibold">
+            {profile && (profile.lastName || profile.firstName) ?
+              `${profile.lastName || ''} ${profile.firstName || ''}`.trim() :
+              'Người dùng'}
+          </p>
         </div>
       </div>
 

@@ -12,6 +12,22 @@ export const AuthProvider = ({ children }) => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loading, setLoading] = useState(true);
     const [shopStatus, setShopStatus] = useState(null);
+
+    // Helper to check if user has a specific role (handles both formats)
+    const hasRoleHelper = (roles = [], roleName) => {
+        if (!Array.isArray(roles)) return false;
+        
+        const normalizedRoleName = roleName.toUpperCase();
+        const prefixedRoleName = normalizedRoleName.startsWith('ROLE_') 
+            ? normalizedRoleName 
+            : `ROLE_${normalizedRoleName}`;
+        
+        return roles.some(role => {
+            if (typeof role !== 'string') return false;
+            const upperRole = role.toUpperCase();
+            return upperRole === prefixedRoleName || upperRole === normalizedRoleName;
+        });
+    };
     
     // Khởi tạo thông tin người dùng từ localStorage
     useEffect(() => {
@@ -25,13 +41,21 @@ export const AuthProvider = ({ children }) => {
                 
                 if (isAuthenticated) {
                     const user = AuthService.getCurrentUser();
-                    setCurrentUser(user);
-                    setUserRoles(user.roles || []);
+                    console.log("Current user from localStorage:", user); // Debug log
                     
-                    // Kiểm tra trạng thái cửa hàng nếu là người bán
-                    if (user.roles && (user.roles.includes('ROLE_SELLER') || user.roles.includes('SELLER'))) {
-                        const shopStatusData = await ShopService.canAccessSellerDashboard();
-                        setShopStatus(shopStatusData);
+                    if (user) {
+                        setCurrentUser(user);
+                        
+                        // Log roles for debugging
+                        console.log("User roles from localStorage:", user.roles);
+                        setUserRoles(user.roles || []);
+                        
+                        // Kiểm tra trạng thái cửa hàng nếu là người bán - sử dụng hàm trợ giúp
+                        if (hasRoleHelper(user.roles, 'SELLER')) {
+                            console.log("User has SELLER role, checking shop status");
+                            const shopStatusData = await ShopService.canAccessSellerDashboard();
+                            setShopStatus(shopStatusData);
+                        }
                     }
                 }
             } catch (error) {
@@ -52,18 +76,23 @@ export const AuthProvider = ({ children }) => {
         return () => window.removeEventListener('storage', handleStorageChange);
     }, []);
     
-    // Đăng nhập
+    // Đăng nhập - enhanced with better logging and role handling
     const login = async (email, password) => {
         try {
             const data = await AuthService.login(email, password);
+            console.log("Login data received in context:", data); // Debug log
             
             if (data.accessToken) {
+                // Enhanced logging of roles
+                console.log("Roles from login:", data.roles);
+                
                 setIsLoggedIn(true);
                 setCurrentUser(data);
                 setUserRoles(data.roles || []);
                 
-                // Nếu là người bán, kiểm tra trạng thái cửa hàng
-                if (data.roles && (data.roles.includes('ROLE_SELLER') || data.roles.includes('SELLER'))) {
+                // Nếu là người bán, kiểm tra trạng thái cửa hàng - sử dụng hàm trợ giúp mới
+                if (hasRoleHelper(data.roles, 'SELLER')) {
+                    console.log("User has SELLER role, checking shop status");
                     const shopStatusData = await ShopService.canAccessSellerDashboard();
                     setShopStatus(shopStatusData);
                 }
@@ -71,22 +100,29 @@ export const AuthProvider = ({ children }) => {
             
             return data;
         } catch (error) {
-            console.error("Login error:", error);
+            console.error("Login error in context:", error);
             throw error;
         }
     };
     
-    // Đăng nhập với Google
+    // Đăng nhập với Google - enhanced with better logging and role handling
     const handleGoogleAuthLogin = (userData) => {
         try {
+            console.log("Google auth login data:", userData); // Debug log
+            
             if (userData && userData.accessToken) {
+                // Set user through AuthService to ensure consistent role formatting
                 AuthService.setUser(userData);
+                
                 setIsLoggedIn(true);
                 setCurrentUser(userData);
+                
+                console.log("Setting user roles from Google auth:", userData.roles);
                 setUserRoles(userData.roles || []);
                 
-                // Kiểm tra trạng thái cửa hàng nếu là người bán
-                if (userData.roles && (userData.roles.includes('ROLE_SELLER') || userData.roles.includes('SELLER'))) {
+                // Kiểm tra trạng thái cửa hàng nếu là người bán - sử dụng hàm trợ giúp
+                if (hasRoleHelper(userData.roles, 'SELLER')) {
+                    console.log("Google user has SELLER role, checking shop status");
                     ShopService.canAccessSellerDashboard()
                         .then(shopStatusData => setShopStatus(shopStatusData));
                 }
@@ -118,8 +154,8 @@ export const AuthProvider = ({ children }) => {
                 setCurrentUser(updatedUser);
                 setUserRoles(updatedUser.roles || []);
                 
-                // Kiểm tra lại trạng thái cửa hàng nếu là người bán
-                if (updatedUser.roles && (updatedUser.roles.includes('ROLE_SELLER') || updatedUser.roles.includes('SELLER'))) {
+                // Kiểm tra lại trạng thái cửa hàng nếu là người bán - sử dụng hàm trợ giúp
+                if (hasRoleHelper(updatedUser.roles, 'SELLER')) {
                     const shopStatusData = await ShopService.canAccessSellerDashboard();
                     setShopStatus(shopStatusData);
                 }
@@ -132,10 +168,12 @@ export const AuthProvider = ({ children }) => {
         }
     };
     
-    // Kiểm tra xem người dùng có quyền seller và cửa hàng có hoạt động không
+    // Kiểm tra xem người dùng có quyền seller và cửa hàng có hoạt động không - sử dụng hàm trợ giúp
     const canAccessSellerDashboard = () => {
         if (!isLoggedIn || !shopStatus) return false;
-        return shopStatus.canAccess === true;
+        
+        const isSeller = hasRoleHelper(userRoles, 'SELLER');
+        return isSeller && shopStatus.canAccess === true;
     };
     
     // Lấy lý do không thể truy cập seller dashboard
@@ -156,7 +194,8 @@ export const AuthProvider = ({ children }) => {
         refreshUserData,
         canAccessSellerDashboard,
         getSellerDashboardAccessReason,
-        shopStatus
+        shopStatus,
+        hasRole: hasRoleHelper // Export the helper function for components to use
     };
     
     return (

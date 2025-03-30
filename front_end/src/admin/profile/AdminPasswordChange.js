@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import ApiService from "../../../services/ApiService";
-import AuthService from "../../../services/AuthService";
+import ApiService from "../../services/ApiService";
+import AuthService from "../../services/AuthService";
 
-const PasswordChange = () => {
+const AdminPasswordChange = () => {
     const navigate = useNavigate();
     const currentUser = AuthService.getCurrentUser();
-
+    
     // Nếu không có thông tin người dùng, chuyển về trang đăng nhập
     useEffect(() => {
         if (!currentUser) {
@@ -40,7 +40,7 @@ const PasswordChange = () => {
     // Hàm xử lý xác nhận email và gửi OTP
     const handleVerifyEmail = async (e) => {
         e.preventDefault();
-
+        
         if (!email) {
             setError("Vui lòng nhập email của bạn");
             return;
@@ -54,11 +54,11 @@ const PasswordChange = () => {
 
         setLoading(true);
         setError("");
-
+        
         try {
             // Gọi API để gửi OTP đến email
             await ApiService.post("/user/forgot-password", { email });
-
+            
             // Chuyển sang bước nhập OTP
             setStep(2);
             setSuccess("Mã OTP đã được gửi đến email của bạn");
@@ -72,7 +72,7 @@ const PasswordChange = () => {
     // Hàm xử lý xác nhận OTP
     const handleVerifyOtp = async (e) => {
         e.preventDefault();
-
+        
         if (!otp) {
             setError("Vui lòng nhập mã OTP");
             return;
@@ -85,10 +85,11 @@ const PasswordChange = () => {
 
         setLoading(true);
         setError("");
-
+        
         // Trong thực tế, bạn sẽ gọi API để xác thực OTP
-        // Tuy nhiên, vì không có endpoint cụ thể, nên chúng ta sẽ chuyển sang bước tiếp theo
+        // Tuy nhiên ở đây chuyển sang bước tiếp theo để đổi mật khẩu
         try {
+            // Trong thực tế ở đây sẽ có API kiểm tra OTP
             // Giả lập xác thực OTP thành công
             setTimeout(() => {
                 setStep(3);
@@ -111,10 +112,10 @@ const PasswordChange = () => {
             return;
         }
 
-        // Kiểm tra mật khẩu mạnh hơn: ít nhất 8 ký tự, có chữ thường, chữ hoa, số và ký tự đặc biệt
-        const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-        if (!strongPasswordRegex.test(formData.newPassword)) {
-            setError("Mật khẩu mới phải có ít nhất 8 ký tự, bao gồm chữ thường, chữ hoa, số và ký tự đặc biệt (@$!%*?&)");
+        // Kiểm tra mật khẩu mạnh hơn: ít nhất 8 ký tự, có chữ và số
+        const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/;
+        if (!passwordRegex.test(formData.newPassword)) {
+            setError("Mật khẩu mới phải có ít nhất 8 ký tự, bao gồm chữ và số");
             return;
         }
 
@@ -136,11 +137,11 @@ const PasswordChange = () => {
 
             // Hiển thị thông báo thành công
             setSuccess("Đổi mật khẩu thành công!");
-
+            
             // Đăng xuất người dùng sau 3 giây và chuyển họ đến trang đăng nhập
             setTimeout(() => {
                 AuthService.logout();
-                navigate("/user-profile");
+                navigate("/login");
             }, 3000);
         } catch (error) {
             setError(typeof error === 'string' ? error : "Có lỗi xảy ra khi đổi mật khẩu");
@@ -150,23 +151,23 @@ const PasswordChange = () => {
     };
 
     return (
-        <div className="p-6">
+        <div className="p-6 bg-white rounded-lg shadow-md">
             <h2 className="text-xl font-semibold mb-4">Đổi Mật Khẩu</h2>
-
+            
             {/* Hiển thị thông báo lỗi */}
             {error && (
                 <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
                     {error}
                 </div>
             )}
-
+            
             {/* Hiển thị thông báo thành công */}
             {success && (
                 <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
                     {success}
                 </div>
             )}
-
+            
             {/* Form xác nhận email */}
             {step === 1 && (
                 <form className="space-y-4" onSubmit={handleVerifyEmail}>
@@ -181,7 +182,7 @@ const PasswordChange = () => {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             disabled={loading}
                             required
                         />
@@ -189,7 +190,7 @@ const PasswordChange = () => {
                     <div className="flex justify-end">
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                             disabled={loading}
                         >
                             {loading ? "Đang xử lý..." : "Gửi mã xác nhận"}
@@ -197,7 +198,7 @@ const PasswordChange = () => {
                     </div>
                 </form>
             )}
-
+            
             {/* Form nhập OTP */}
             {step === 2 && (
                 <form className="space-y-4" onSubmit={handleVerifyOtp}>
@@ -214,7 +215,7 @@ const PasswordChange = () => {
                             placeholder="Nhập mã 6 chữ số"
                             value={otp}
                             onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             disabled={loading}
                             required
                         />
@@ -226,14 +227,14 @@ const PasswordChange = () => {
                         <button
                             type="button"
                             onClick={() => setStep(1)}
-                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             disabled={loading}
                         >
                             Quay lại
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                             disabled={loading}
                         >
                             {loading ? "Đang xử lý..." : "Xác nhận"}
@@ -241,7 +242,7 @@ const PasswordChange = () => {
                     </div>
                 </form>
             )}
-
+            
             {/* Form đổi mật khẩu */}
             {step === 3 && (
                 <form className="space-y-4" onSubmit={handleChangePassword}>
@@ -255,7 +256,7 @@ const PasswordChange = () => {
                             placeholder="Nhập mật khẩu mới"
                             value={formData.newPassword}
                             onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             disabled={loading}
                             required
                         />
@@ -273,7 +274,7 @@ const PasswordChange = () => {
                             placeholder="Nhập lại mật khẩu mới"
                             value={formData.confirmPassword}
                             onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             disabled={loading}
                             required
                         />
@@ -282,14 +283,14 @@ const PasswordChange = () => {
                         <button
                             type="button"
                             onClick={() => setStep(2)}
-                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             disabled={loading}
                         >
                             Quay lại
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                             disabled={loading}
                         >
                             {loading ? "Đang xử lý..." : "Đổi mật khẩu"}
@@ -301,4 +302,4 @@ const PasswordChange = () => {
     );
 };
 
-export default PasswordChange;
+export default AdminPasswordChange;

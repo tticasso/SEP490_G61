@@ -16,20 +16,40 @@ const LoginPage = () => {
     // Use auth context
     const { isLoggedIn, login, handleGoogleAuthLogin, userRoles } = useAuth();
 
-    // Function to redirect based on user role
+    // Function to redirect based on user role - IMPROVED VERSION
     const redirectBasedOnRole = (roles = []) => {
+        console.log("Redirecting based on roles:", roles); // Debug log
+        
         // Default to home page
         let redirectPath = '/';
         
-        // Check for admin role first (priority)
-        if (roles.includes('ROLE_ADMIN')) {
+        // Ensure roles is an array
+        if (!Array.isArray(roles)) {
+            console.error("Roles is not an array:", roles);
+            roles = [];
+        }
+        
+        // Check for both formats: "ROLE_ADMIN", "ADMIN", etc.
+        const hasAdminRole = roles.some(role => {
+            if (typeof role !== 'string') return false;
+            return role.toUpperCase() === 'ROLE_ADMIN' || role.toUpperCase() === 'ADMIN';
+        });
+        
+        const hasSellerRole = roles.some(role => {
+            if (typeof role !== 'string') return false;
+            return role.toUpperCase() === 'ROLE_SELLER' || role.toUpperCase() === 'SELLER';
+        });
+        
+        // Set redirect path based on role
+        if (hasAdminRole) {
             redirectPath = '/admin';
-        }
-        // Then check for seller/mod role
-        else if (roles.includes('ROLE_SELLER')) {
+            console.log("Redirecting to admin dashboard");
+        } else if (hasSellerRole) {
             redirectPath = '/seller-dashboard';
+            console.log("Redirecting to seller dashboard");
+        } else {
+            console.log("Redirecting to home (member role)");
         }
-        // For MEMBER or other roles, go to homepage
         
         navigate(redirectPath);
     };
@@ -37,9 +57,10 @@ const LoginPage = () => {
     // Check if user is already logged in and redirect accordingly
     useEffect(() => {
         if (isLoggedIn && userRoles) {
+            console.log("User is already logged in with roles:", userRoles);
             redirectBasedOnRole(userRoles);
         }
-    }, [isLoggedIn, userRoles]);
+    }, [isLoggedIn, userRoles, navigate]);
 
     // Handle Google auth redirect
     useEffect(() => {
@@ -65,13 +86,16 @@ const LoginPage = () => {
         try {
             // Use context's login function
             const result = await login(formData.email, formData.password);
+            console.log("Login successful, result:", result);
             
             // Get roles from the result or from context
             const roles = result?.roles || userRoles || [];
+            console.log("Roles for redirection:", roles);
             
             // Redirect based on user role
             redirectBasedOnRole(roles);
         } catch (error) {
+            console.error("Login error:", error);
             setError(error || "Đăng nhập thất bại");
         } finally {
             setLoading(false);
@@ -87,11 +111,14 @@ const LoginPage = () => {
         try {
             // Decode the user data
             const userData = JSON.parse(decodeURIComponent(userDataEncoded));
+            console.log("Google auth data:", userData);
             
             // Use the context's function to handle Google auth login
             const success = handleGoogleAuthLogin(userData);
             
             if (success) {
+                console.log("Google login successful, roles:", userData.roles);
+                
                 // Add a delay before redirect to ensure storage is complete
                 setTimeout(() => {
                     // Redirect based on user roles from the userData

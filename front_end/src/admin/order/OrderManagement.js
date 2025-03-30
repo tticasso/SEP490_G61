@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Eye, RefreshCw, Clock, DollarSign, Package, XCircle, Truck, CheckCircle } from 'lucide-react';
 import ApiService from '../../services/ApiService';
 import OrderDetail from './OrderDetail';
+import PaymentDetailsPopup from './PaymentDetailsPopup';
 
 const OrderManagement = () => {
   const [showOrderDetail, setShowOrderDetail] = useState(false);
@@ -25,6 +26,8 @@ const OrderManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
+  const [showPaymentDetails, setShowPaymentDetails] = useState(false);
+  const [selectedPaymentDetails, setSelectedPaymentDetails] = useState(null);
 
   // Filter states
   const [filter, setFilter] = useState({
@@ -168,6 +171,12 @@ const OrderManagement = () => {
 
   // Handle view order detail
   const handleViewOrderDetail = (order) => {
+    // Chuyển đổi payment_details từ Object sang định dạng đúng nếu cần
+    if (order.payment_details && typeof order.payment_details === 'object') {
+      // Xử lý dữ liệu payment_details nếu cần
+      console.log("Payment details available:", order.payment_details);
+    }
+
     setSelectedOrder(order);
     setShowOrderDetail(true);
   };
@@ -430,37 +439,40 @@ const OrderManagement = () => {
           </div>
 
           {/* Orders table */}
-          <div className="px-6 pb-6 overflow-x-auto">
+          <div className="px-6 pb-6">
             <div className="bg-white rounded-md shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+              <div className="overflow-x-auto" style={{ width: '100%' }}>
+                <table className="min-w-full divide-y divide-gray-200" >
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
                         Mã đơn hàng
                       </th>
-                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
                         Khách hàng
                       </th>
-                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
                         Phương thức vận chuyển
                       </th>
-                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
                         Phương thức thanh toán
                       </th>
-                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
                         Trạng thái đơn hàng
                       </th>
-                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
                         Trạng thái thanh toán
                       </th>
-                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
+                        Chi tiết thanh toán
+                      </th>
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
                         Thời gian đặt hàng
                       </th>
-                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
                         Tổng tiền
                       </th>
-                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap" >
                         Thao tác
                       </th>
                     </tr>
@@ -479,6 +491,9 @@ const OrderManagement = () => {
                         </td>
                         <td className="py-4 px-4 text-sm text-gray-900">
                           {order.payment_id?.name || 'Không có thông tin'}
+                          {order.payment_method && (
+                            <span className="text-xs block text-gray-500">({order.payment_method})</span>
+                          )}
                         </td>
                         {/* Trạng thái đơn hàng */}
                         <td className="py-4 px-4">
@@ -494,6 +509,25 @@ const OrderManagement = () => {
                             </span>
                           ) : (
                             <span className="text-gray-400 text-xs">Không áp dụng</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4">
+                          {isVNPayPayment(order) ? (
+                            order.payment_details && Object.keys(order.payment_details).length > 0 ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedPaymentDetails(order.payment_details);
+                                  setShowPaymentDetails(true);
+                                }}
+                                className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md text-xs hover:bg-blue-200"
+                              >
+                                Xem chi tiết
+                              </button>
+                            ) : (
+                              <span className="text-gray-400 text-xs">Không có dữ liệu</span>
+                            )
+                          ) : (
+                            <span className="text-gray-400 text-xs">-</span>
                           )}
                         </td>
                         <td className="py-4 px-4 text-sm text-gray-700">
@@ -594,6 +628,16 @@ const OrderManagement = () => {
             </div>
           </div>
         </>
+      )}
+      {/* Chi tiết thanh toán popup */}
+      {showPaymentDetails && (
+        <PaymentDetailsPopup
+          paymentDetails={selectedPaymentDetails}
+          onClose={() => {
+            setShowPaymentDetails(false);
+            setSelectedPaymentDetails(null);
+          }}
+        />
       )}
     </div>
   );

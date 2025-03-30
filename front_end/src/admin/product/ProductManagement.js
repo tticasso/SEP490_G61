@@ -521,7 +521,7 @@ const ProductManagement = () => {
 
             {/* Products table */}
             <div className="px-6 pb-6">
-                <div className="bg-white rounded-md shadow-sm">
+                <div className="bg-white rounded-md shadow-sm overflow-x-auto" style={{ width: '100%' }}>
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead>
                             <tr className="bg-gray-50">
@@ -533,28 +533,28 @@ const ProductManagement = () => {
                                         onChange={handleSelectAllItems}
                                     />
                                 </th>
-                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                     Tên sản phẩm
                                 </th>
-                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                     Cửa hàng
                                 </th>
-                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                     Danh mục
                                 </th>
-                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                     Thương hiệu
                                 </th>
-                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                     Giá bán
                                 </th>
-                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                     Đã bán
                                 </th>
-                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                     Trạng thái
                                 </th>
-                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">
+                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                     Thao tác
                                 </th>
                             </tr>
@@ -565,7 +565,7 @@ const ProductManagement = () => {
                                     <React.Fragment key={product._id}>
                                         {/* Product row */}
                                         <tr className={`hover:bg-gray-50 ${expandedProducts[product._id] ? 'bg-blue-50' : ''}`}>
-                                            <td className="py-3 px-4">
+                                            <td className="py-3 px-4" >
                                                 <div className="flex items-center">
                                                     <input
                                                         type="checkbox"
@@ -581,7 +581,7 @@ const ProductManagement = () => {
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td className="py-3 px-4">
+                                            <td className="py-3 px-4 truncate w-[80px]">
                                                 <div className="flex items-center">
                                                     <img
                                                         src={product.thumbnail || 'https://via.placeholder.com/40'}
@@ -591,22 +591,22 @@ const ProductManagement = () => {
                                                     <span className="text-sm text-gray-900">{product.name}</span>
                                                 </div>
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-gray-700">
+                                            <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-700">
                                                 {product.shop_id && product.shop_id.name ? product.shop_id.name : 'N/A'}
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-gray-700">
+                                            <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-700">
                                                 {product.category_id && product.category_id.length > 0 
                                                     ? product.category_id.map(cat => cat.name).join(', ') 
                                                     : 'N/A'}
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-gray-700">
+                                            <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-700">
                                                 {product.brand_id ? product.brand_id.name : 'N/A'}
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-gray-700">
+                                            <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-700">
                                                 {formatPrice(product.price)}
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-gray-700">{product.sold || 0}</td>
-                                            <td className="py-3 px-4">
+                                            <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-700">{product.sold || 0}</td>
+                                            <td className="py-3 px-4 whitespace-nowrap">
                                                 <div className="flex items-center">
                                                     <span className={`h-2 w-2 rounded-full mr-2 ${product.is_active ? 'bg-green-500' : 'bg-red-500'}`}></span>
                                                     <span className="text-sm text-gray-700">
@@ -618,7 +618,7 @@ const ProductManagement = () => {
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="py-3 px-4">
+                                            <td className="py-3 px-4 whitespace-nowrap">
                                                 <div className="flex items-center space-x-3">
                                                     <button 
                                                         className="text-blue-500 hover:text-blue-600"

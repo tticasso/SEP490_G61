@@ -182,26 +182,26 @@ const Message = () => {
       // Find id of the other participant
       const otherParticipantId = conversation.participantId;
       if (!otherParticipantId) return;
-  
+
       console.log("Fetching details for participant:", otherParticipantId);
-  
+
       const response = await ApiService.get(`/user-status/participant/${otherParticipantId}`, true);
-      
+
       // Debug the API response
       console.log("Participant API response:", response);
-  
+
       // Store participant info
       setParticipants(prev => ({
         ...prev,
         [otherParticipantId]: response
       }));
-  
+
       // Update online status
       setOnlineStatuses(prev => ({
         ...prev,
         [otherParticipantId]: response.status
       }));
-  
+
     } catch (error) {
       console.error('Error fetching participant details:', error);
     }
@@ -355,26 +355,26 @@ const Message = () => {
 
   // Hàm gửi tin nhắn
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+    // Kiểm tra và làm sạch nội dung tin nhắn
+    const cleanMessage = newMessage.trim();
+
+    if (!cleanMessage || !selectedConversation) return;
+
+    // Kiểm tra độ dài tin nhắn
+    if (cleanMessage.length > 500) {
+      alert('Tin nhắn không được vượt quá 500 ký tự');
+      return;
+    }
 
     try {
       // Lưu nội dung tin nhắn để sau khi xử lý xong input trống
-      const messageContent = newMessage;
+      const messageContent = cleanMessage;
 
       // Clear input ngay lập tức để UX tốt hơn
       setNewMessage('');
 
       // ID tạm thời cho tin nhắn
       const tempId = Date.now().toString();
-
-      // Thêm tin nhắn vào UI ngay lập tức (optimistic update)
-      // setMessages(prev => [...prev, {
-      //   id: tempId,
-      //   sender: 'me',
-      //   text: messageContent,
-      //   timestamp: new Date().toLocaleString(),
-      //   isRead: false
-      // }]);
 
       // Cập nhật danh sách cuộc trò chuyện
       setConversations(prev =>
@@ -384,8 +384,6 @@ const Message = () => {
             : conv
         )
       );
-
-
 
       if (socketRef.current && socketRef.current.connected) {
         // Gửi tin nhắn qua Socket.IO
@@ -460,25 +458,25 @@ const Message = () => {
                 )}
               </div>
               <div className="flex-grow">
-              {participants[selectedConversationData.participantId] ? (
-      <h3 className="font-semibold">
-        {(() => {
-          const participant = participants[selectedConversationData.participantId];
-          console.log("Rendering participant:", participant);
-          
-          // For sellers, show shop name and personal name
-          if (participant.isSeller && participant.shop) {
-            return `${participant.shop.name} (${participant.firstName} ${participant.lastName})`;
-          } 
-          // For regular users, show their name
-          else {
-            return `${participant.firstName} ${participant.lastName}`;
-          }
-        })()}
-      </h3>
-    ) : (
-      <h3 className="font-semibold">{selectedConversationData.name}</h3>
-    )}
+                {participants[selectedConversationData.participantId] ? (
+                  <h3 className="font-semibold">
+                    {(() => {
+                      const participant = participants[selectedConversationData.participantId];
+                      console.log("Rendering participant:", participant);
+
+                      // For sellers, show shop name and personal name
+                      if (participant.isSeller && participant.shop) {
+                        return `${participant.shop.name} (${participant.firstName} ${participant.lastName})`;
+                      }
+                      // For regular users, show their name
+                      else {
+                        return `${participant.firstName} ${participant.lastName}`;
+                      }
+                    })()}
+                  </h3>
+                ) : (
+                  <h3 className="font-semibold">{selectedConversationData.name}</h3>
+                )}
                 <p className="text-gray-500 text-sm">{conv.lastMessage}</p>
               </div>
               {conv.unread && (
@@ -494,55 +492,54 @@ const Message = () => {
         <div className="w-3/4 flex flex-col">
           {/* Chat Header */}
           <div className="bg-white p-4 flex items-center border-b">
-  <div className="">
-    <img
-      src={selectedConversationData.image}
-      className='w-12 h-12 rounded-full mr-3 object-cover'
-      alt={selectedConversationData.name}
-    />
-  </div>
-  <div>
-    {participants[selectedConversationData.participantId] ? (
-      <h3 className="font-semibold">
-        {(() => {
-          const participant = participants[selectedConversationData.participantId];
-          console.log("Rendering participant:", participant);
-          
-          // For sellers, show shop name and personal name
-          if (participant.isSeller && participant.shop) {
-            return `${participant.shop.name} (${participant.firstName} ${participant.lastName})`;
-          } 
-          // For regular users, show their name
-          else {
-            return `${participant.firstName} ${participant.lastName}`;
-          }
-        })()}
-      </h3>
-    ) : (
-      <h3 className="font-semibold">{selectedConversationData.name}</h3>
-    )}
-    <p className="text-gray-500 text-sm flex items-center gap-1">
-      {participants[selectedConversationData.participantId] && (
-        <>
-          <div className={`w-3 h-3 rounded-full ${
-            onlineStatuses[selectedConversationData.participantId] === 'online'
-              ? 'bg-green-600'
-              : onlineStatuses[selectedConversationData.participantId] === 'recently'
-                ? 'bg-yellow-500'
-                : 'bg-gray-400'
-          }`}></div>
-          <span>
-            {onlineStatuses[selectedConversationData.participantId] === 'online'
-              ? 'Đang hoạt động'
-              : onlineStatuses[selectedConversationData.participantId] === 'recently'
-                ? 'Vừa hoạt động gần đây'
-                : 'Không hoạt động'}
-          </span>
-        </>
-      )}
-    </p>
-  </div>
-</div>
+            <div className="">
+              <img
+                src={selectedConversationData.image}
+                className='w-12 h-12 rounded-full mr-3 object-cover'
+                alt={selectedConversationData.name}
+              />
+            </div>
+            <div>
+              {participants[selectedConversationData.participantId] ? (
+                <h3 className="font-semibold">
+                  {(() => {
+                    const participant = participants[selectedConversationData.participantId];
+                    console.log("Rendering participant:", participant);
+
+                    // For sellers, show shop name and personal name
+                    if (participant.isSeller && participant.shop) {
+                      return `${participant.shop.name} (${participant.firstName} ${participant.lastName})`;
+                    }
+                    // For regular users, show their name
+                    else {
+                      return `${participant.firstName} ${participant.lastName}`;
+                    }
+                  })()}
+                </h3>
+              ) : (
+                <h3 className="font-semibold">{selectedConversationData.name}</h3>
+              )}
+              <p className="text-gray-500 text-sm flex items-center gap-1">
+                {participants[selectedConversationData.participantId] && (
+                  <>
+                    <div className={`w-3 h-3 rounded-full ${onlineStatuses[selectedConversationData.participantId] === 'online'
+                        ? 'bg-green-600'
+                        : onlineStatuses[selectedConversationData.participantId] === 'recently'
+                          ? 'bg-yellow-500'
+                          : 'bg-gray-400'
+                      }`}></div>
+                    <span>
+                      {onlineStatuses[selectedConversationData.participantId] === 'online'
+                        ? 'Đang hoạt động'
+                        : onlineStatuses[selectedConversationData.participantId] === 'recently'
+                          ? 'Vừa hoạt động gần đây'
+                          : 'Không hoạt động'}
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
 
           {/* Messages */}
           <div className="flex-grow overflow-y-auto p-4 space-y-4">

@@ -13,24 +13,24 @@ const ShippingAddresses = () => {
 
   // Lấy userId từ thông tin người dùng đã đăng nhập
   const currentUser = AuthService.getCurrentUser();
-  
+
   // Xử lý userId có thể được lưu trữ với nhiều tên thuộc tính khác nhau
   const userId = currentUser?._id || currentUser?.id || currentUser?.userId || "";
-  
+
   // Lấy tên người dùng để hiển thị
-  const userName = currentUser ? 
-    `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() : 
+  const userName = currentUser ?
+    `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() :
     "";
-  
+
   // Dữ liệu mẫu khi API không hoạt động
   const mockAddresses = [
-    
+
   ];
 
   // Xử lý phản hồi API
   const processApiResponse = (response) => {
     console.log("Processing API response:", response);
-    
+
     if (Array.isArray(response)) {
       console.log("Response is an array, setting directly:", response);
       setAddresses(response);
@@ -61,30 +61,30 @@ const ShippingAddresses = () => {
   const fetchAddresses = async () => {
     try {
       setLoading(true);
-      
+
       // Kiểm tra môi trường phát triển - ưu tiên ghi đè biến isDevelopment để dễ debug
       const isDevelopment = false; // Ghi đè - set false để luôn gọi API, true để sử dụng dữ liệu mẫu
-      
+
       if (isDevelopment) {
         console.log("Đang chạy ở chế độ DEV - Sử dụng dữ liệu mẫu");
-        
+
         // Delay giả lập API để tạo trải nghiệm thực tế
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         // Sử dụng dữ liệu mẫu
         setAddresses(mockAddresses);
         setError(null);
         setLoading(false);
         return;
       }
-      
+
       // Kiểm tra userId
       if (!userId) {
         throw new Error("User ID không tồn tại");
       }
-      
+
       console.log("Đang gọi API với userId:", userId);
-      
+
       // Kiểm tra các endpoints khác nhau mà backend có thể đã đăng ký
       const possibleEndpoints = [
         `/address/list`, // Lấy tất cả địa chỉ rồi lọc phía client
@@ -92,30 +92,30 @@ const ShippingAddresses = () => {
         `/user-address/user/${userId}`,
         `/address/user/${userId}`
       ];
-      
+
       let foundData = false;
       let lastError = null;
-      
+
       // Thử từng endpoint cho đến khi tìm thấy dữ liệu
       for (const endpoint of possibleEndpoints) {
         try {
           console.log(`Đang thử endpoint: ${endpoint}`);
           const response = await ApiService.get(endpoint);
-          
+
           // Nếu là endpoint list, lọc theo userId
           if (endpoint.includes('/list')) {
-            const allAddresses = Array.isArray(response) ? response : 
-                              (response.data && Array.isArray(response.data)) ? response.data : [];
-            
+            const allAddresses = Array.isArray(response) ? response :
+              (response.data && Array.isArray(response.data)) ? response.data : [];
+
             console.log("All addresses before filtering:", allAddresses);
-            
+
             // Lọc địa chỉ theo userId - chuyển đổi cả hai thành chuỗi để so sánh chắc chắn
-            const filteredAddresses = allAddresses.filter(addr => 
+            const filteredAddresses = allAddresses.filter(addr =>
               String(addr.user_id) === String(userId)
             );
-            
+
             console.log("Filtered addresses for userId", userId, ":", filteredAddresses);
-            
+
             if (filteredAddresses.length > 0) {
               setAddresses(filteredAddresses);
               foundData = true;
@@ -139,22 +139,22 @@ const ShippingAddresses = () => {
           lastError = apiError;
         }
       }
-      
+
       // Nếu không tìm thấy dữ liệu từ bất kỳ endpoint nào
       if (!foundData) {
         // Nếu không tìm thấy dữ liệu, sử dụng dữ liệu mẫu trong môi trường phát triển
         console.log("Không tìm thấy dữ liệu từ API, sử dụng dữ liệu mẫu");
         setAddresses(mockAddresses);
-        
+
         // Thông báo lỗi nhưng vẫn hiển thị dữ liệu mẫu
         setError("Không tìm thấy API, hiển thị dữ liệu mẫu. Lỗi: " + (lastError?.message || "API không tồn tại"));
       }
-      
+
     } catch (err) {
       console.error("Error fetching addresses:", err);
       // Cải thiện thông báo lỗi với thông tin chi tiết hơn
       let errorMessage = "Không thể tải danh sách địa chỉ";
-      
+
       if (err.message) {
         if (err.message.includes("401")) {
           errorMessage += ": Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại";
@@ -168,7 +168,7 @@ const ShippingAddresses = () => {
           errorMessage += `: ${err.message}`;
         }
       }
-      
+
       setError(errorMessage);
       setAddresses([]);
     } finally {
@@ -181,10 +181,10 @@ const ShippingAddresses = () => {
     // In ra thông tin user hiện tại để debug
     console.log("Current user object:", currentUser);
     console.log("User ID being used:", userId);
-    
+
     // Hiển thị thông tin tên người dùng
     console.log("User name:", getUserName());
-    
+
     if (userId) {
       fetchAddresses();
     } else {
@@ -192,7 +192,7 @@ const ShippingAddresses = () => {
       setError("Vui lòng đăng nhập để xem địa chỉ của bạn.");
     }
   }, [userId]);
-  
+
   // Kiểm tra kết nối API chung
   useEffect(() => {
     const checkServerStatus = async () => {
@@ -202,7 +202,7 @@ const ShippingAddresses = () => {
           method: 'GET'
         });
         console.log("Server status:", response.status);
-        
+
         if (response.status === 404) {
           console.log("API auth/check không tồn tại, nhưng server đang chạy");
           // Kiểm tra các endpoint khác để xác nhận server đang chạy
@@ -213,7 +213,7 @@ const ShippingAddresses = () => {
         setError("Không thể kết nối đến server. Vui lòng kiểm tra xem server đã được khởi động chưa.");
       }
     };
-    
+
     // Kiểm tra các endpoint có sẵn
     const checkAvailableEndpoints = async () => {
       try {
@@ -222,7 +222,7 @@ const ShippingAddresses = () => {
           '/user-address/list',
           '/address/list'
         ];
-        
+
         for (const endpoint of endpoints) {
           try {
             const resp = await fetch(`${BE_API_URL}/api${endpoint}`, {
@@ -233,7 +233,7 @@ const ShippingAddresses = () => {
               }
             });
             console.log(`API endpoint ${endpoint} status:`, resp.status);
-            
+
             if (resp.status !== 404) {
               console.log(`Endpoint ${endpoint} có thể được sử dụng`);
             }
@@ -245,7 +245,7 @@ const ShippingAddresses = () => {
         console.error("Lỗi khi kiểm tra endpoints:", err);
       }
     };
-    
+
     checkServerStatus();
   }, []);
 
@@ -275,32 +275,32 @@ const ShippingAddresses = () => {
         phone: newAddressData.phone,
         status: true
       };
-  
+
       console.log("Đang gửi dữ liệu:", formattedAddress);
-      
+
       // Kiểm tra môi trường phát triển
       const isDevelopment = false; // Ghi đè để luôn gọi API
-      
+
       if (isDevelopment) {
         console.log("Đang chạy ở chế độ DEV - Thêm địa chỉ vào dữ liệu mẫu");
-        
+
         // Delay giả lập API
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         // Thêm địa chỉ mới vào state
         const newAddress = {
           _id: `mock-address-${Date.now()}`,
           ...formattedAddress,
           status: true
         };
-        
+
         setAddresses(prevAddresses => [...prevAddresses, newAddress]);
         setShowAddAddressPopup(false);
         return;
       }
-      
+
       let savedAddress = null;
-      
+
       try {
         // Thử với endpoint mới trước
         savedAddress = await ApiService.post('/address/create', formattedAddress);
@@ -311,21 +311,21 @@ const ShippingAddresses = () => {
         savedAddress = await ApiService.post('/user-address/create', formattedAddress);
         console.log("Address created successfully with old endpoint:", savedAddress);
       }
-      
+
       // Tạo địa chỉ tạm thời dựa trên dữ liệu đã gửi để cập nhật UI ngay lập tức
       const tempAddress = {
         _id: savedAddress?._id || `temp-address-${Date.now()}`,
         ...formattedAddress
       };
-      
+
       // Cập nhật state UI trước để phản hồi ngay cho người dùng
       setAddresses(prevAddresses => [...prevAddresses, tempAddress]);
-      
+
       // Sau đó tải lại dữ liệu từ server sau một khoảng thời gian nhỏ
       setTimeout(() => {
         fetchAddresses(); // Refresh data after adding
       }, 1000);
-      
+
       setShowAddAddressPopup(false);
     } catch (err) {
       console.error("Error saving address:", err);
@@ -338,7 +338,7 @@ const ShippingAddresses = () => {
       if (!currentAddress || !currentAddress._id) {
         throw new Error("Không tìm thấy ID địa chỉ để cập nhật");
       }
-  
+
       const formattedAddress = {
         address_line1: updatedAddressData.address,
         address_line2: updatedAddressData.address_line2 || "",
@@ -347,30 +347,30 @@ const ShippingAddresses = () => {
         phone: updatedAddressData.phone,
         status: true
       };
-      
+
       // Kiểm tra môi trường phát triển
       const isDevelopment = false; // Ghi đè để luôn gọi API
-      
+
       if (isDevelopment) {
         console.log("Đang chạy ở chế độ DEV - Cập nhật địa chỉ mẫu");
-        
+
         // Delay giả lập API
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         // Cập nhật địa chỉ trong state
-        setAddresses(prevAddresses => 
-          prevAddresses.map(addr => 
-            addr._id === currentAddress._id ? {...addr, ...formattedAddress} : addr
+        setAddresses(prevAddresses =>
+          prevAddresses.map(addr =>
+            addr._id === currentAddress._id ? { ...addr, ...formattedAddress } : addr
           )
         );
-        
+
         setShowEditAddressPopup(false);
         setCurrentAddress(null);
         return;
       }
-      
+
       let updatedAddress = null;
-      
+
       try {
         // Thử với endpoint mới trước
         updatedAddress = await ApiService.put(`/address/edit/${currentAddress._id}`, formattedAddress);
@@ -381,10 +381,10 @@ const ShippingAddresses = () => {
         updatedAddress = await ApiService.put(`/user-address/edit/${currentAddress._id}`, formattedAddress);
         console.log("Address updated successfully with old endpoint:", updatedAddress);
       }
-      
+
       // Cập nhật state UI trước
-      setAddresses(prevAddresses => 
-        prevAddresses.map(addr => 
+      setAddresses(prevAddresses =>
+        prevAddresses.map(addr =>
           addr._id === currentAddress._id ? {
             ...addr,
             ...formattedAddress,
@@ -393,12 +393,12 @@ const ShippingAddresses = () => {
           } : addr
         )
       );
-      
+
       // Sau đó tải lại dữ liệu từ server sau một khoảng thời gian nhỏ
       setTimeout(() => {
         fetchAddresses(); // Refresh data after updating
       }, 1000);
-      
+
       setShowEditAddressPopup(false);
       setCurrentAddress(null);
     } catch (err) {
@@ -412,21 +412,21 @@ const ShippingAddresses = () => {
       try {
         // Kiểm tra môi trường phát triển
         const isDevelopment = false; // Ghi đè để luôn gọi API
-        
+
         if (isDevelopment) {
           console.log("Đang chạy ở chế độ DEV - Xóa địa chỉ mẫu");
-          
+
           // Delay giả lập API
           await new Promise(resolve => setTimeout(resolve, 500));
-          
+
           // Xóa địa chỉ khỏi state
           setAddresses(prevAddresses => prevAddresses.filter(addr => addr._id !== addressId));
           return;
         }
-        
+
         // Xóa địa chỉ khỏi UI trước
         setAddresses(prevAddresses => prevAddresses.filter(addr => addr._id !== addressId));
-        
+
         try {
           // Thử với endpoint mới trước
           await ApiService.delete(`/address/delete/${addressId}`);
@@ -437,9 +437,9 @@ const ShippingAddresses = () => {
           await ApiService.delete(`/user-address/delete/${addressId}`);
           console.log("Address deleted successfully with old endpoint");
         }
-        
+
         // Không cần tải lại dữ liệu từ server vì đã xóa khỏi UI
-        
+
       } catch (err) {
         console.error("Error deleting address:", err);
         alert("Không thể xóa địa chỉ. Vui lòng thử lại sau.");
@@ -452,21 +452,21 @@ const ShippingAddresses = () => {
   // Lấy tên người dùng từ user hiện tại
   const getUserName = () => {
     if (!currentUser) return "Không có tên";
-    
+
     // Ưu tiên lấy tên từ currentUser
     const fullName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim();
-    
+
     // Nếu không có tên trong currentUser, kiểm tra xem có trường name không
     if (fullName) return fullName;
     if (currentUser.name) return currentUser.name;
-    
+
     // Nếu không có tên, lấy email hoặc username (nếu có)
     if (currentUser.email) return currentUser.email.split('@')[0]; // Lấy phần username từ email
     if (currentUser.username) return currentUser.username;
-    
+
     return "Không có tên";
   };
-  
+
   // Kiểm tra xem API endpoint có tồn tại không
   const checkEndpointExists = async (endpoint) => {
     try {
@@ -477,7 +477,7 @@ const ShippingAddresses = () => {
           'x-access-token': AuthService.getToken()
         }
       });
-      
+
       console.log(`API endpoint ${endpoint} status:`, response.status);
       return response.status !== 404;
     } catch (err) {
@@ -490,7 +490,7 @@ const ShippingAddresses = () => {
   const formatAddressForDisplay = (addressItem) => {
     // Lấy tên người dùng
     const name = getUserName();
-    
+
     return {
       id: addressItem._id,
       name: name,
@@ -508,14 +508,14 @@ const ShippingAddresses = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">Địa chỉ nhận hàng</h2>
-        <button 
+        <button
           onClick={handleRefreshData}
           className="text-purple-600 hover:text-purple-800"
         >
           ↻ Làm mới
         </button>
       </div>
-      
+
       {loading ? (
         <div className="text-center py-4">Đang tải...</div>
       ) : error ? (
@@ -545,13 +545,13 @@ const ShippingAddresses = () => {
                       <p className="text-gray-600">{displayAddress.phone}</p>
                     </div>
                     <div className="space-x-2">
-                      <button 
+                      <button
                         className="text-purple-600 hover:underline"
                         onClick={() => handleEditAddress(addressItem)}
                       >
                         Sửa
                       </button>
-                      <button 
+                      <button
                         className="text-red-600 hover:underline"
                         onClick={() => handleDeleteAddress(displayAddress.id)}
                       >
@@ -564,7 +564,7 @@ const ShippingAddresses = () => {
               );
             })
           )}
-          
+
           <button
             className="w-full border-2 border-purple-600 text-purple-600 py-2 rounded-md hover:bg-purple-50"
             onClick={handleAddAddress}
@@ -579,10 +579,10 @@ const ShippingAddresses = () => {
       )}
 
       {showEditAddressPopup && currentAddress && (
-        <EditAddressPopup 
-          address={currentAddress} 
-          onClose={handleClosePopup} 
-          onSave={handleUpdateAddress} 
+        <EditAddressPopup
+          address={currentAddress}
+          onClose={handleClosePopup}
+          onSave={handleUpdateAddress}
         />
       )}
     </div>
@@ -602,18 +602,18 @@ const AddAddressPopup = ({ onClose, onSave }) => {
     address: '',
     address_line2: ''
   });
-  
+
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [wards, setWards] = useState([]);
-  
+
   // Tải dữ liệu tỉnh/thành phố khi component được mount
   useEffect(() => {
     const fetchProvinces = async () => {
       try {
         const response = await fetch('https://esgoo.net/api-tinhthanh/1/0.htm');
         const data = await response.json();
-        
+
         if (data.error === 0) {
           setProvinces(data.data);
         } else {
@@ -623,16 +623,16 @@ const AddAddressPopup = ({ onClose, onSave }) => {
         console.error('Lỗi khi gọi API tỉnh/thành phố:', error);
       }
     };
-    
+
     fetchProvinces();
   }, []);
-  
+
   // Lấy dữ liệu quận/huyện khi chọn tỉnh/thành phố
   const fetchDistricts = async (provinceId) => {
     try {
       const response = await fetch(`https://esgoo.net/api-tinhthanh/2/${provinceId}.htm`);
       const data = await response.json();
-      
+
       if (data.error === 0) {
         setDistricts(data.data);
         setWards([]); // Reset danh sách phường/xã
@@ -650,13 +650,13 @@ const AddAddressPopup = ({ onClose, onSave }) => {
       console.error('Lỗi khi gọi API quận/huyện:', error);
     }
   };
-  
+
   // Lấy dữ liệu phường/xã khi chọn quận/huyện
   const fetchWards = async (districtId) => {
     try {
       const response = await fetch(`https://esgoo.net/api-tinhthanh/3/${districtId}.htm`);
       const data = await response.json();
-      
+
       if (data.error === 0) {
         setWards(data.data);
         setFormData(prev => ({
@@ -676,17 +676,17 @@ const AddAddressPopup = ({ onClose, onSave }) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
-  
+
   const handleProvinceChange = (e) => {
     const provinceId = e.target.value;
     const selectedProvince = provinces.find(p => p.id === provinceId);
-    
+
     setFormData({
       ...formData,
       provinceId,
       provinceName: selectedProvince ? selectedProvince.full_name : ''
     });
-    
+
     if (provinceId !== '0') {
       fetchDistricts(provinceId);
     } else {
@@ -694,28 +694,28 @@ const AddAddressPopup = ({ onClose, onSave }) => {
       setWards([]);
     }
   };
-  
+
   const handleDistrictChange = (e) => {
     const districtId = e.target.value;
     const selectedDistrict = districts.find(d => d.id === districtId);
-    
+
     setFormData({
       ...formData,
       districtId,
       districtName: selectedDistrict ? selectedDistrict.full_name : ''
     });
-    
+
     if (districtId !== '0') {
       fetchWards(districtId);
     } else {
       setWards([]);
     }
   };
-  
+
   const handleWardChange = (e) => {
     const wardId = e.target.value;
     const selectedWard = wards.find(w => w.id === wardId);
-    
+
     setFormData({
       ...formData,
       wardId,
@@ -723,18 +723,32 @@ const AddAddressPopup = ({ onClose, onSave }) => {
     });
   };
 
+  // Trong AddAddressPopup và EditAddressPopup, thêm validation trước khi gửi form
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    // Kiểm tra xem đã chọn đầy đủ địa chỉ chưa
+
+    // Kiểm tra số điện thoại
+    const phoneRegex = /^(0|\+84)[0-9]{9}$/;
+    if (!formData.phone || !phoneRegex.test(formData.phone)) {
+      alert('Vui lòng nhập số điện thoại hợp lệ (bắt đầu bằng 0 hoặc +84 và có 10 chữ số)');
+      return;
+    }
+
+    // Kiểm tra địa chỉ chi tiết
+    if (!formData.address || formData.address.trim().length < 5) {
+      alert('Vui lòng nhập địa chỉ chi tiết (tối thiểu 5 ký tự)');
+      return;
+    }
+
+    // Kiểm tra đã chọn đầy đủ địa chỉ chưa
     if (formData.provinceId === '0' || formData.districtId === '0' || formData.wardId === '0') {
       alert('Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã');
       return;
     }
-    
+
     // Tạo chuỗi địa chỉ đầy đủ
     const fullAddress = `${formData.address}, ${formData.wardName}, ${formData.districtName}, ${formData.provinceName}`;
-    
+
     onSave({
       phone: formData.phone,
       address: fullAddress,
@@ -762,7 +776,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
               required
             />
           </div>
-          
+
           <div>
             <label htmlFor="country" className="block text-sm text-gray-600 mb-1">Quốc gia</label>
             <select
@@ -775,7 +789,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
               <option value="Việt Nam">Việt Nam</option>
             </select>
           </div>
-          
+
           <div className="grid grid-cols-1 gap-4">
             <div>
               <label htmlFor="provinceId" className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố</label>
@@ -793,7 +807,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label htmlFor="districtId" className="block text-sm text-gray-600 mb-1">Quận / Huyện</label>
               <select
@@ -811,7 +825,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label htmlFor="wardId" className="block text-sm text-gray-600 mb-1">Phường / Xã</label>
               <select
@@ -830,7 +844,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
               </select>
             </div>
           </div>
-          
+
           <div>
             <label htmlFor="address" className="block text-sm text-gray-600 mb-1">Địa chỉ cụ thể</label>
             <input
@@ -844,7 +858,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
               required
             />
           </div>
-          
+
           <div>
             <label htmlFor="address_line2" className="block text-sm text-gray-600 mb-1">Địa chỉ bổ sung (không bắt buộc)</label>
             <input
@@ -857,7 +871,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
               className="border p-2 rounded-md w-full"
             />
           </div>
-          
+
           <div className="flex justify-end space-x-3 mt-6">
             <button
               type="button"
@@ -884,7 +898,7 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
   const parseAddress = (addressObj) => {
     // Thử phân tích từ address_line1 nếu có định dạng "số nhà, phường, quận, tỉnh"
     const addressParts = addressObj.address_line1 ? addressObj.address_line1.split(', ') : [];
-    
+
     // Mặc định giá trị
     return {
       phone: addressObj.phone || '',
@@ -893,9 +907,9 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
       address_line2: addressObj.address_line2 || ''
     };
   };
-  
+
   const parsedAddress = parseAddress(address);
-  
+
   const [formData, setFormData] = useState({
     phone: parsedAddress.phone,
     country: parsedAddress.country,
@@ -908,34 +922,34 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
     address: parsedAddress.address,
     address_line2: parsedAddress.address_line2
   });
-  
+
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [wards, setWards] = useState([]);
-  
+
   // Tải dữ liệu tỉnh/thành phố khi component được mount
   useEffect(() => {
     const fetchProvinces = async () => {
       try {
         const response = await fetch('https://esgoo.net/api-tinhthanh/1/0.htm');
         const data = await response.json();
-        
+
         if (data.error === 0) {
           setProvinces(data.data);
-          
+
           // Nếu có tỉnh/thành phố trong dữ liệu ban đầu, thử tìm provinceId
           if (address.city) {
-            const foundProvince = data.data.find(p => 
+            const foundProvince = data.data.find(p =>
               p.full_name.toLowerCase() === address.city.toLowerCase()
             );
-            
+
             if (foundProvince) {
               setFormData(prev => ({
                 ...prev,
                 provinceId: foundProvince.id,
                 provinceName: foundProvince.full_name
               }));
-              
+
               // Tải quận/huyện nếu tìm thấy tỉnh
               fetchDistricts(foundProvince.id);
             }
@@ -947,19 +961,19 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
         console.error('Lỗi khi gọi API tỉnh/thành phố:', error);
       }
     };
-    
+
     fetchProvinces();
   }, [address.city]);
-  
+
   // Lấy dữ liệu quận/huyện khi chọn tỉnh/thành phố
   const fetchDistricts = async (provinceId) => {
     try {
       const response = await fetch(`https://esgoo.net/api-tinhthanh/2/${provinceId}.htm`);
       const data = await response.json();
-      
+
       if (data.error === 0) {
         setDistricts(data.data);
-        
+
         // Nếu không có ID quận/huyện, reset các giá trị
         if (formData.districtId === '0') {
           setWards([]);
@@ -978,16 +992,16 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
       console.error('Lỗi khi gọi API quận/huyện:', error);
     }
   };
-  
+
   // Lấy dữ liệu phường/xã khi chọn quận/huyện
   const fetchWards = async (districtId) => {
     try {
       const response = await fetch(`https://esgoo.net/api-tinhthanh/3/${districtId}.htm`);
       const data = await response.json();
-      
+
       if (data.error === 0) {
         setWards(data.data);
-        
+
         // Nếu không có ID phường/xã, reset giá trị
         if (formData.wardId === '0') {
           setFormData(prev => ({
@@ -1008,17 +1022,17 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
-  
+
   const handleProvinceChange = (e) => {
     const provinceId = e.target.value;
     const selectedProvince = provinces.find(p => p.id === provinceId);
-    
+
     setFormData({
       ...formData,
       provinceId,
       provinceName: selectedProvince ? selectedProvince.full_name : ''
     });
-    
+
     if (provinceId !== '0') {
       fetchDistricts(provinceId);
     } else {
@@ -1026,28 +1040,28 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
       setWards([]);
     }
   };
-  
+
   const handleDistrictChange = (e) => {
     const districtId = e.target.value;
     const selectedDistrict = districts.find(d => d.id === districtId);
-    
+
     setFormData({
       ...formData,
       districtId,
       districtName: selectedDistrict ? selectedDistrict.full_name : ''
     });
-    
+
     if (districtId !== '0') {
       fetchWards(districtId);
     } else {
       setWards([]);
     }
   };
-  
+
   const handleWardChange = (e) => {
     const wardId = e.target.value;
     const selectedWard = wards.find(w => w.id === wardId);
-    
+
     setFormData({
       ...formData,
       wardId,
@@ -1057,16 +1071,16 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     // Kiểm tra xem đã chọn đầy đủ địa chỉ chưa
     if (formData.provinceId === '0' || formData.districtId === '0' || formData.wardId === '0') {
       alert('Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã');
       return;
     }
-    
+
     // Tạo chuỗi địa chỉ đầy đủ
     const fullAddress = `${formData.address}, ${formData.wardName}, ${formData.districtName}, ${formData.provinceName}`;
-    
+
     onSave({
       phone: formData.phone,
       address: fullAddress,
@@ -1094,7 +1108,7 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
               required
             />
           </div>
-          
+
           <div>
             <label htmlFor="country" className="block text-sm text-gray-600 mb-1">Quốc gia</label>
             <select
@@ -1107,7 +1121,7 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
               <option value="Việt Nam">Việt Nam</option>
             </select>
           </div>
-          
+
           <div className="grid grid-cols-1 gap-4">
             <div>
               <label htmlFor="provinceId" className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố</label>
@@ -1125,7 +1139,7 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label htmlFor="districtId" className="block text-sm text-gray-600 mb-1">Quận / Huyện</label>
               <select
@@ -1143,7 +1157,7 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label htmlFor="wardId" className="block text-sm text-gray-600 mb-1">Phường / Xã</label>
               <select
@@ -1162,7 +1176,7 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
               </select>
             </div>
           </div>
-          
+
           <div>
             <label htmlFor="address" className="block text-sm text-gray-600 mb-1">Địa chỉ cụ thể</label>
             <input
@@ -1176,7 +1190,7 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
               required
             />
           </div>
-          
+
           <div>
             <label htmlFor="address_line2" className="block text-sm text-gray-600 mb-1">Địa chỉ bổ sung (không bắt buộc)</label>
             <input
@@ -1189,7 +1203,7 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
               className="border p-2 rounded-md w-full"
             />
           </div>
-          
+
           <div className="flex justify-end space-x-3 mt-6">
             <button
               type="button"

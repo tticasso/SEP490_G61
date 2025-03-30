@@ -17,7 +17,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
 
     // Xử lý khi nhấn nút Chỉnh sửa
     const handleEdit = () => {
-        setInitialProfile({...profile}); // Lưu giá trị hiện tại trước khi chỉnh sửa
+        setInitialProfile({ ...profile }); // Lưu giá trị hiện tại trước khi chỉnh sửa
         setIsEditing(true);
         // Reset thông báo
         setError('');
@@ -44,9 +44,42 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         setSuccess('');
     };
 
-    // Xử lý khi nhấn nút Lưu
+    const validateProfileData = () => {
+        let errors = {};
+
+        // Kiểm tra firstname không được để trống
+        if (!profile.firstName || profile.firstName.trim() === '') {
+            errors.firstName = 'Tên không được để trống';
+        }
+
+        // Kiểm tra lastName không được để trống
+        if (!profile.lastName || profile.lastName.trim() === '') {
+            errors.lastName = 'Họ không được để trống';
+        }
+
+        // Kiểm tra số điện thoại chỉ chứa số và đủ 10 chữ số
+        if (profile.phone) {
+            const phoneRegex = /^(0|\+84)[0-9]{9}$/;
+            if (!phoneRegex.test(profile.phone)) {
+                errors.phone = 'Số điện thoại không hợp lệ (bắt đầu bằng 0 hoặc +84 và có 10 chữ số)';
+            }
+        }
+
+        return { isValid: Object.keys(errors).length === 0, errors };
+    };
+
+    // Cập nhật hàm handleSave để dùng validation
     const handleSave = async (e) => {
         e.preventDefault();
+
+        // Validate dữ liệu trước khi gửi
+        const { isValid, errors } = validateProfileData();
+        if (!isValid) {
+            const errorMessage = Object.values(errors).join(', ');
+            setError(errorMessage);
+            return;
+        }
+
         setLoading(true);
         setError('');
         setSuccess('');

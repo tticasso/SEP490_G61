@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart2, Package, Grid, ShoppingBag, Users, Truck, HelpCircle, Settings, ChevronDown, ArrowRight, Tag, LogOut, DollarSign } from 'lucide-react';
+import { BarChart2, Package, Grid, ShoppingBag, Users, Truck, HelpCircle, Settings, ChevronDown, ArrowRight, Tag, LogOut, DollarSign, User } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthService from '../services/AuthService';
 
@@ -24,11 +24,9 @@ const Sidebar = () => {
     ]},
     { id: 'categories', icon: <Grid size={20} />, label: 'Danh mục', hasSubmenu: true, submenus: [
       { id: 'allCategories', label: 'Tất cả danh mục', path: '/admin/categories' }
-      // Đã xóa mục "Thêm mới danh mục" ở đây
     ]},
     { id: 'brands', icon: <ShoppingBag size={20} />, label: 'Thương hiệu', hasSubmenu: true, submenus: [
       { id: 'brandList', label: 'Danh sách thương hiệu', path: '/admin/brands' }
-      // Đã xóa mục "Thêm mới thương hiệu" ở đây
     ]},
     { id: 'stores', icon: <ShoppingBag size={20} />, label: 'Cửa hàng', hasSubmenu: true, submenus: [
       { id: 'storeList', label: 'Danh sách cửa hàng', path: '/admin/stores' },
@@ -42,15 +40,12 @@ const Sidebar = () => {
     ]},
     { id: 'coupons', icon: <Tag size={20} />, label: 'Mã giảm giá', hasSubmenu: true, submenus: [
       { id: 'couponList', label: 'Danh sách mã giảm giá', path: '/admin/coupons' }
-      // Đã xóa mục "Thêm mã giảm giá" ở đây
     ]},
     { id: 'payments', icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>, label: 'Thanh toán', hasSubmenu: true, submenus: [
       { id: 'paymentManagement', label: 'Phương thức thanh toán', path: '/admin/payments' }
-      // Đã xóa mục "Thêm phương thức thanh toán" ở đây
     ]},
     { id: 'shipping', icon: <Truck size={20} />, label: 'Vận chuyển', hasSubmenu: true, submenus: [
       { id: 'shippingManagement', label: 'Phương thức vận chuyển', path: '/admin/shippings' }
-      // Đã xóa mục "Thêm phương thức vận chuyển" ở đây
     ]},
     { 
       id: 'revenue', 
@@ -63,7 +58,10 @@ const Sidebar = () => {
         { id: 'paymentBatches', label: 'Đợt thanh toán', path: '/admin/revenue/payment-batches' }
       ]
     },
-    { id: 'support', icon: <HelpCircle size={20} />, label: 'Hỗ trợ', hasSubmenu: false, path: '/admin/support' },
+    { id: 'profile', icon: <User size={20} />, label: 'Hồ sơ của tôi', hasSubmenu: true, submenus: [
+      { id: 'profileManagement', label: 'Thông tin cá nhân', path: '/admin/profile' },
+      { id: 'passwordChange', label: 'Đổi mật khẩu', path: '/admin/password' }
+    ]},
     { id: 'settings', icon: <Settings size={20} />, label: 'Cài đặt', hasSubmenu: false, path: '/admin/settings' },
   ];
   

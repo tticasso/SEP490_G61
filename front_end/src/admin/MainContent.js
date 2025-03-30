@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, User } from 'lucide-react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import ProductManagement from './product/ProductManagement';
 import CategoryManagement from './category/CategoryManagement';
@@ -24,13 +24,15 @@ import ShopPaymentList from './revenue/ShopPaymentList';
 import PaymentBatchList from './revenue/PaymentBatchList';
 import ShopPaymentDetail from './revenue/ShopPaymentDetail';
 import PaymentBatchDetail from './revenue/PaymentBatchDetail';
+import AdminProfile from './profile/ProfileContent';
+import AdminPasswordChange from './profile/AdminPasswordChange';
 
 // Main Content Component
 const MainContent = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col flex-1">
+    <div className="flex flex-col flex-1 h-screen overflow-y-auto">
       {/* Header */}
       <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4">
         <div className="p-4 flex gap-2 items-center">
@@ -77,22 +79,21 @@ const MainContent = () => {
           <Route path="/customers" element={<CustomerManagement />} />
           <Route path="/orders" element={<OrderManagement />} />
 
-          {/* Updated coupon routes to use separate components */}
           <Route path="/coupons" element={<CouponManagement />} />
-          {/* Đã xóa route add-coupon */}
           <Route path="/edit-coupon/:id" element={<EditCouponForm />} />
 
           <Route path="/shippings" element={<ShippingManagement />} />
-          {/* Đã xóa route add-shipping */}
 
           <Route path="/payments" element={<PaymentManagement />} />
-          {/* Đã xóa route add-payment */}
 
           <Route path="/revenue/dashboard" element={<RevenueDashboard />} />
           <Route path="/revenue/shop-payments" element={<ShopPaymentList />} />
           <Route path="/revenue/shop-payment/:id" element={<ShopPaymentDetail />} />
           <Route path="/revenue/payment-batches" element={<PaymentBatchList />} />
           <Route path="/revenue/payment-batch/:id" element={<PaymentBatchDetail />} />
+
+          <Route path="/profile" element={<AdminProfile />} />
+          <Route path="/password" element={<AdminPasswordChange />} />
 
           <Route path="/support" element={<div className="p-6">Nội dung Hỗ trợ</div>} />
           <Route path="/settings" element={<div className="p-6">Nội dung Cài đặt</div>} />

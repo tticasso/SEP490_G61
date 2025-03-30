@@ -5,9 +5,15 @@ import MainContent from './MainContent';
 
 const AdminLayout = () => {
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <MainContent />
+    <div className="flex w-full h-screen">
+      <div className='w-1/5 h-screen'>
+        <Sidebar />
+      </div>
+
+      <div className='w-4/5'>
+        <MainContent />
+      </div>
+
     </div>
   );
 };

@@ -93,6 +93,30 @@ const UserOrders = () => {
 
     // Xử lý hủy đơn hàng
     const handleCancelOrder = async (orderId) => {
+        // Trước tiên kiểm tra xem đơn hàng có thể hủy không
+        const orderToCancel = orders.find(order => order._id === orderId);
+
+        if (!orderToCancel) {
+            alert("Không tìm thấy thông tin đơn hàng");
+            return;
+        }
+
+        // Chỉ cho phép hủy đơn hàng ở trạng thái Chờ xử lý hoặc Đang xử lý
+        if (orderToCancel.order_status !== 'pending' && orderToCancel.order_status !== 'processing') {
+            alert("Đơn hàng này không thể hủy vì đã được xử lý");
+            return;
+        }
+
+        // Kiểm tra thời gian đặt hàng, nếu quá 24h thì không cho hủy
+        const orderDate = new Date(orderToCancel.created_at);
+        const currentDate = new Date();
+        const hoursDiff = Math.abs(currentDate - orderDate) / 36e5; // Chuyển đổi ms thành giờ
+
+        if (hoursDiff > 24 && orderToCancel.order_status !== 'pending') {
+            alert("Đơn hàng đã quá 24 giờ kể từ khi đặt, bạn không thể hủy. Vui lòng liên hệ hỗ trợ!");
+            return;
+        }
+
         if (!window.confirm("Bạn có chắc muốn hủy đơn hàng này không?")) {
             return;
         }
@@ -104,7 +128,7 @@ const UserOrders = () => {
             // Cập nhật state
             setOrders(prevOrders =>
                 prevOrders.map(order =>
-                    order._id === orderId ? { ...order, status_id: 'cancelled' } : order
+                    order._id === orderId ? { ...order, order_status: 'cancelled' } : order
                 )
             );
 

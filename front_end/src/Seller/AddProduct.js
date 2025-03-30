@@ -553,9 +553,8 @@ const AddProduct = () => {
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    <option value="new">Mới</option>
-                    <option value="used">Đã qua sử dụng</option>
-                    <option value="refurbished">Tân trang</option>
+                    <option value="Mới">Mới</option>
+                    <option value="Đã qua sử dụng">Đã qua sử dụng</option>
                   </select>
                 </div>
 

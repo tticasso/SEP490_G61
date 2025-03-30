@@ -24,7 +24,7 @@ const Cart = () => {
     const [showCouponModal, setShowCouponModal] = useState(false);
     const [availableCoupons, setAvailableCoupons] = useState([]);
     const [loadingCoupons, setLoadingCoupons] = useState(false);
-    
+
     const currentUser = AuthService.getCurrentUser();
     const userId = currentUser?._id || currentUser?.id || "";
 
@@ -58,7 +58,7 @@ const Cart = () => {
 
             if (response && response.items && response.items.length > 0) {
                 setCartItems(response.items);
-                
+
                 // Khởi tạo selectedItems với tất cả các item là false (không chọn)
                 const initialSelectedState = {};
                 response.items.forEach(item => {
@@ -78,13 +78,75 @@ const Cart = () => {
             setCartItems([]);
         }
     };
+    useEffect(() => {
+        // Chỉ gọi khi đã có danh sách giỏ hàng và có sự thay đổi về lựa chọn
+        if (cartItems.length > 0) {
+            fetchAvailableCoupons();
+        }
+    }, [selectedItems]);
 
     const fetchAvailableCoupons = async () => {
         try {
             setLoadingCoupons(true);
-            // Lấy danh sách mã giảm giá khả dụng từ API
+
+            // Tính toán các thông tin cần thiết cho việc kiểm tra mã giảm giá
+            const cartTotal = calculateTotal();
+
+            // Lấy danh sách sản phẩm và danh mục đã chọn
+            const selectedProductIds = cartItems
+                .filter(item => selectedItems[item._id])
+                .map(item => {
+                    if (item.product_id && typeof item.product_id === 'object') {
+                        return item.product_id._id;
+                    }
+                    return item.product_id;
+                });
+
+            const selectedCategoryIds = cartItems
+                .filter(item => selectedItems[item._id])
+                .map(item => {
+                    if (item.product_id && typeof item.product_id === 'object' && item.product_id.category_id) {
+                        // Nếu category_id là mảng (nhiều danh mục)
+                        if (Array.isArray(item.product_id.category_id)) {
+                            return item.product_id.category_id.map(cat =>
+                                typeof cat === 'object' ? cat._id : cat
+                            );
+                        }
+                        // Nếu category_id là object hoặc string
+                        return typeof item.product_id.category_id === 'object'
+                            ? item.product_id.category_id._id
+                            : item.product_id.category_id;
+                    }
+                    return null;
+                })
+                .filter(id => id !== null)
+                .flat(); // Làm phẳng mảng trong trường hợp có mảng lồng nhau
+
+            // Lấy danh sách cửa hàng được chọn
+            const selectedShopIds = cartItems
+                .filter(item => selectedItems[item._id])
+                .map(item => {
+                    if (item.product_id && typeof item.product_id === 'object' && item.product_id.shop_id) {
+                        return typeof item.product_id.shop_id === 'object'
+                            ? item.product_id.shop_id._id
+                            : item.product_id.shop_id;
+                    }
+                    return null;
+                })
+                .filter(id => id !== null);
+
+            // Dữ liệu biến thể được chọn
+            const selectedVariantIds = cartItems
+                .filter(item => selectedItems[item._id] && item.variant_id)
+                .map(item => {
+                    return typeof item.variant_id === 'object'
+                        ? item.variant_id._id
+                        : item.variant_id;
+                });
+
+            // Lấy danh sách mã giảm giá
             const response = await ApiService.get('/coupon/list?active=true&limit=100');
-            
+
             if (response && response.coupons && response.coupons.length > 0) {
                 // Lọc các mã giảm giá còn hạn sử dụng
                 const currentDate = new Date();
@@ -93,11 +155,53 @@ const Cart = () => {
                     const endDate = new Date(coupon.end_date);
                     return startDate <= currentDate && endDate >= currentDate && !coupon.is_delete;
                 });
-                
-                setAvailableCoupons(validCoupons);
+
+                // Kiểm tra tính hợp lệ của từng mã giảm giá với các sản phẩm đã chọn
+                const enhancedCoupons = await Promise.all(validCoupons.map(async (coupon) => {
+                    try {
+                        // Bỏ qua việc kiểm tra nếu không có sản phẩm nào được chọn
+                        if (selectedProductIds.length === 0) {
+                            return {
+                                ...coupon,
+                                isValid: false,
+                                validationMessage: 'Vui lòng chọn sản phẩm để áp dụng mã giảm giá',
+                                discountAmount: 0
+                            };
+                        }
+
+                        // Kiểm tra tính hợp lệ của mã giảm giá
+                        const validationResponse = await ApiService.post('/coupon/validate', {
+                            code: coupon.code,
+                            userId: userId,
+                            cartTotal: cartTotal,
+                            productIds: selectedProductIds,
+                            categoryIds: selectedCategoryIds,
+                            shopIds: selectedShopIds,
+                            variantIds: selectedVariantIds
+                        });
+
+                        return {
+                            ...coupon,
+                            isValid: validationResponse.valid || false,
+                            validationMessage: validationResponse.message || '',
+                            discountAmount: validationResponse.discountAmount || 0
+                        };
+                    } catch (error) {
+                        // Nếu có lỗi, đánh dấu mã giảm giá là không hợp lệ
+                        return {
+                            ...coupon,
+                            isValid: false,
+                            validationMessage: typeof error === 'string' ? error : 'Mã giảm giá không hợp lệ',
+                            discountAmount: 0
+                        };
+                    }
+                }));
+
+                setAvailableCoupons(enhancedCoupons);
             } else {
                 setAvailableCoupons([]);
             }
+
             setLoadingCoupons(false);
         } catch (error) {
             console.error('Error fetching available coupons:', error);
@@ -106,31 +210,161 @@ const Cart = () => {
         }
     };
 
+
     const applyCoupon = async (code) => {
         if (!code.trim()) {
             setCouponError('Vui lòng chọn mã giảm giá');
             return;
         }
 
+        // Kiểm tra xem có sản phẩm nào được chọn không
+        if (!hasSelectedItems()) {
+            setCouponError('Vui lòng chọn ít nhất một sản phẩm để áp dụng mã giảm giá');
+            return;
+        }
+
         try {
+            // Lấy danh sách sản phẩm được chọn
+            const productIds = cartItems
+                .filter(item => selectedItems[item._id])
+                .map(item => {
+                    if (item.product_id && typeof item.product_id === 'object') {
+                        return item.product_id._id;
+                    }
+                    return item.product_id;
+                });
+
+            // Lấy danh sách danh mục
+            const categoryIds = cartItems
+                .filter(item => selectedItems[item._id])
+                .map(item => {
+                    if (item.product_id && typeof item.product_id === 'object') {
+                        if (Array.isArray(item.product_id.category_id)) {
+                            return item.product_id.category_id.map(cat =>
+                                typeof cat === 'object' ? cat._id : cat
+                            );
+                        }
+                        return item.product_id.category_id && typeof item.product_id.category_id === 'object'
+                            ? item.product_id.category_id._id
+                            : item.product_id.category_id;
+                    }
+                    return null;
+                })
+                .filter(id => id !== null)
+                .flat();
+
+            // Lấy danh sách shop
+            const shopIds = cartItems
+                .filter(item => selectedItems[item._id])
+                .map(item => {
+                    if (item.product_id && typeof item.product_id === 'object' && item.product_id.shop_id) {
+                        return typeof item.product_id.shop_id === 'object'
+                            ? item.product_id.shop_id._id
+                            : item.product_id.shop_id;
+                    }
+                    return null;
+                })
+                .filter(id => id !== null);
+
+            // Lấy danh sách biến thể
+            const variantIds = cartItems
+                .filter(item => selectedItems[item._id] && item.variant_id)
+                .map(item => {
+                    return typeof item.variant_id === 'object'
+                        ? item.variant_id._id
+                        : item.variant_id;
+                });
+
             const response = await ApiService.post('/coupon/validate', {
                 code: code,
                 userId: userId,
-                cartTotal: calculateTotal()
+                cartTotal: calculateTotal(),
+                productIds: productIds,
+                categoryIds: categoryIds,
+                shopIds: shopIds,
+                variantIds: variantIds
             });
 
             if (response.valid) {
                 setAppliedCoupon(response.coupon);
                 setCouponError('');
                 setShowCouponModal(false);
+                // Thông báo thành công
+                alert(`Đã áp dụng mã giảm giá "${code}" thành công. Bạn được giảm ${response.discountAmount.toLocaleString()}đ`);
             } else {
                 setCouponError(response.message || 'Mã giảm giá không hợp lệ');
+                // Hiển thị modal thông báo lỗi
+                alert(`Không thể áp dụng mã giảm giá: ${response.message}`);
             }
         } catch (error) {
             console.error('Error validating coupon:', error);
-            setCouponError('Không thể áp dụng mã giảm giá. ');
+            setCouponError('Không thể áp dụng mã giảm giá. ' + (typeof error === 'string' ? error : ''));
+            alert('Không thể áp dụng mã giảm giá. Vui lòng thử lại sau.');
         }
     };
+
+    useEffect(() => {
+        // Nếu đã có coupon được áp dụng, kiểm tra lại tính hợp lệ
+        if (appliedCoupon && hasSelectedItems()) {
+            const checkAppliedCoupon = async () => {
+                try {
+                    // Lấy danh sách sản phẩm và danh mục được chọn
+                    const productIds = cartItems
+                        .filter(item => selectedItems[item._id])
+                        .map(item => {
+                            if (item.product_id && typeof item.product_id === 'object') {
+                                return item.product_id._id;
+                            }
+                            return item.product_id;
+                        });
+
+                    const categoryIds = cartItems
+                        .filter(item => selectedItems[item._id])
+                        .map(item => {
+                            if (item.product_id && typeof item.product_id === 'object' && item.product_id.category_id) {
+                                if (Array.isArray(item.product_id.category_id)) {
+                                    return item.product_id.category_id.map(cat =>
+                                        typeof cat === 'object' ? cat._id : cat
+                                    );
+                                }
+                                return typeof item.product_id.category_id === 'object'
+                                    ? item.product_id.category_id._id
+                                    : item.product_id.category_id;
+                            }
+                            return null;
+                        })
+                        .filter(id => id !== null)
+                        .flat();
+
+                    // Kiểm tra lại mã giảm giá
+                    const response = await ApiService.post('/coupon/validate', {
+                        code: appliedCoupon.code,
+                        userId: userId,
+                        cartTotal: calculateTotal(),
+                        productIds: productIds,
+                        categoryIds: categoryIds
+                    });
+
+                    // Nếu mã không còn hợp lệ, gỡ bỏ
+                    if (!response.valid) {
+                        setAppliedCoupon(null);
+                        alert(`Mã giảm giá "${appliedCoupon.code}" không còn áp dụng được với các sản phẩm đã chọn. Vui lòng chọn mã khác.`);
+                    } else if (appliedCoupon._id !== response.coupon._id) {
+                        // Nếu giá trị coupon thay đổi, cập nhật lại
+                        setAppliedCoupon(response.coupon);
+                    }
+                } catch (error) {
+                    console.error('Error re-validating coupon:', error);
+                    setAppliedCoupon(null);
+                }
+            };
+
+            checkAppliedCoupon();
+        } else if (appliedCoupon && !hasSelectedItems()) {
+            // Nếu không có sản phẩm nào được chọn nhưng có coupon, gỡ bỏ coupon
+            setAppliedCoupon(null);
+        }
+    }, [selectedItems]);
 
     const updateQuantity = async (cartItemId, change) => {
         try {
@@ -138,7 +372,7 @@ const Cart = () => {
             if (!item) return;
 
             const newQuantity = Math.max(1, item.quantity + change);
-            
+
             // Kiểm tra số lượng tồn kho nếu là biến thể
             if (item.variant_id && typeof item.variant_id === 'object') {
                 const variant = item.variant_id;
@@ -231,7 +465,7 @@ const Cart = () => {
         const subtotal = cartItems.reduce((total, item) => {
             // Kiểm tra xem item có được chọn không
             if (!selectedItems[item._id]) return total;
-            
+
             // Lấy giá của item (từ variant hoặc product)
             const price = getItemPrice(item);
             return total + price * item.quantity;
@@ -260,12 +494,12 @@ const Cart = () => {
                 return item.variant_id.price;
             }
         }
-        
+
         // Fallback to product price
         if (item.product_id && typeof item.product_id === 'object') {
             return item.product_id.discounted_price || item.product_id.price || 0;
         }
-        
+
         return 0;
     };
 
@@ -370,7 +604,7 @@ const Cart = () => {
     return (
         <div className='flex gap-10 max-w-7xl mx-auto'>
             {/* Modal chọn mã giảm giá */}
-            <CouponModal 
+            <CouponModal
                 show={showCouponModal}
                 onClose={() => setShowCouponModal(false)}
                 availableCoupons={availableCoupons}
@@ -379,12 +613,12 @@ const Cart = () => {
                 cartTotal={totalAmount}
                 error={couponError}
             />
-            
+
             <div className="w-2/3 flex flex-col bg-white shadow-md rounded-lg p-4 mt-8 mb-8">
                 <CartHeader clearCart={clearCart} />
 
                 {shops.map((shop, index) => (
-                    <ShopGroup 
+                    <ShopGroup
                         key={shop.shop_id}
                         shop={shop}
                         index={index}
@@ -400,7 +634,7 @@ const Cart = () => {
                 ))}
             </div>
 
-            <CartSidebar 
+            <CartSidebar
                 totalAmount={totalAmount}
                 appliedCoupon={appliedCoupon}
                 setAppliedCoupon={setAppliedCoupon}

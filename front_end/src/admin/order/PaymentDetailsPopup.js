@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-const PaymentDetailsPopup = ({ paymentDetails, onClose }) => {
+const PaymentDetailsPopup = ({ paymentDetails, onClose, orderStatusId }) => {
   if (!paymentDetails) return null;
 
   // Format date
@@ -16,6 +16,11 @@ const PaymentDetailsPopup = ({ paymentDetails, onClose }) => {
     if (!price && price !== 0) return '';
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   };
+
+  // Kiểm tra trạng thái thanh toán từ status_id của đơn hàng
+  const isPaymentPaid = (statusId) => {
+    return statusId === 'paid';
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -39,7 +44,7 @@ const PaymentDetailsPopup = ({ paymentDetails, onClose }) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="border p-3 rounded-md">
               <p className="text-sm text-gray-600">Mã giao dịch</p>
-              <p className="font-medium">{paymentDetails.orderCode || '-'}</p>
+              <p className="font-medium">{paymentDetails.orderCode || paymentDetails.order_payment_id || '-'}</p>
             </div>
             <div className="border p-3 rounded-md">
               <p className="text-sm text-gray-600">Số tiền</p>
@@ -60,10 +65,10 @@ const PaymentDetailsPopup = ({ paymentDetails, onClose }) => {
               </div>
             )}
             
-              <div className="border p-3 rounded-md">
-                <p className="text-sm text-gray-600">Mã ngân hàng (BIN)</p>
-                <p className="font-medium">{paymentDetails.bin || "MB Bank"}</p>
-              </div>
+            <div className="border p-3 rounded-md">
+              <p className="text-sm text-gray-600">Mã ngân hàng (BIN)</p>
+              <p className="font-medium">{paymentDetails.bin || "MB Bank"}</p>
+            </div>
      
             <div className="border p-3 rounded-md">
               <p className="text-sm text-gray-600">Loại tiền tệ</p>
@@ -75,8 +80,8 @@ const PaymentDetailsPopup = ({ paymentDetails, onClose }) => {
             </div>
             <div className="border p-3 rounded-md">
               <p className="text-sm text-gray-600">Trạng thái</p>
-              <p className={`font-medium ${paymentDetails.status === 'PAID' ? 'text-green-600' : 'text-yellow-600'}`}>
-                {paymentDetails.status === 'PAID' ? 'Đã thanh toán' : (paymentDetails.status || 'Chưa thanh toán')}
+              <p className={`font-medium ${isPaymentPaid(orderStatusId) ? 'text-green-600' : 'text-yellow-600'}`}>
+                {isPaymentPaid(orderStatusId) ? 'Đã thanh toán' : 'Chưa thanh toán'}
               </p>
             </div>
             <div className="border p-3 rounded-md">

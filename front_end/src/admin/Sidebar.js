@@ -62,7 +62,7 @@ const Sidebar = () => {
       { id: 'profileManagement', label: 'Thông tin cá nhân', path: '/admin/profile' },
       { id: 'passwordChange', label: 'Đổi mật khẩu', path: '/admin/password' }
     ]},
-    { id: 'settings', icon: <Settings size={20} />, label: 'Cài đặt', hasSubmenu: false, path: '/admin/settings' },
+    // { id: 'settings', icon: <Settings size={20} />, label: 'Cài đặt', hasSubmenu: false, path: '/admin/settings' },
   ];
   
   const toggleMenu = (menuId) => {

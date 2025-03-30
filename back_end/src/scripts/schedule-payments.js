@@ -118,7 +118,7 @@ async function schedulePayments() {
             }
         });
 
-        console.log('Payment schedule initialized to run every 30 seconds for testing');
+        console.log('Payment schedule initialized to run every 3 days');
     } catch (error) {
         console.error('Failed to initialize payment schedule:', error.message);
     }

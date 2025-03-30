@@ -8,12 +8,11 @@ const socketIO = require('socket.io');
 const jwt = require('jsonwebtoken');
 const config = require('./src/config/auth.config');
 require('dotenv').config();
-
+const { schedulePayments } = require('./src/scripts/schedule-payments');
 
 
 const {
   AuthRouter,
-  UploadRouter,
   UserRouter,
   RoleRouter,
   CategoriesRouter,
@@ -68,31 +67,12 @@ app.use(cors({
   allowedHeaders: corsHeaders
 }));
 
-// Bổ sung middleware kiểm soát hoạt động của Web server
 app.use(bodyParser.json());
 app.use(morgan("dev"));
-
-// Cấu hình static files cho uploads - đặt trước các routes
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-
 app.use('/api/gemini', GeminiRouter);
 app.use('/api/payment', PaymentRouter);
 app.use('/api/payos', PayOsRouter);
-// Đảm bảo thư mục uploads tồn tại
-const uploadDirs = [
-  path.join(__dirname, 'uploads'),
-  path.join(__dirname, 'uploads/shops'),
-  path.join(__dirname, 'uploads/documents'),
-  path.join(__dirname, 'uploads/products')
-];
 
-uploadDirs.forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-    console.log(`Created directory: ${dir}`);
-  }
-});
 
 // Định tuyến cho root router
 app.get("/", (req, res, next) => {
@@ -124,10 +104,8 @@ app.use('/api/product-variant', ProductVariantRouter);
 app.use('/api/product-attribute', ProductAttributeRouter);
 app.use('/api/conversation', ConversationRouter);
 app.use('/api/revenue', ShopRevenueRouter);
+
 // Kiểm soát các lỗi trong Express web server
-app.use('/api/upload', UploadRouter);
-app.use('/uploads/products', express.static('./uploads/products'));
-app.use('/uploads/shops', express.static('./uploads/shops'));
 app.use(async (req, res, next) => {
   next(httpErrors.NotFound());
 });
@@ -300,6 +278,7 @@ if (process.env.NODE_ENV !== 'production') {
   server.listen(process.env.PORT || 9999, process.env.HOST_NAME || 'localhost', () => {
     console.log(`Server is running at: http://${process.env.HOST_NAME || 'localhost'}:${process.env.PORT || 9999}`);
     db.connectDB();
+    schedulePayments();
   });
 } else {
   // For production (Vercel), just connect to DB

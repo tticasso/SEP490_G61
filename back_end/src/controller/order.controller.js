@@ -472,7 +472,7 @@ const updateOrderStatus = async (req, res) => {
             try {
                 // Create revenue record internally
                 const axios = require('axios');
-                const BASE_URL = process.env.API_BASE_URL || `http://${process.env.HOST_NAME || 'localhost'}:${process.env.PORT || 9999}`;
+                const BASE_URL = process.env.API_BASE_URL || 'https://trooc.kaine.fun';
 
                 // Get admin token for internal API call
                 const jwt = require('jsonwebtoken');

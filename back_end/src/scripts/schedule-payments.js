@@ -3,11 +3,11 @@ const cron = require('node-cron');
 const axios = require('axios');
 require('dotenv').config();
 
-const BASE_URL = process.env.API_BASE_URL || 'http://localhost:9999';
+const BASE_URL = process.env.API_BASE_URL || 'https://trooc.kaine.fun';
 
 // Thông tin đăng nhập admin
-const ADMIN_USERNAME = 'admin@gmail.com'; // Thay bằng username thực tế của admin
-const ADMIN_PASSWORD = '123456'; // Thay bằng password thực tế của admin
+const ADMIN_USERNAME = 'lahieuts@gmail.com'; // Thay bằng username thực tế của admin
+const ADMIN_PASSWORD = '123456yy'; // Thay bằng password thực tế của admin
 
 /**
  * Lấy token admin bằng cách đăng nhập
@@ -51,7 +51,7 @@ async function schedulePayments() {
         }
 
         // Thay đổi cron pattern để chạy mỗi 30 giây để dễ test
-        cron.schedule('*/30 * * * * *', async () => {
+        cron.schedule('0 0 */3 * *', async () => {
             console.log('Running scheduled payment batch creation...', new Date().toISOString());
 
             try {

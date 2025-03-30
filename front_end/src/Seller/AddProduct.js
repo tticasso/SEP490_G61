@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Upload, 
-  Plus, 
-  Trash, 
+import {
+  ArrowLeft,
+  Upload,
+  Plus,
+  Trash,
   ChevronDown,
   Loader,
   X
@@ -18,18 +18,18 @@ const AddProduct = () => {
   const location = useLocation();
   const editMode = location.pathname.includes('edit-product');
   const editProductId = editMode ? location.pathname.split('/').pop() : null;
-  
+
   // Track loading and error states
   const [loading, setLoading] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
-  
+
   // State for fetched data
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [shop, setShop] = useState(null);
-  
+
   // Form state
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -50,20 +50,20 @@ const AddProduct = () => {
     is_feature: false,
     is_delete: false
   });
-  
+
   const [imageFile, setImageFile] = useState(null);
-  
+
   // Fetch necessary data on component mount
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         setLoadingData(true);
-        
+
         // Fetch all required data
         let userShop;
         let fetchedCategories = [];
         let fetchedBrands = [];
-        
+
         try {
           // Fetch user's shop
           userShop = await ApiService.get('/shops/my-shop');
@@ -74,7 +74,7 @@ const AddProduct = () => {
           userShop = { _id: 'sample-shop-id', name: 'Shop mẫu' };
           setShop(userShop);
         }
-        
+
         try {
           // Thử lấy categories
           fetchedCategories = await ApiService.get('/categories');
@@ -88,7 +88,7 @@ const AddProduct = () => {
           ];
         }
         setCategories(fetchedCategories || []);
-        
+
         try {
           // Thử lấy brands
           fetchedBrands = await ApiService.get('/brand');
@@ -102,12 +102,12 @@ const AddProduct = () => {
           ];
         }
         setBrands(fetchedBrands || []);
-        
+
         // If in edit mode, fetch the product details
         if (editMode && editProductId) {
           try {
             const product = await ApiService.get(`/product/${editProductId}`);
-            
+
             // Populate form with product details
             setNewProduct({
               name: product.name || '',
@@ -144,7 +144,7 @@ const AddProduct = () => {
         setLoadingData(false);
       }
     };
-    
+
     fetchInitialData();
   }, [editMode, editProductId]);
 
@@ -155,7 +155,7 @@ const AddProduct = () => {
         .toLowerCase()
         .replace(/[^\w\s]/gi, '') // Remove special characters
         .replace(/\s+/g, '-'); // Replace spaces with dashes
-      
+
       setNewProduct(prev => ({
         ...prev,
         slug: generatedSlug,
@@ -171,7 +171,7 @@ const AddProduct = () => {
       ...newProduct,
       [name]: value
     });
-    
+
     // Clear error for this field
     if (formErrors[name]) {
       setFormErrors({
@@ -194,12 +194,12 @@ const AddProduct = () => {
   const handleCategoryChange = (e) => {
     // Convert selected options to array of values
     const selectedOptions = Array.from(e.target.selectedOptions).map(option => option.value);
-    
+
     setNewProduct({
       ...newProduct,
       category_id: selectedOptions
     });
-    
+
     // Clear error for this field
     if (formErrors.category_id) {
       setFormErrors({
@@ -212,37 +212,22 @@ const AddProduct = () => {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Kiểm tra loại file
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+
+      if (!validImageTypes.includes(file.type)) {
+        alert('Chỉ chấp nhận file hình ảnh (JPEG, JPG, PNG, GIF, WEBP)');
+        e.target.value = ''; // Reset input file
+        return;
+      }
+
+      console.log("File được chọn:", file.name, file.type, file.size);
       setImageFile(file);
-      // Create a temporary URL for preview
+      // Tạo URL tạm thời để preview
       setNewProduct({
         ...newProduct,
         thumbnail: URL.createObjectURL(file)
       });
-    }
-  };
-
-  const uploadImage = async () => {
-    if (!imageFile) return newProduct.thumbnail;
-    
-    try {
-      const formData = new FormData();
-      formData.append('image', imageFile);
-      
-      console.log('Uploading image file:', imageFile.name, imageFile.size, imageFile.type);
-      
-      const uploadedImage = await ApiService.uploadFile('/upload/product-image', formData);
-      
-      console.log('Upload response:', uploadedImage);
-      
-      if (uploadedImage && uploadedImage.url) {
-        return uploadedImage.url;
-      } else {
-        console.error('Invalid response:', uploadedImage);
-        throw new Error('URL hình ảnh không hợp lệ');
-      }
-    } catch (error) {
-      console.error('Error in uploadImage function:', error);
-      throw new Error('Không thể tải lên hình ảnh sản phẩm');
     }
   };
 
@@ -256,7 +241,7 @@ const AddProduct = () => {
     if (!newProduct.detail) errors.detail = 'Chi tiết sản phẩm là bắt buộc';
     if (!newProduct.meta_title) errors.meta_title = 'Meta title là bắt buộc';
     if (!newProduct.weight) errors.weight = 'Khối lượng sản phẩm là bắt buộc';
-    
+
     // Các trường meta và danh mục, thương hiệu đặt dưới mức nghiêm trọng hơn
     if (!newProduct.meta_keyword) errors.meta_keyword = 'Meta keyword là bắt buộc';
     if (!newProduct.meta_description) errors.meta_description = 'Meta description là bắt buộc';
@@ -264,7 +249,7 @@ const AddProduct = () => {
     if (!newProduct.category_id || newProduct.category_id.length === 0) {
       errors.category_id = 'Danh mục là bắt buộc';
     }
-    
+
     return errors;
   };
 
@@ -276,62 +261,91 @@ const AddProduct = () => {
       setFormErrors(errors);
       return;
     }
-    
+
     try {
       setLoading(true);
       setFormErrors({});
-      
-      // Upload image if a new one was selected
-      let imageUrl = newProduct.thumbnail;
-      if (imageFile) {
-        try {
-          imageUrl = await uploadImage();
-        } catch (err) {
-          console.error("Lỗi upload hình ảnh:", err);
-          imageUrl = newProduct.thumbnail || ''; // Giữ lại URL cũ nếu upload thất bại
-        }
-      }
-      
+
       const currentUser = AuthService.getCurrentUser();
-      
-      // Prepare product data
-      const productData = {
-        ...newProduct,
-        price: parseFloat(newProduct.price),
-        weight: newProduct.weight ? parseFloat(newProduct.weight) : undefined,
-        thumbnail: imageUrl,
-        shop_id: shop?._id || 'sample-shop',
-        is_active: isActive,
-        created_by: currentUser?.id || 'sample-user',
-        updated_by: currentUser?.id || 'sample-user',
-      };
-      console.log("dữ liệu trước khi gửi", productData);
-      
+
+      // Tạo FormData để gửi cả dữ liệu sản phẩm và file ảnh
+      const formData = new FormData();
+
+      // Thêm trường is_active dựa trên tham số
+      formData.append('is_active', isActive);
+
+      // Thêm các trường cơ bản
+      formData.append('name', newProduct.name);
+      formData.append('price', parseFloat(newProduct.price));
+      formData.append('description', newProduct.description);
+      formData.append('detail', newProduct.detail);
+      formData.append('slug', newProduct.slug);
+      formData.append('brand_id', newProduct.brand_id);
+      formData.append('meta_title', newProduct.meta_title);
+      formData.append('meta_keyword', newProduct.meta_keyword);
+      formData.append('meta_description', newProduct.meta_description);
+      formData.append('condition', newProduct.condition);
+
+      // Thêm trường khối lượng nếu có
+      if (newProduct.weight) {
+        formData.append('weight', parseFloat(newProduct.weight));
+      }
+
+      // Thêm các trường boolean
+      formData.append('is_hot', newProduct.is_hot);
+      formData.append('is_feature', newProduct.is_feature);
+      formData.append('is_delete', newProduct.is_delete);
+
+      // Thêm shop_id và thông tin user
+      formData.append('shop_id', shop?._id || 'sample-shop');
+      formData.append('created_by', currentUser?.id || 'sample-user');
+      formData.append('updated_by', currentUser?.id || 'sample-user');
+
+      // Xử lý danh mục (category_id là mảng)
+      if (newProduct.category_id && newProduct.category_id.length > 0) {
+        // FormData không hỗ trợ trực tiếp mảng, nên cần phải thêm từng phần tử
+        newProduct.category_id.forEach((catId, index) => {
+          formData.append(`category_id[${index}]`, catId);
+        });
+      }
+
+      // Thêm file ảnh nếu có file mới được chọn
+      if (imageFile) {
+        formData.append('thumbnail', imageFile);
+        console.log("Đã thêm file ảnh:", imageFile.name);
+      } else if (newProduct.thumbnail && !newProduct.thumbnail.startsWith('blob:')) {
+        // Nếu là URL thực và không phải blob URL tạm thời, thêm URL vào formData
+        formData.append('thumbnail_url', newProduct.thumbnail);
+        console.log("Giữ nguyên URL thumbnail cũ:", newProduct.thumbnail);
+      }
+
+      console.log("Đang gửi form data với ảnh");
+
       let response;
       try {
         if (editMode && editProductId) {
-          // Update existing product
-          response = await ApiService.put(`/product/edit/${editProductId}`, productData);
+          // Cập nhật sản phẩm đã tồn tại
+          response = await ApiService.putFormData(`/product/edit/${editProductId}`, formData);
         } else {
-          // Create new product
-          response = await ApiService.post('/product/create', productData);
+          // Tạo sản phẩm mới
+          response = await ApiService.postFormData('/product/create', formData);
         }
         setSubmitSuccess(true);
-        
+
         // Hiển thị thông báo thành công
         alert(`Đã ${editMode ? 'cập nhật' : 'thêm'} sản phẩm "${newProduct.name}" thành công!`);
-        
+
         // Điều hướng về trang danh sách sản phẩm
         navigate('/seller-dashboard/product');
       } catch (err) {
-        console.error('Error saving product:', err);
+        console.error('Lỗi khi lưu sản phẩm:', err);
         // Hiển thị lỗi
         setFormErrors({
           submit: `Lỗi khi ${editMode ? 'cập nhật' : 'tạo'} sản phẩm: ${err.toString()}`
         });
       }
     } catch (err) {
-      console.error('Error in submission:', err);
+      console.error('Lỗi trong quá trình xử lý:', err);
       setFormErrors({
         submit: 'Có lỗi xảy ra. Vui lòng thử lại sau.'
       });
@@ -339,7 +353,7 @@ const AddProduct = () => {
       setLoading(false);
     }
   };
-  
+
   const handleSave = () => {
     handleSubmit(false); // Save as draft
   };
@@ -372,22 +386,22 @@ const AddProduct = () => {
         <div className="p-6 bg-gray-100 min-h-screen">
           {/* Header with back button and action buttons */}
           <div className="flex justify-between items-center mb-6">
-            <button 
-              className="flex items-center text-gray-600" 
+            <button
+              className="flex items-center text-gray-600"
               onClick={() => navigate('/seller-dashboard/product')}
             >
               <ArrowLeft className="mr-2" />
               Quay lại
             </button>
             <div className="flex space-x-4">
-              <button 
+              <button
                 className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50"
                 onClick={handleSave}
                 disabled={loading}
               >
                 {loading ? 'Đang lưu...' : 'Lưu nháp'}
               </button>
-              <button 
+              <button
                 className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:opacity-50"
                 onClick={handleSaveAndDisplay}
                 disabled={loading}
@@ -402,7 +416,7 @@ const AddProduct = () => {
             <h3 className="text-xl font-medium mb-6">
               {editMode ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}
             </h3>
-            
+
             {formErrors.submit && (
               <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded mb-6">
                 {formErrors.submit}
@@ -427,7 +441,7 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
                   )}
                 </div>
-                
+
                 {/* Giá */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -461,7 +475,7 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.slug}</p>
                   )}
                 </div>
-                
+
                 {/* Thương hiệu */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -484,7 +498,7 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.brand_id}</p>
                   )}
                 </div>
-                
+
                 {/* Danh mục */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -510,7 +524,7 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.category_id}</p>
                   )}
                 </div>
-                
+
                 {/* Khối lượng */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -527,7 +541,7 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.weight}</p>
                   )}
                 </div>
-                
+
                 {/* Tình trạng */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -544,7 +558,7 @@ const AddProduct = () => {
                     <option value="refurbished">Tân trang</option>
                   </select>
                 </div>
-                
+
                 {/* Mô tả */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -561,7 +575,7 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.description}</p>
                   )}
                 </div>
-                
+
                 {/* Chi tiết */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -578,21 +592,21 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.detail}</p>
                   )}
                 </div>
-                
+
                 {/* Thumbnail */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Hình ảnh sản phẩm
                   </label>
-                  <div 
+                  <div
                     className="border-dashed border-2 border-gray-300 p-4 rounded-md flex items-center justify-center cursor-pointer"
                     onClick={() => document.getElementById('image-upload').click()}
                   >
                     {newProduct.thumbnail ? (
                       <div className="text-center">
-                        <img 
-                          src={newProduct.thumbnail} 
-                          alt="Product preview" 
+                        <img
+                          src={newProduct.thumbnail}
+                          alt="Product preview"
                           className="max-h-48 mx-auto mb-2"
                         />
                         <p className="text-sm text-gray-500">Nhấp để thay đổi hình ảnh</p>
@@ -604,16 +618,16 @@ const AddProduct = () => {
                         <p className="text-xs text-gray-400 mt-1">JPEG, PNG, GIF, JPG...</p>
                       </div>
                     )}
-                    <input 
-                      id="image-upload" 
-                      type="file" 
-                      className="hidden" 
-                      accept="image/*"
+                    <input
+                      id="image-upload"
+                      type="file"
+                      className="hidden"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
                       onChange={handleImageUpload}
                     />
                   </div>
                 </div>
-                
+
                 {/* Meta Title */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -630,7 +644,7 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.meta_title}</p>
                   )}
                 </div>
-                
+
                 {/* Meta Keyword */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -647,7 +661,7 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.meta_keyword}</p>
                   )}
                 </div>
-                
+
                 {/* Meta Description */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -664,7 +678,7 @@ const AddProduct = () => {
                     <p className="mt-1 text-sm text-red-500">{formErrors.meta_description}</p>
                   )}
                 </div>
-                
+
                 {/* Status toggles */}
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="flex items-center">
@@ -680,7 +694,7 @@ const AddProduct = () => {
                       Hiển thị trên cửa hàng
                     </label>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <input
                       type="checkbox"
@@ -694,7 +708,7 @@ const AddProduct = () => {
                       Sản phẩm nổi bật
                     </label>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <input
                       type="checkbox"

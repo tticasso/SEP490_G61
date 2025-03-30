@@ -50,23 +50,23 @@ async function signIn(req, res, next) {
     try {
         if (!req.body.email || !req.body.password)
             throw createHttpError.BadRequest("Email or password is required")
-            
+
         // Find user and populate roles
         const existUser = await User.findOne({ email: req.body.email }).populate("roles", '-__v')
         if (!existUser)
             throw createHttpError.BadRequest(`Email ${req.body.email} not registered`)
-            
+
         const isMatchPassword = bcrypt.compareSync(req.body.password, existUser.password)
         if (!isMatchPassword)
             throw createHttpError.BadRequest("Password incorrect")
-            
+
         // Generate AccessToken - using JsonWebToken
         const token = jwt.sign({ id: existUser._id }, config.secret, {
             algorithm: "HS256",
             expiresIn: config.jwtExpiration
         })
-        
-        
+
+
         // Process roles with better error handling
         const authorities = []
         if (existUser.roles && existUser.roles.length > 0) {
@@ -85,7 +85,7 @@ async function signIn(req, res, next) {
             console.warn("No roles found for user, adding default MEMBER role");
             authorities.push("MEMBER");
         }
-        
+
 
         res.status(200).json({
             id: existUser._id,
@@ -101,27 +101,27 @@ async function signIn(req, res, next) {
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "http://localhost:9999/api/auth/google/callback"
+    callbackURL: "https://trooc.kaine.fun/api/auth/google/callback"
 }, async (accessToken, refreshToken, profile, done) => {
     try {
         let user = await User.findOne({ email: profile.emails[0].value });
 
-if (!user) {
-    const newUser = new User({
-        email: profile.emails[0].value,
-        firstName: profile.name.givenName || 'Google',
-        lastName: profile.name.familyName || 'User',
-        password: bcrypt.hashSync(Math.random().toString(36).slice(-8), 10),
-        phone: '0912345678' // Số điện thoại mặc định
-    });
+        if (!user) {
+            const newUser = new User({
+                email: profile.emails[0].value,
+                firstName: profile.name.givenName || 'Google',
+                lastName: profile.name.familyName || 'User',
+                password: bcrypt.hashSync(Math.random().toString(36).slice(-8), 10),
+                phone: '0912345678' // Số điện thoại mặc định
+            });
 
-    // Gán quyền mặc định
-    const role = await Role.findOne({ name: "MEMBER" });
-    newUser.roles = [role._id]; // Cập nhật thuộc tính roles cho newUser
+            // Gán quyền mặc định
+            const role = await Role.findOne({ name: "MEMBER" });
+            newUser.roles = [role._id]; // Cập nhật thuộc tính roles cho newUser
 
-    await newUser.save(); // Lưu người dùng mới
-    user = newUser; // Gán user mới vào biến user
-}
+            await newUser.save(); // Lưu người dùng mới
+            user = newUser; // Gán user mới vào biến user
+        }
 
         return done(null, user);
     } catch (error) {
@@ -152,7 +152,7 @@ function googleAuthCallback(req, res, next) {
         try {
             // Fetch roles more explicitly
             const populatedUser = await User.findById(user._id).populate('roles');
-            
+
             // Generate JWT token
             const token = jwt.sign({ id: user._id }, config.secret, {
                 algorithm: "HS256",
@@ -173,7 +173,7 @@ function googleAuthCallback(req, res, next) {
             } else {
                 authorities.push("MEMBER");
             }
-            
+
 
             // Create user data object
             const userData = {

@@ -3,7 +3,6 @@ import { Search, ChevronDown } from 'lucide-react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import ProductManagement from './product/ProductManagement';
 import CategoryManagement from './category/CategoryManagement';
-import AddCategory from './category/AddCategory';
 import Dashboard from './dashboard/Dashboard';
 import BrandList from './brand/BrandList';
 import AddBrand from './brand/AddBrand';
@@ -66,10 +65,10 @@ const MainContent = () => {
           <Route path="/products" element={<ProductManagement />} />
 
           <Route path="/categories" element={<CategoryManagement />} />
-          <Route path="/add-category" element={<AddCategory />} />
+          {/* Đã xóa route add-category */}
 
           <Route path="/brands" element={<BrandList />} />
-          <Route path="/add-brand" element={<AddBrand />} />
+          {/* Đã xóa route add-brand */}
 
           <Route path="/stores" element={<StoreList />} />
           <Route path="/store/:id" element={<StoreDetail onBack={() => navigate('/admin/stores')} />} />
@@ -80,14 +79,14 @@ const MainContent = () => {
 
           {/* Updated coupon routes to use separate components */}
           <Route path="/coupons" element={<CouponManagement />} />
-          <Route path="/add-coupon" element={<AddCouponForm />} />
+          {/* Đã xóa route add-coupon */}
           <Route path="/edit-coupon/:id" element={<EditCouponForm />} />
 
           <Route path="/shippings" element={<ShippingManagement />} />
-          <Route path="/add-shipping" element={<AddShipping />} />
+          {/* Đã xóa route add-shipping */}
 
           <Route path="/payments" element={<PaymentManagement />} />
-          <Route path="/add-payment" element={<AddPayment />} />
+          {/* Đã xóa route add-payment */}
 
           <Route path="/revenue/dashboard" element={<RevenueDashboard />} />
           <Route path="/revenue/shop-payments" element={<ShopPaymentList />} />

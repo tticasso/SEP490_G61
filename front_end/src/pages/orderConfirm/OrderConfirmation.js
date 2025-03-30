@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, Package, Truck, Home } from 'lucide-react';
+import { CheckCircle, Package, Truck, Home, AlertCircle, XCircle } from 'lucide-react';
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import defaultProductImage from '../../assets/dongho.png';
@@ -13,6 +13,9 @@ const OrderConfirmation = () => {
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [calculatedSubtotal, setCalculatedSubtotal] = useState(0);
   const [calculatedTotal, setCalculatedTotal] = useState(0); // New state for calculated total
+  const [paymentStatus, setPaymentStatus] = useState(null);
+  const [checkingPayment, setCheckingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
 
   // Get user information
   const currentUser = AuthService.getCurrentUser();
@@ -22,52 +25,73 @@ const OrderConfirmation = () => {
     const fetchOrderData = async () => {
       try {
         setLoading(true);
-        
+
         // Get orderId from URL
         const urlParams = new URLSearchParams(window.location.search);
         const orderId = urlParams.get('orderId');
-        
+
+        const paymentErrorParam = urlParams.get('paymentError');
+
         if (!orderId) {
+          const storedOrderId = localStorage.getItem('currentOrderId');
+          if (storedOrderId) {
+            localStorage.removeItem('currentOrderId');
+            window.location.href = `/order-confirmation?orderId=${storedOrderId}`;
+            return;
+          }
           throw new Error("Order ID not found");
         }
-        
-        console.log(`Fetching order data for ID: ${orderId}`);
-        
+
         // Call API to get order information
         const orderData = await ApiService.get(`/order/find/${orderId}`);
-        
+
         if (!orderData || !orderData.order) {
           throw new Error("Unable to load order information");
         }
-        
+
         console.log("Order data received:", orderData);
-        
+
         setOrder(orderData.order);
         setOrderDetails(orderData.orderDetails || []);
-        
+
         // Calculate subtotal with received data
         if (orderData.orderDetails && orderData.orderDetails.length > 0) {
           const subtotal = calculateOrderSubtotal(orderData.orderDetails);
           setCalculatedSubtotal(subtotal);
-          
+
           // Calculate total including shipping cost
           const shippingCost = orderData.order.shipping_id?.price || 0;
           const totalDiscount = (orderData.order.discount_amount || 0) + (orderData.order.coupon_amount || 0);
           const total = Math.max(0, subtotal - totalDiscount) + shippingCost;
           setCalculatedTotal(total);
-          
+
           console.log(`Calculated subtotal: ${subtotal}, Shipping cost: ${shippingCost}, Discounts: ${totalDiscount}, Total: ${total}`);
         }
-        
+
+        // Code kiểm tra nếu đơn hàng sử dụng PayOS
+        const paymentMethod = orderData.order.payment_id;
+        const isPayOsOrder = paymentMethod &&
+          (typeof paymentMethod === 'object'
+            ? (paymentMethod.name && (paymentMethod.name.toLowerCase().includes('vnpay') || paymentMethod.name.toLowerCase().includes('payos')))
+            : false);
+
+        // Kiểm tra xem có transaction code trong localStorage không
+        const transactionCode = localStorage.getItem('paymentTransactionCode');
+
+        if (isPayOsOrder || transactionCode) {
+          // Kiểm tra trạng thái thanh toán từ PayOS
+          await checkPaymentStatus(orderId, transactionCode || orderData.order.order_payment_id);
+        }
+
         setLoading(false);
 
         // Only load variant details for items that don't have variant info populated
-        const needsVariantLoad = (orderData.orderDetails || []).some(detail => 
-          detail.variant_id && 
-          (typeof detail.variant_id !== 'object' || 
-           !detail.variant_id.attributes && !detail.variant_id.name)
+        const needsVariantLoad = (orderData.orderDetails || []).some(detail =>
+          detail.variant_id &&
+          (typeof detail.variant_id !== 'object' ||
+            !detail.variant_id.attributes && !detail.variant_id.name)
         );
-        
+
         if (needsVariantLoad) {
           await loadVariantDetails(orderData.orderDetails, orderData.order);
         }
@@ -81,43 +105,86 @@ const OrderConfirmation = () => {
     fetchOrderData();
   }, []);
 
+  // Kiểm tra xem đơn hàng có phải thanh toán qua VNPay/PayOS không
+  const isOnlinePayment = (order) => {
+    if (!order) return false;
+
+    return order.payment_method === "payos" ||
+      (typeof order.payment_id === 'object' &&
+        order.payment_id?.name?.toLowerCase().includes('vnpay'));
+  };
+
+  // Function to check payment status
+  const checkPaymentStatus = async (orderId, transactionCode) => {
+    try {
+      setCheckingPayment(true);
+      console.log(`Checking payment status for transaction: ${transactionCode}`);
+
+      // Call PayOS API to check payment status
+      const response = await ApiService.get(`/payos/check-payment-status/${transactionCode}`);
+
+      if (response && response.success) {
+        console.log("Payment status response:", response);
+        setPaymentStatus(response.data.payment);
+
+        // Xóa thông tin thanh toán từ localStorage sau khi đã kiểm tra
+        localStorage.removeItem('paymentTransactionCode');
+
+        // Nếu thanh toán thành công và trạng thái thanh toán vẫn là pending, reload lại trang sau 2s
+        if (response.data.payment.status === "PAID" && response.data.order.status_id === "pending") {
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      } else {
+        console.warn("Payment status check failed or returned unexpected format:", response);
+        setPaymentError("Không thể kiểm tra trạng thái thanh toán");
+      }
+    } catch (err) {
+      console.error("Error checking payment status:", err);
+      setPaymentError("Lỗi khi kiểm tra trạng thái thanh toán: " + (err.message || "Không xác định"));
+    } finally {
+      setCheckingPayment(false);
+    }
+  };
+
   // Main function to load variant details only for items that need it
   const loadVariantDetails = async (details, orderObj) => {
     try {
       setLoadingVariants(true);
       console.log(`Checking if variant details needed for ${details.length} items`);
-      
+
       // Create a copy of the current variant details
       const detailsMap = {};
-      
+
       // Process each order detail item
       for (const detail of details) {
         // Skip if there's no variant_id or if variant_id is already a fully populated object
-        if (!detail.variant_id || 
-            (typeof detail.variant_id === 'object' && 
-             detail.variant_id !== null &&
-             (detail.variant_id.attributes || detail.variant_id.name))) {
+        if (!detail.variant_id ||
+          (typeof detail.variant_id === 'object' &&
+            detail.variant_id !== null &&
+            (detail.variant_id.attributes || detail.variant_id.name))) {
           console.log(`Item ${detail._id} already has complete variant info or no variant, skipping`);
           continue;
         }
-        
+
         // We need to fetch the variant info from the API
         // Extract product ID and variant ID
-        const productId = typeof detail.product_id === 'object' 
-          ? (detail.product_id._id || detail.product_id.id) 
+        const productId = typeof detail.product_id === 'object'
+          ? (detail.product_id._id || detail.product_id.id)
           : detail.product_id;
-        
+
         const variantId = typeof detail.variant_id === 'object'
           ? (detail.variant_id._id || detail.variant_id.id)
           : detail.variant_id;
-        
+
         if (!productId || !variantId) {
           console.log(`Missing productId or variantId for ${detail._id}, skipping`);
           continue;
         }
-        
+
         console.log(`Fetching variants for product ${productId}, looking for variant ${variantId}`);
-        
+
         try {
           // First try direct variant fetch - may be faster and more reliable
           try {
@@ -131,20 +198,20 @@ const OrderConfirmation = () => {
             console.log(`Direct fetch of variant ${variantId} failed:`, directFetchError);
             // Fall through to try the product variants approach
           }
-          
+
           // Fetch all variants for this product
           const variants = await ApiService.get(`/product-variant/product/${productId}`, false);
-          
+
           if (!Array.isArray(variants)) {
             console.log(`API returned non-array response for variants of product ${productId}:`, variants);
             continue;
           }
-          
+
           console.log(`Found ${variants.length} variants for product ${productId}`);
-          
+
           // Find the specific variant we need
           const variant = variants.find(v => v._id === variantId);
-          
+
           if (variant) {
             console.log(`Found matching variant for ${detail._id}:`, variant);
             detailsMap[detail._id] = variant;
@@ -155,24 +222,24 @@ const OrderConfirmation = () => {
           console.error(`Error fetching variants for product ${productId}:`, error);
         }
       }
-      
+
       console.log("Final variant details:", detailsMap);
       setVariantDetails(detailsMap);
-      
+
       // Recalculate subtotal and total with newly fetched variant info if needed
       if (Object.keys(detailsMap).length > 0) {
         const subtotal = calculateOrderSubtotal(details, detailsMap);
         setCalculatedSubtotal(subtotal);
-        
+
         // Recalculate total with updated subtotal
         const shippingCost = orderObj.shipping_id?.price || 0;
         const totalDiscount = (orderObj.discount_amount || 0) + (orderObj.coupon_amount || 0);
         const total = Math.max(0, subtotal - totalDiscount) + shippingCost;
         setCalculatedTotal(total);
-        
+
         console.log(`Updated calculated subtotal: ${subtotal}, Total: ${total}`);
       }
-      
+
     } catch (error) {
       console.error('Error in loadVariantDetails:', error);
     } finally {
@@ -186,29 +253,29 @@ const OrderConfirmation = () => {
     if (detail.price !== undefined && detail.price > 0) {
       return detail.price;
     }
-    
+
     // Priority 2: Use price from populated variant_id
     if (detail.variant_id && typeof detail.variant_id === 'object' && detail.variant_id.price !== undefined) {
       return detail.variant_id.price;
     }
-    
+
     // Priority 3: Check our separately loaded variant details
     if (variantDetails[detail._id]?.price !== undefined) {
       return variantDetails[detail._id].price;
     }
-    
+
     // Priority 4: Use product price as fallback
     if (typeof detail.product_id === 'object') {
       return detail.product_id.discounted_price || detail.product_id.price || 0;
     }
-    
+
     return 0;
   };
 
   // Calculate correct subtotal for order
   const calculateOrderSubtotal = (details, variants = {}) => {
     if (!details || details.length === 0) return 0;
-    
+
     // If order.original_price is available from server and seems reasonable, use it
     if (order && order.original_price !== undefined && order.original_price > 0) {
       // Verify by calculating manually
@@ -216,7 +283,7 @@ const OrderConfirmation = () => {
         const price = getItemPrice(detail);
         return sum + (price * detail.quantity);
       }, 0);
-      
+
       // Only use original_price if it's close to our manual calculation
       // This helps catch cases where original_price might be incorrect
       if (Math.abs(order.original_price - manualTotal) < manualTotal * 0.5) {
@@ -227,7 +294,7 @@ const OrderConfirmation = () => {
         return manualTotal;
       }
     }
-    
+
     // Calculate from order details
     const total = details.reduce((sum, detail) => {
       const price = getItemPrice(detail);
@@ -235,7 +302,7 @@ const OrderConfirmation = () => {
       console.log(`Item ${detail._id}: ${price} x ${detail.quantity} = ${itemTotal}`);
       return sum + itemTotal;
     }, 0);
-    
+
     console.log(`Calculated subtotal from order details: ${total}`);
     return total;
   };
@@ -243,7 +310,7 @@ const OrderConfirmation = () => {
   // Format price
   const formatPrice = (price) => {
     if (!price && price !== 0) return "0đ";
-    
+
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
       .format(price)
       .replace('₫', 'đ');
@@ -259,28 +326,28 @@ const OrderConfirmation = () => {
   // Render variant information
   const renderVariantInfo = (detail) => {
     // First check if we have populated variant info in the detail itself
-    if (detail.variant_id && typeof detail.variant_id === 'object' && 
-        (detail.variant_id.name || detail.variant_id.attributes)) {
-      
+    if (detail.variant_id && typeof detail.variant_id === 'object' &&
+      (detail.variant_id.name || detail.variant_id.attributes)) {
+
       const variantInfo = detail.variant_id;
-      
+
       // Render variant name if available
       const variantName = variantInfo.name ? (
         <div className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs inline-block mb-1">
           {variantInfo.name}
         </div>
       ) : null;
-      
+
       // Get variant attributes based on structure
-      const attributes = variantInfo.attributes instanceof Map 
-        ? Object.fromEntries(variantInfo.attributes) 
+      const attributes = variantInfo.attributes instanceof Map
+        ? Object.fromEntries(variantInfo.attributes)
         : variantInfo.attributes;
-      
+
       // If no attributes or empty object
       if (!attributes || Object.keys(attributes).length === 0) {
         return variantName; // Just return the name if available
       }
-      
+
       // Create attribute elements
       const attributeElements = (
         <div className="text-xs text-gray-600 flex flex-wrap gap-1">
@@ -291,7 +358,7 @@ const OrderConfirmation = () => {
           ))}
         </div>
       );
-      
+
       // Return both name and attributes
       return (
         <div className="mt-1 space-y-1">
@@ -300,10 +367,10 @@ const OrderConfirmation = () => {
         </div>
       );
     }
-    
+
     // Fallback - use data from variantDetails state if it's been loaded
     let variantInfo = variantDetails[detail._id];
-    
+
     if (!variantInfo) {
       // No variant info available
       return (
@@ -312,24 +379,24 @@ const OrderConfirmation = () => {
         </div>
       );
     }
-    
+
     // Render variant name if available
     const variantName = variantInfo.name ? (
       <div className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs inline-block mb-1">
         {variantInfo.name}
       </div>
     ) : null;
-    
+
     // Get variant attributes based on structure
-    const attributes = variantInfo.attributes instanceof Map 
-      ? Object.fromEntries(variantInfo.attributes) 
+    const attributes = variantInfo.attributes instanceof Map
+      ? Object.fromEntries(variantInfo.attributes)
       : variantInfo.attributes;
-    
+
     // If no attributes or empty object
     if (!attributes || Object.keys(attributes).length === 0) {
       return variantName; // Just return the name if available
     }
-    
+
     // Create attribute elements
     const attributeElements = (
       <div className="text-xs text-gray-600 flex flex-wrap gap-1">
@@ -340,7 +407,7 @@ const OrderConfirmation = () => {
         ))}
       </div>
     );
-    
+
     // Return both name and attributes
     return (
       <div className="mt-1 space-y-1">
@@ -354,20 +421,20 @@ const OrderConfirmation = () => {
   const getItemImage = (detail) => {
     // Priority 1: Get from populated variant_id
     if (detail.variant_id && typeof detail.variant_id === 'object' &&
-        detail.variant_id.images && detail.variant_id.images.length > 0) {
+      detail.variant_id.images && detail.variant_id.images.length > 0) {
       return detail.variant_id.images[0];
     }
-    
+
     // Priority 2: Get from our separately loaded variant details
     if (variantDetails[detail._id]?.images && variantDetails[detail._id].images.length > 0) {
       return variantDetails[detail._id].images[0];
     }
-    
+
     // Fallback to product image
     if (detail.product_id && typeof detail.product_id === 'object') {
       return detail.product_id.thumbnail || detail.product_id.image;
     }
-    
+
     return defaultProductImage;
   };
 
@@ -385,7 +452,7 @@ const OrderConfirmation = () => {
       <div className="max-w-4xl mx-auto p-6 mt-10 bg-white rounded-lg shadow-md">
         <div className="text-red-500 text-center mb-4">❌ {error}</div>
         <div className="flex justify-center">
-          <button 
+          <button
             onClick={() => window.location.href = '/'}
             className="bg-purple-600 text-white px-4 py-2 rounded-lg"
           >
@@ -401,7 +468,7 @@ const OrderConfirmation = () => {
       <div className="max-w-4xl mx-auto p-6 mt-10 bg-white rounded-lg shadow-md">
         <div className="text-center mb-4">Không tìm thấy thông tin đơn hàng</div>
         <div className="flex justify-center">
-          <button 
+          <button
             onClick={() => window.location.href = '/'}
             className="bg-purple-600 text-white px-4 py-2 rounded-lg"
           >
@@ -418,7 +485,7 @@ const OrderConfirmation = () => {
   const totalDiscount = (order.discount_amount || 0) + (order.coupon_amount || 0);
   // Calculate shipping cost
   const shippingCost = order.shipping_id?.price || 0;
-  
+
   // ALWAYS use our calculatedTotal if available, otherwise calculate it manually
   // This ensures shipping is ALWAYS included in the total
   const displayTotal = calculatedTotal || Math.max(0, subtotal - totalDiscount) + shippingCost;
@@ -432,15 +499,28 @@ const OrderConfirmation = () => {
         <p className="text-gray-600">
           Cảm ơn bạn đã đặt hàng. Mã đơn hàng của bạn là <span className="font-semibold">{order._id}</span>
         </p>
-        <p className="text-gray-600 mt-1">
-          Chúng tôi đã gửi thông tin xác nhận đến email của bạn.
-        </p>
+
+        {/* Thêm ghi chú nếu là đơn hàng VNPay chưa thanh toán */}
+        {isOnlinePayment(order) && order.status_id === 'pending' && (
+          <p className="text-yellow-600 mt-2 bg-yellow-50 p-2 rounded">
+            <AlertCircle size={16} className="inline mr-1" />
+            Lưu ý: Đơn hàng của bạn đang chờ thanh toán. Vui lòng hoàn tất thanh toán để đơn hàng được xử lý.
+          </p>
+        )}
+
+        {/* Thông báo nếu đã thanh toán thành công */}
+        {isOnlinePayment(order) && order.status_id === 'paid' && (
+          <p className="text-green-600 mt-2 bg-green-50 p-2 rounded">
+            <CheckCircle size={16} className="inline mr-1" />
+            Thanh toán đã hoàn tất. Đơn hàng của bạn đang được xử lý.
+          </p>
+        )}
       </div>
 
       {/* Order Summary */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
         <h2 className="text-xl font-bold mb-4">Thông tin đơn hàng</h2>
-        
+
         <div className="flex flex-col md:flex-row md:justify-between mb-6">
           <div className="mb-4 md:mb-0">
             <p className="text-gray-600">Mã đơn hàng:</p>
@@ -453,18 +533,18 @@ const OrderConfirmation = () => {
           <div>
             <p className="text-gray-600">Trạng thái:</p>
             <p className="font-semibold bg-yellow-100 text-yellow-800 px-2 py-1 rounded inline-block">
-              {order.status_id === 'pending' ? 'Chờ xử lý' :
-               order.status_id === 'processing' ? 'Đang xử lý' :
-               order.status_id === 'shipped' ? 'Đang giao hàng' :
-               order.status_id === 'delivered' ? 'Đã giao hàng' :
-               order.status_id === 'cancelled' ? 'Đã hủy' : 'Đang xử lý'}
+              {order.order_status === 'pending' ? 'Chờ xử lý' :
+                order.order_status === 'processing' ? 'Đang xử lý' :
+                  order.order_status === 'shipped' ? 'Đang giao hàng' :
+                    order.order_status === 'delivered' ? 'Đã giao hàng' :
+                      order.order_status === 'cancelled' ? 'Đã hủy' : 'Đang xử lý'}
             </p>
           </div>
         </div>
 
         <div className="border-t border-gray-200 pt-6">
           <h3 className="font-semibold mb-4">Chi tiết sản phẩm</h3>
-          
+
           <div className="space-y-4">
             {orderDetails.length > 0 ? orderDetails.map((detail) => (
               <div key={detail._id} className="flex items-center border-b border-gray-100 pb-4">
@@ -476,14 +556,14 @@ const OrderConfirmation = () => {
                 />
                 <div className="flex-grow">
                   <p className="font-medium">{detail.product_id?.name || "Sản phẩm"}</p>
-                  
+
                   {/* Variant info */}
                   {loadingVariants ? (
                     <div className="text-xs text-gray-600 mt-1">Đang tải thông tin biến thể...</div>
                   ) : (
                     renderVariantInfo(detail)
                   )}
-                  
+
                   <p className="text-sm text-gray-600 mt-1">
                     Số lượng: {detail.quantity} x {formatPrice(getItemPrice(detail))}
                   </p>
@@ -505,19 +585,19 @@ const OrderConfirmation = () => {
             <span>Tạm tính:</span>
             <span>{formatPrice(subtotal)}</span>
           </div>
-          
+
           {totalDiscount > 0 && (
             <div className="flex justify-between mb-2">
               <span>Giảm giá:</span>
               <span>-{formatPrice(totalDiscount)}</span>
             </div>
           )}
-          
+
           <div className="flex justify-between mb-2">
             <span>Phí vận chuyển:</span>
             <span>{shippingCost > 0 ? formatPrice(shippingCost) : "Miễn phí"}</span>
           </div>
-          
+
           <div className="flex justify-between font-bold text-lg border-t border-gray-200 pt-2 mt-2">
             <span>Tổng cộng:</span>
             <span>{formatPrice(displayTotal)}</span>
@@ -533,14 +613,14 @@ const OrderConfirmation = () => {
               <Home size={20} className="mr-2 text-purple-600" />
               <h3 className="font-semibold">Địa chỉ giao hàng</h3>
             </div>
-            
+
             {order.user_address_id ? (
               <div className="ml-7">
                 <p className="font-medium">
-                  {order.user_address_id.name || 
-                   (currentUser?.firstName && currentUser?.lastName ? 
-                    `${currentUser.firstName} ${currentUser.lastName}` : 
-                    'Khách hàng')}
+                  {order.user_address_id.name ||
+                    (currentUser?.firstName && currentUser?.lastName ?
+                      `${currentUser.firstName} ${currentUser.lastName}` :
+                      'Khách hàng')}
                 </p>
                 <p className="text-gray-600">{order.user_address_id.phone}</p>
                 <p className="text-gray-600">
@@ -554,19 +634,19 @@ const OrderConfirmation = () => {
               <p className="text-gray-600 ml-7">Không có thông tin địa chỉ</p>
             )}
           </div>
-          
+
           <div className="md:w-1/2 md:pl-4 md:border-l border-gray-200">
             <div className="flex items-center mb-3">
               <Truck size={20} className="mr-2 text-purple-600" />
               <h3 className="font-semibold">Phương thức giao hàng & thanh toán</h3>
             </div>
-            
+
             <div className="ml-7">
               <p className="text-gray-600 mb-3">
                 <span className="font-medium">Phương thức giao hàng: </span>
                 {order.shipping_id?.name || "Giao hàng tiêu chuẩn"}
               </p>
-              
+
               <p className="text-gray-600">
                 <span className="font-medium">Phương thức thanh toán: </span>
                 {order.payment_id?.name || "Thanh toán khi nhận hàng"}
@@ -578,14 +658,14 @@ const OrderConfirmation = () => {
 
       {/* CTA Buttons */}
       <div className="flex flex-col md:flex-row gap-4 mb-10">
-        <button 
+        <button
           onClick={() => window.location.href = '/'}
           className="flex-1 bg-white text-purple-600 border border-purple-600 hover:bg-purple-50 py-3 rounded-lg font-medium"
         >
           Tiếp tục mua sắm
         </button>
-        
-        <button 
+
+        <button
           onClick={() => window.location.href = `/user-profile/orders?id=${order._id}`}
           className="flex-1 bg-purple-600 text-white hover:bg-purple-700 py-3 rounded-lg font-medium"
         >

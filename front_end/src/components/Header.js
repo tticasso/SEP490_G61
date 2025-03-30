@@ -351,9 +351,9 @@ const Header = () => {
                     </div>
                     {/* Language and Tracking */}
                     <div className="flex gap-3 items-center space-x-4 text-sm text-gray-600">
-                        <a href="#" className="hover:text-purple-600">Vị trí cửa hàng</a>
-                        <a href="#" className="hover:text-purple-600">Theo dõi đơn hàng</a>
-                        <a href="#" className="hover:text-purple-600">FAQs</a>
+                        {/* <a href="#" className="hover:text-purple-600">Vị trí cửa hàng</a> */}
+                        <a href="/user-profile/orders" className="hover:text-purple-600">Theo dõi đơn hàng</a>
+                        {/* <a href="#" className="hover:text-purple-600">FAQs</a> */}
                         <div className="flex items-center space-x-2">
                             <Globe size={16} />
                             <select

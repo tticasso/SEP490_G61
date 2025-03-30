@@ -14,11 +14,6 @@ import Sidebar from './Sidebar';
 import ApiService from '../services/ApiService';
 import AuthService from '../services/AuthService';
 import { BE_API_URL } from '../../src/config/config';
-const getImagePath = (imgPath) => {
-  if (!imgPath) return "";
-  const fileName = imgPath.split("\\").pop();
-  return `${BE_API_URL}/uploads/products/${fileName}`;
-};
 // Product Details Modal Component
 const ProductDetailsModal = ({ product, onClose }) => {
   const [loading, setLoading] = useState(true);
@@ -190,7 +185,7 @@ const ProductDetailsModal = ({ product, onClose }) => {
                 <div className="border rounded-md p-2 h-80 flex items-center justify-center">
                   {productDetails.thumbnail ? (
                     <img 
-                      src={getImagePath(productDetails.thumbnail)} 
+                      src={productDetails.thumbnail} 
                       alt={productDetails.name} 
                       className="max-h-full max-w-full object-contain"
                       onError={(e) => {
@@ -1847,7 +1842,7 @@ const ProductList = () => {
                         <div className="flex items-center">
                           <div className="w-12 h-12 mr-4 flex-shrink-0 bg-gray-200 rounded overflow-hidden">
                             <img 
-                              src={getImagePath(product.thumbnail)} 
+                              src={product.thumbnail} 
                               alt={product.name} 
                               className="w-full h-full object-cover"
                               onError={(e) => {

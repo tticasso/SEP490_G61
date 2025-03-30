@@ -124,7 +124,7 @@ class PayOsController {
       next(error.isJoi ? httpErrors.BadRequest(error.message) : error);
     }
   }
-
+  
   // Xử lý webhook từ PayOs
   async handleWebhook(req, res, next) {
     try {
@@ -132,26 +132,25 @@ class PayOsController {
       console.log("Webhook received. Headers:", req.headers);
       console.log("Webhook body:", JSON.stringify(req.body));
 
-      // Xử lý webhook trong background
-      // this.processWebhookData(req.body).then(() => {
-      // // Trả về response thành công ngay lập tức để tránh timeout
-      //     res.status(200).json({ success: true });
-      // }).catch(error => {
-      //     console.error('Error processing webhook data:', error);
-      // });
       try {
         // Kiểm tra webhookData có cấu trúc đúng không
         const webhookData = req.body;
         if (!webhookData || !webhookData.data) {
           console.error("Invalid webhook data structure");
-          return;
+          return res.status(200).json({ success: true }); // Vẫn trả về 200 để PayOS không gửi lại webhook
         }
 
         // Lấy thông tin từ webhook data
         const {
-          orderCode,
+          bin,
+          accountNumber,
+          accountName,
           amount,
           description,
+          orderCode,
+          paymentLinkId,
+          status,
+          qrCode,
           transactionDateTime,
           counterAccountName,
           reference,
@@ -168,7 +167,7 @@ class PayOsController {
 
         if (!order) {
           console.error(`Order not found for orderCode: ${orderCode}`);
-          return;
+          return res.status(200).json({ success: true });
         }
 
         console.log(
@@ -177,38 +176,50 @@ class PayOsController {
 
         // Kiểm tra xem transaction đã thành công hay chưa dựa trên code
         if (webhookData.code === "00" && webhookData.success === true) {
-          // Cập nhật trạng thái đơn hàng thành 'processing' (đã thanh toán)
+          // Cập nhật trạng thái đơn hàng thành 'paid' (đã thanh toán)
           order.status_id = "paid";
+          order.order_status = "processing";
           order.updated_at = new Date();
 
-          // Lưu thêm thông tin giao dịch nếu cần
+          // Lưu thông tin chi tiết thanh toán
           order.payment_details = {
-            transactionTime: transactionDateTime,
-            paymentReference: reference,
-            payerName: counterAccountName,
-            amount: amount,
+            bin: bin || "",
+            accountNumber: accountNumber || "",
+            accountName: accountName || "",
+            amount: amount || 0,
+            description: description || "",
+            orderCode: orderCode || "",
+            currency: webhookData.data.currency || "VND",
+            paymentLinkId: paymentLinkId || "",
+            status: status || "",
+            transactionTime: transactionDateTime || new Date(),
+            paymentReference: reference || "",
+            payerName: counterAccountName || accountName || "",
+            qrCode: qrCode || ""
           };
 
-          console.log(`Updating order ${order._id} status to 'processing'`);
+          console.log(`Updating order ${order._id} status to 'paid' and saving payment details`);
         } else if (webhookData.code !== "00" || webhookData.success !== true) {
           // Trường hợp thanh toán thất bại
-          order.status_id = "payment_failed";
+          order.status_id = "pending";
+          order.order_status = "cancelled";
           order.updated_at = new Date();
-          console.log(`Updating order ${order._id} status to 'payment_failed'`);
+          console.log(`Updating order ${order._id} status to 'pending' and order_status to 'cancelled'`);
         }
 
         // Lưu thay đổi vào database
         await order.save();
         console.log(`Order ${order._id} updated successfully`);
-        res.status(200).json({ success: true });
+        return res.status(200).json({ success: true });
       } catch (error) {
         console.error("Error processing webhook data:", error);
+        return res.status(200).json({ success: true }); // Vẫn trả về 200 để PayOS không gửi lại webhook
       }
     } catch (error) {
       console.error("PayOs webhook error:", error);
       // Nếu headers chưa được gửi, trả về lỗi
       if (!res.headersSent) {
-        next(error);
+        return res.status(200).json({ success: true }); // Vẫn trả về 200 để PayOS không gửi lại webhook
       }
     }
   }

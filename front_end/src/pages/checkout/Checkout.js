@@ -781,8 +781,8 @@ const CheckoutPage = () => {
                 // Kiểm tra phương thức thanh toán VNPay
                 const selectedPaymentMethod = paymentMethods.find(method => method.id === paymentMethod);
                 const isVNPayMethod = selectedPaymentMethod && (
-                    selectedPaymentMethod.name.toLowerCase().includes("vnpay") || 
-                    selectedPaymentMethod.name.toLowerCase().includes("payos")
+                    selectedPaymentMethod.name.toLowerCase().includes("qr") || 
+                    selectedPaymentMethod.name.toLowerCase().includes("mã qr")
                 );
 
                 if (isVNPayMethod) {

@@ -33,6 +33,7 @@ import ProtectedRoute, { AdminRoute, SellerRoute } from './route/ProtectedRoute'
 import MyShop from './Seller/MyShop';
 import OrderConfirmation from './pages/orderConfirm/OrderConfirmation';
 import PaymentCallback from './pages/checkout/payment/PaymentCallback';
+import MessageBubble from './pages/UserProfile/components/messageBubble';
 
 function App() {
   const location = useLocation();
@@ -153,6 +154,7 @@ function App() {
         </Routes>
         {!noHeaderPage && <Footer />}
         <ChatBot />
+        {<MessageBubble />}
       </AuthProvider>
     </div>
   );

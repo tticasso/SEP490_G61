@@ -400,16 +400,18 @@ const Categories = () => {
             )}
 
             <div className="flex flex-col md:flex-row">
-                {/* Sidebar Categories */}
-                <CategorySidebar 
-                    categories={categories}
-                    selectedCategory={selectedCategory}
-                    handleCategorySelect={handleCategorySelect}
-                    priceRange={priceRange}
-                    handlePriceChange={handlePriceChange}
-                    applyPriceFilter={applyPriceFilter}
-                    clearFilters={clearFilters}
-                />
+                {/* Sidebar Categories - Sử dụng w-64 để đảm bảo chiều rộng cố định */}
+                <div className="md:w-64 flex-shrink-0 mb-6 md:mb-0">
+                    <CategorySidebar 
+                        categories={categories}
+                        selectedCategory={selectedCategory}
+                        handleCategorySelect={handleCategorySelect}
+                        priceRange={priceRange}
+                        handlePriceChange={handlePriceChange}
+                        applyPriceFilter={applyPriceFilter}
+                        clearFilters={clearFilters}
+                    />
+                </div>
 
                 {/* Product Listing */}
                 <div className="md:flex-grow md:pl-6">

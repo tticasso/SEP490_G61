@@ -239,7 +239,7 @@ const ProductDetailsModal = ({ product, onClose }) => {
                     <p className="text-sm text-gray-500">Tình trạng</p>
                     <p>
                       {productDetails.condition === 'new' && 'Mới'}
-                      {productDetails.condition === 'used' && 'Đã qua sử dụng'}
+                      {productDetails.condition === 'Used' && 'Đã qua sử dụng'}
                       {productDetails.condition === 'refurbished' && 'Tân trang'}
                     </p>
                   </div>

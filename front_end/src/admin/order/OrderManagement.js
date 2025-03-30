@@ -237,13 +237,18 @@ const OrderManagement = () => {
   };
 
   // Hàm kiểm tra phương thức thanh toán VNPay
-  const isVNPayPayment = (order) => {
+  const isOnlinePayment = (order) => {
     if (!order || !order.payment_id || !order.payment_id.name) {
       return false;
     }
 
     const paymentMethod = order.payment_id.name.toLowerCase();
-    return paymentMethod.includes('vnpay') || paymentMethod.includes('vn pay');
+    // Kiểm tra các phương thức thanh toán online
+    return paymentMethod.includes('qr') ||
+      paymentMethod.includes('mã qr') ||
+      paymentMethod.includes('payos') ||
+      paymentMethod.includes('momo') ||
+      paymentMethod.includes('online');
   };
 
   // Convert status to Vietnamese
@@ -503,20 +508,18 @@ const OrderManagement = () => {
                         </td>
                         {/* Trạng thái thanh toán */}
                         <td className="py-4 px-4">
-                          {isVNPayPayment(order) ? (
-                            <span className={`px-3 py-1 truncate text-xs font-medium rounded ${getPaymentStatusClass(order.status_id)}`}>
-                              {order.status_id === 'paid' ? 'ĐÃ THANH TOÁN' : 'CHƯA THANH TOÁN'}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 text-xs">Không áp dụng</span>
-                          )}
+                          <span className={`px-3 py-1 truncate text-xs font-medium rounded ${getPaymentStatusClass(order.status_id)}`}>
+                            {order.status_id === 'paid' ? 'ĐÃ THANH TOÁN' : 'CHƯA THANH TOÁN'}
+                          </span>
                         </td>
+                        {/* Chi tiết thanh toán */}
                         <td className="py-4 px-4">
-                          {isVNPayPayment(order) ? (
+                          {isOnlinePayment(order) ? (
                             order.payment_details && Object.keys(order.payment_details).length > 0 ? (
                               <button
                                 onClick={() => {
                                   setSelectedPaymentDetails(order.payment_details);
+                                  setSelectedOrder(order); // Lưu thông tin đơn hàng để lấy status_id
                                   setShowPaymentDetails(true);
                                 }}
                                 className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md text-xs hover:bg-blue-200"
@@ -527,7 +530,7 @@ const OrderManagement = () => {
                               <span className="text-gray-400 text-xs">Không có dữ liệu</span>
                             )
                           ) : (
-                            <span className="text-gray-400 text-xs">-</span>
+                            <span className="text-gray-400 text-xs">Không áp dụng</span>
                           )}
                         </td>
                         <td className="py-4 px-4 text-sm text-gray-700">
@@ -633,6 +636,7 @@ const OrderManagement = () => {
       {showPaymentDetails && (
         <PaymentDetailsPopup
           paymentDetails={selectedPaymentDetails}
+          orderStatusId={selectedOrder.status_id}
           onClose={() => {
             setShowPaymentDetails(false);
             setSelectedPaymentDetails(null);

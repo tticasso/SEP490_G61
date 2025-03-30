@@ -26,6 +26,10 @@ const PasswordChange = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [passwordStrength, setPasswordStrength] = useState({
+        score: 0,
+        message: ""
+    });
 
     // Hàm xử lý thay đổi input
     const handleInputChange = (e) => {
@@ -34,7 +38,44 @@ const PasswordChange = () => {
             ...prev,
             [name]: value
         }));
+
+        // Validate password strength khi thay đổi mật khẩu mới
+        if (name === 'newPassword') {
+            validatePasswordStrength(value);
+        }
+
         if (error) setError("");
+    };
+
+    // Hàm đánh giá độ mạnh của mật khẩu
+    const validatePasswordStrength = (password) => {
+        let score = 0;
+        let message = "";
+
+        if (!password) {
+            setPasswordStrength({ score: 0, message: "" });
+            return;
+        }
+
+        // Minimum 8 characters
+        if (password.length >= 8) score += 1;
+
+        // Has letter
+        if (/[a-zA-Z]/.test(password)) score += 1;
+        
+        // Has number
+        if (/\d/.test(password)) score += 1;
+        
+        // Has special character
+        if (/[^a-zA-Z0-9]/.test(password)) score += 1;
+
+        // Determine message based on score
+        if (score === 1) message = "Yếu";
+        else if (score === 2) message = "Trung bình";
+        else if (score === 3) message = "Khá mạnh";
+        else if (score === 4) message = "Mạnh";
+
+        setPasswordStrength({ score, message });
     };
 
     // Hàm xử lý xác nhận email và gửi OTP
@@ -101,20 +142,24 @@ const PasswordChange = () => {
         }
     };
 
+    // Validate mật khẩu mới - sử dụng logic giống với Register.js
+    const validatePassword = (password) => {
+        if (!password) {
+            return "Mật khẩu không được để trống";
+        } else if (!/^(?=.*[a-zA-Z])(?=.*\d).{8,}$/.test(password)) {
+            return "Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ và số";
+        }
+        return "";
+    };
+
     // Hàm xử lý đổi mật khẩu
     const handleChangePassword = async (e) => {
         e.preventDefault();
 
         // Kiểm tra mật khẩu mới
-        if (!formData.newPassword) {
-            setError("Vui lòng nhập mật khẩu mới");
-            return;
-        }
-
-        // Kiểm tra mật khẩu mạnh hơn: ít nhất 8 ký tự, có chữ thường, chữ hoa, số và ký tự đặc biệt
-        const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-        if (!strongPasswordRegex.test(formData.newPassword)) {
-            setError("Mật khẩu mới phải có ít nhất 8 ký tự, bao gồm chữ thường, chữ hoa, số và ký tự đặc biệt (@$!%*?&)");
+        const passwordError = validatePassword(formData.newPassword);
+        if (passwordError) {
+            setError(passwordError);
             return;
         }
 
@@ -147,6 +192,28 @@ const PasswordChange = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Render password strength indicator
+    const renderPasswordStrengthIndicator = () => {
+        if (!formData.newPassword) return null;
+        
+        const { score, message } = passwordStrength;
+        let colorClass = "bg-gray-200";
+        
+        if (score === 1) colorClass = "bg-red-500";
+        else if (score === 2) colorClass = "bg-yellow-500";
+        else if (score === 3) colorClass = "bg-green-300";
+        else if (score === 4) colorClass = "bg-green-500";
+        
+        return (
+            <div className="mt-1">
+                <div className="h-2 w-full bg-gray-200 rounded">
+                    <div className={`h-full ${colorClass} rounded`} style={{ width: `${score * 25}%` }}></div>
+                </div>
+                <p className="text-xs mt-1">{message}</p>
+            </div>
+        );
     };
 
     return (
@@ -259,6 +326,7 @@ const PasswordChange = () => {
                             disabled={loading}
                             required
                         />
+                        {renderPasswordStrengthIndicator()}
                         <p className="text-xs text-gray-500 mt-1">
                             Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ và số
                         </p>

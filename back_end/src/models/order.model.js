@@ -74,6 +74,25 @@ const orderSchema = new Schema({
     payment_method: {
         type: String
     },
+    // Chi tiết thanh toán từ PayOS
+    payment_details: {
+        type: {
+            bin: { type: String },                  // Mã ngân hàng (bin)
+            accountNumber: { type: String },        // Số tài khoản thanh toán
+            accountName: { type: String },          // Tên người thanh toán
+            amount: { type: Number },               // Số tiền thanh toán
+            description: { type: String },          // Mô tả giao dịch
+            orderCode: { type: Number },            // Mã đơn hàng từ PayOS
+            currency: { type: String, default: 'VND' }, // Đơn vị tiền tệ
+            paymentLinkId: { type: String },        // ID của payment link
+            status: { type: String },               // Trạng thái thanh toán
+            transactionTime: { type: Date },        // Thời gian giao dịch 
+            paymentReference: { type: String },     // Mã tham chiếu thanh toán
+            payerName: { type: String },            // Tên người thanh toán (thay thế cho accountName)
+            qrCode: { type: String }                // Mã QR thanh toán
+        },
+        default: {}
+    },
     // Thời gian tạo đơn hàng
     created_at: {
         type: Date,

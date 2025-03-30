@@ -146,7 +146,7 @@ function googleAuth(req, res, next) {
 function googleAuthCallback(req, res, next) {
     passport.authenticate('google', { session: false }, async (err, user) => {
         if (err || !user) {
-            return res.redirect('http://localhost:3000/login?error=true');
+            return res.redirect(`${process.env.FRONTEND_URL}/login?error=true`);
         }
 
         try {
@@ -184,10 +184,10 @@ function googleAuthCallback(req, res, next) {
             };
 
             const userDataEncoded = encodeURIComponent(JSON.stringify(userData));
-            res.redirect(`http://localhost:3000/login?googleAuth=${userDataEncoded}`);
+            res.redirect(`${process.env.FRONTEND_URL}/login?googleAuth=${userDataEncoded}`);
         } catch (error) {
             console.error("Error in Google auth callback:", error);
-            return res.redirect('http://localhost:3000/login?error=true');
+            return res.redirect(`${process.env.FRONTEND_URL}/login?error=true`);
         }
     })(req, res, next);
 }

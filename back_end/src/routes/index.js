@@ -47,6 +47,5 @@ module.exports = {
     ProductAttributeRouter,
     GeminiRouter,
     PayOsRouter ,
-    ShopRevenueRouter,
-    UploadRouter
+    ShopRevenueRouter
 }

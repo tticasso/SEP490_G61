@@ -8,7 +8,8 @@ import {
   ChevronUp,
   Loader,
   X,
-  Eye // Thêm icon Eye
+  Eye, // Thêm icon Eye
+  Upload
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import ApiService from '../services/ApiService';
@@ -950,11 +951,14 @@ const VariantFormModal = ({ variant, isEditing, onClose, onSave }) => {
   );
 };
 
-// Edit Product Modal Component
+// Edit Product Modal Component - UPDATED WITH IMPROVED IMAGE UPLOAD
 const EditProductModal = ({ product, onClose, onUpdate }) => {
     const [editingProduct, setEditingProduct] = useState(null);
     const [formErrors, setFormErrors] = useState({});
     const [loading, setLoading] = useState(false);
+    
+    // Add new state for image file
+    const [imageFile, setImageFile] = useState(null);
     
     // State for categories and brands
     const [categories, setCategories] = useState([]);
@@ -1069,6 +1073,29 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
         }
     };
 
+    // Add image upload handler
+    const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Kiểm tra loại file
+            const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+
+            if (!validImageTypes.includes(file.type)) {
+                alert('Chỉ chấp nhận file hình ảnh (JPEG, JPG, PNG, GIF, WEBP)');
+                e.target.value = ''; // Reset input file
+                return;
+            }
+
+            console.log("File được chọn:", file.name, file.type, file.size);
+            setImageFile(file);
+            // Tạo URL tạm thời để preview
+            setEditingProduct({
+                ...editingProduct,
+                thumbnail: URL.createObjectURL(file)
+            });
+        }
+    };
+
     // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -1091,14 +1118,73 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
         
         try {
             setLoading(true);
-            const updatedProduct = await ApiService.put(`/product/edit/${editingProduct._id || editingProduct.id}`, editingProduct)
-                .catch(() => {
-                    // For demo, return mock response if API fails
-                    return {
-                        ...editingProduct,
-                        updatedAt: new Date().toISOString()
-                    };
-                });
+            
+            // Use FormData to support file uploads
+            const formData = new FormData();
+            
+            // Add all product fields to FormData
+            Object.keys(editingProduct).forEach(key => {
+                if (key === 'category_id' && Array.isArray(editingProduct[key])) {
+                    // Handle arrays specially for FormData
+                    editingProduct[key].forEach((catId, index) => {
+                        formData.append(`category_id[${index}]`, catId);
+                    });
+                } else if (key !== 'thumbnail' || (key === 'thumbnail' && !imageFile)) {
+                    // Don't append thumbnail if there's a new image file
+                    if (key === 'price' || key === 'weight') {
+                        formData.append(key, parseFloat(editingProduct[key]));
+                    } else {
+                        formData.append(key, editingProduct[key]);
+                    }
+                }
+            });
+            
+            // Add image file if exists
+            if (imageFile) {
+                formData.append('thumbnail', imageFile);
+                console.log("Đã thêm file ảnh:", imageFile.name);
+            } else if (editingProduct.thumbnail && !editingProduct.thumbnail.startsWith('blob:')) {
+                // If it's a real URL and not a temporary blob URL, add it to FormData
+                formData.append('thumbnail_url', editingProduct.thumbnail);
+                console.log("Giữ nguyên URL thumbnail cũ:", editingProduct.thumbnail);
+            }
+            
+            let updatedProduct;
+            try {
+                // Use put or putFormData depending on whether we have a file
+                if (imageFile) {
+                    updatedProduct = await ApiService.putFormData(
+                        `/product/edit/${editingProduct._id || editingProduct.id}`, 
+                        formData
+                    );
+                } else {
+                    // Convert FormData to regular object
+                    const productData = {};
+                    for (let [key, value] of formData.entries()) {
+                        // Handle nested array fields
+                        if (key.includes('[') && key.includes(']')) {
+                            const mainKey = key.split('[')[0];
+                            if (!productData[mainKey]) {
+                                productData[mainKey] = [];
+                            }
+                            productData[mainKey].push(value);
+                        } else {
+                            productData[key] = value;
+                        }
+                    }
+                    updatedProduct = await ApiService.put(
+                        `/product/edit/${editingProduct._id || editingProduct.id}`, 
+                        productData
+                    );
+                }
+            } catch (err) {
+                console.error('API error:', err);
+                // For demo fallback
+                updatedProduct = {
+                    ...editingProduct,
+                    updatedAt: new Date().toISOString()
+                };
+            }
             
             // Call onUpdate callback with updated product
             if (onUpdate) {
@@ -1307,31 +1393,43 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
                                 />
                             </div>
                             
-                            {/* Thumbnail */}
-                            <div>
+                            {/* Thumbnail - Updated to match AddProduct style */}
+                            <div className="col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    URL Hình ảnh
+                                    Hình ảnh sản phẩm
                                 </label>
-                                <input
-                                    type="text"
-                                    name="thumbnail"
-                                    value={editingProduct.thumbnail || ''}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                />
-                                {editingProduct.thumbnail && (
-                                    <div className="mt-2">
-                                        <img
-                                            src={editingProduct.thumbnail}
-                                            alt="Thumbnail preview"
-                                            className="h-20 w-20 object-cover border"
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = "/api/placeholder/50/50";
-                                            }}
-                                        />
-                                    </div>
-                                )}
+                                <div
+                                    className="border-dashed border-2 border-gray-300 p-4 rounded-md flex items-center justify-center cursor-pointer"
+                                    onClick={() => document.getElementById('edit-image-upload').click()}
+                                >
+                                    {editingProduct.thumbnail ? (
+                                        <div className="text-center">
+                                            <img
+                                                src={editingProduct.thumbnail}
+                                                alt="Product preview"
+                                                className="max-h-48 mx-auto mb-2"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = "/api/placeholder/200/200";
+                                                }}
+                                            />
+                                            <p className="text-sm text-gray-500">Nhấp để thay đổi hình ảnh</p>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center">
+                                            <Upload className="mx-auto mb-2 text-gray-400" size={32} />
+                                            <p className="text-gray-500">Upload or drop a file right here</p>
+                                            <p className="text-xs text-gray-400 mt-1">JPEG, PNG, GIF, JPG...</p>
+                                        </div>
+                                    )}
+                                    <input
+                                        id="edit-image-upload"
+                                        type="file"
+                                        className="hidden"
+                                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                                        onChange={handleImageUpload}
+                                    />
+                                </div>
                             </div>
                             
                             {/* Meta fields */}

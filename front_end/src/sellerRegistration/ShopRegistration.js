@@ -22,15 +22,12 @@ const ShopRegistration = () => {
   // State quản lý form
   const [formData, setFormData] = useState({
     name: '',
-    username: '',
+    username: '', // Thêm lại username nhưng sẽ tự động tạo từ email, không hiển thị trong UI
     phone: '',
     email: '',
     CCCD: '',
     address: '',
     description: '',
-    website: '',
-    nation_id: null,
-    province_id: null,
     logo: null,
     image_cover: null,
     identityCardImage: null, // Không có trong model nhưng cần cho quá trình xác minh
@@ -71,12 +68,19 @@ const ShopRegistration = () => {
         setUser(userData);
 
         // Pre-fill form với thông tin user
+        const email = userData.email || '';
+        let username = '';
+        
+        if (email) {
+          // Tạo username từ phần đầu của email và loại bỏ ký tự đặc biệt
+          username = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        }
+        
         setFormData(prev => ({
           ...prev,
-          email: userData.email || '',
+          email: email,
           phone: userData.phone || '',
-          // Tạo username từ email (loại bỏ @...)
-          username: userData.email ? userData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() : ''
+          username: username
         }));
 
         // Fetch danh mục
@@ -108,10 +112,23 @@ const ShopRegistration = () => {
   // Xử lý thay đổi input
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Tự động tạo username từ email nếu email thay đổi
+    if (name === 'email' && value) {
+      // Tạo username từ phần đầu của email và loại bỏ ký tự đặc biệt
+      const username = value.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        username: username
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   // Xử lý chọn danh mục
@@ -207,12 +224,11 @@ const ShopRegistration = () => {
         throw new Error('URL hình ảnh không hợp lệ');
       }
     } catch (error) {
-      throw new Error(`Không thể tải lên hình ảnh: ${error.message}`);
+      console.error(`Lỗi upload ảnh ${imageType}:`, error);
+      throw new Error(`Không thể tải lên hình ảnh: ${error.message || 'Lỗi không xác định'}`);
     }
   };
   
-  
-
   // Xử lý chuyển bước
   const handleNextStep = () => {
     setError(null);
@@ -224,7 +240,7 @@ const ShopRegistration = () => {
 
     if (currentStep === 2) {
       // Validate fields in step 2
-      const requiredFields = ['name', 'username', 'phone', 'email', 'CCCD', 'address'];
+      const requiredFields = ['name', 'phone', 'email', 'CCCD', 'address'];
       const missingFields = requiredFields.filter(field => !formData[field]);
 
       if (missingFields.length > 0) {
@@ -232,10 +248,27 @@ const ShopRegistration = () => {
         return;
       }
 
-      // Validate username format (no spaces, special chars)
-      const usernameRegex = /^[a-zA-Z0-9_]+$/;
-      if (!usernameRegex.test(formData.username)) {
-        setError('Username chỉ được chứa chữ cái, số và dấu gạch dưới');
+      // Tạo hoặc cập nhật username từ email
+      if (formData.email && (!formData.username || formData.username.trim() === '')) {
+        const generatedUsername = formData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        setFormData(prev => ({
+          ...prev,
+          username: generatedUsername
+        }));
+        console.log("Auto-generated username from email:", generatedUsername);
+      }
+
+      // Validate CCCD format (exactly 12 digits)
+      const cccdRegex = /^\d{12}$/;
+      if (!cccdRegex.test(formData.CCCD)) {
+        setError('Số CCCD phải có đúng 12 chữ số');
+        return;
+      }
+
+      // Validate phone format (Vietnamese phone number: starts with 0 and has 10 digits)
+      const phoneRegex = /^(0[3-9])[0-9]{8}$/;
+      if (!phoneRegex.test(formData.phone)) {
+        setError('Số điện thoại không hợp lệ. Phải có 10 chữ số và bắt đầu bằng 0');
         return;
       }
 
@@ -266,8 +299,10 @@ const ShopRegistration = () => {
     }
   };
 
-  // Xử lý submit form - Cập nhật để tích hợp uploadImage
+  // Xử lý submit form - Cập nhật để tích hợp uploadImage và xử lý lỗi tốt hơn
   const handleSubmit = async () => {
+    console.log("handleSubmit called");
+    
     if (!AuthService.isLoggedIn()) {
       setError('Bạn cần đăng nhập để thực hiện chức năng này');
       navigate('/login', { state: { from: '/shop/register' } });
@@ -277,6 +312,19 @@ const ShopRegistration = () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Debug trước khi bắt đầu
+      console.log("Form data before submission:", JSON.stringify(formData, null, 2));
+      
+      // Kiểm tra lại username
+      if (!formData.username && formData.email) {
+        const generatedUsername = formData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        console.log("Re-generating username at submission time:", generatedUsername);
+        setFormData(prev => ({
+          ...prev,
+          username: generatedUsername
+        }));
+      }
 
       // Debug user object
       const user = AuthService.getCurrentUser();
@@ -297,7 +345,7 @@ const ShopRegistration = () => {
           logoUrl = await uploadShopImage(logoFile, 'logo');
         } catch (err) {
           console.error("Lỗi upload logo:", err);
-          throw new Error("Không thể tải lên logo: " + err.message);
+          throw new Error("Không thể tải lên logo: " + (err.message || 'Lỗi không xác định'));
         }
       }
       
@@ -308,7 +356,7 @@ const ShopRegistration = () => {
           coverUrl = await uploadShopImage(coverFile, 'cover');
         } catch (err) {
           console.error("Lỗi upload ảnh bìa:", err);
-          throw new Error("Không thể tải lên ảnh bìa: " + err.message);
+          throw new Error("Không thể tải lên ảnh bìa: " + (err.message || 'Lỗi không xác định'));
         }
       }
       
@@ -319,7 +367,7 @@ const ShopRegistration = () => {
           identityUrl = await uploadShopImage(identityFile, 'identity');
         } catch (err) {
           console.error("Lỗi upload CMND/CCCD:", err);
-          throw new Error("Không thể tải lên CMND/CCCD: " + err.message);
+          throw new Error("Không thể tải lên CMND/CCCD: " + (err.message || 'Lỗi không xác định'));
         }
       }
       
@@ -330,43 +378,112 @@ const ShopRegistration = () => {
           licenseUrl = await uploadShopImage(licenseFile, 'license');
         } catch (err) {
           console.error("Lỗi upload giấy phép:", err);
-          throw new Error("Không thể tải lên giấy phép kinh doanh: " + err.message);
+          throw new Error("Không thể tải lên giấy phép kinh doanh: " + (err.message || 'Lỗi không xác định'));
         }
       }
 
       // 5. Tạo shop mới với URL hình ảnh
+      // Tạo username từ email TRƯỚC KHI tạo shopData
+      let usernameValue = formData.username || '';
+      if (!usernameValue && formData.email) {
+        usernameValue = formData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        console.log("Generated username:", usernameValue);
+      }
+      
       const shopData = {
         name: formData.name,
-        username: formData.username,
+        username: usernameValue, // Đảm bảo username luôn có giá trị
         phone: formData.phone,
         email: formData.email,
         CCCD: formData.CCCD,
         address: formData.address,
         description: formData.description || '',
-        website: formData.website || '',
-        nation_id: formData.nation_id || null,
-        province_id: formData.province_id || null,
         logo: logoUrl,
         image_cover: coverUrl,
         identity_card_image: identityUrl,
         business_license: licenseUrl
       };
+      
+      // Log để debug
+      console.log("Sending request to create shop with data:", JSON.stringify(shopData, null, 2));
 
-      console.log("Sending request to create shop with data:", shopData);
+      // Kiểm tra xem dữ liệu có đầy đủ các trường bắt buộc không
+      const requiredFields = ['name', 'username', 'phone', 'email', 'CCCD', 'address'];
+      const missingFields = requiredFields.filter(field => !shopData[field]);
       
+      if (missingFields.length > 0) {
+        throw new Error(`Thiếu thông tin bắt buộc: ${missingFields.join(', ')}`);
+      }
+
       // Gọi API tạo shop
-      const response = await ApiService.post('/shops/create', shopData);
-      console.log("Shop creation successful:", response);
-      
-      // Lấy shopId
-      const shopId = response.shop._id;
-      
-      // 6. Lưu danh mục cửa hàng
+      let shopId;
       try {
-        await ApiService.post(`/shop-categories/${shopId}`, { categoryIds: selectedCategories });
-      } catch (err) {
-        console.error("Error saving shop categories:", err);
-        // Không throw lỗi, vì shop đã được tạo thành công
+        // Đảm bảo có username trước khi gửi API
+        if (!shopData.username && shopData.email) {
+          shopData.username = shopData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        }
+        
+        // Log dữ liệu chi tiết để kiểm tra
+        console.log("Final data being sent to API:", JSON.stringify(shopData, null, 2));
+        
+        // Kiểm tra lại một lần nữa xem có username không
+        if (!shopData.username) {
+          throw new Error('Thiếu trường username bắt buộc');
+        }
+        
+        const response = await ApiService.post('/shops/create', shopData);
+        console.log("Shop creation successful:", response);
+        
+        // Kiểm tra xem response có hợp lệ không
+        if (!response || !response.shop || !response.shop._id) {
+          throw new Error('Phản hồi từ server không hợp lệ hoặc thiếu thông tin shop');
+        }
+        
+        shopId = response.shop._id;
+      } catch (apiError) {
+        console.error("API Error details:", apiError);
+        
+        // Log chi tiết về lỗi
+        if (apiError.response) {
+          console.error("Response status:", apiError.response.status);
+          console.error("Response data:", apiError.response.data);
+        }
+        
+        // Kiểm tra các trường hợp lỗi cụ thể
+        if (apiError.response && apiError.response.status === 400) {
+          // Lỗi dữ liệu không hợp lệ
+          if (apiError.response.data && apiError.response.data.message) {
+            throw new Error(`Lỗi từ server: ${apiError.response.data.message}`);
+          } else {
+            throw new Error('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.');
+          }
+        } else if (apiError.response && apiError.response.status === 409) {
+          // Lỗi xung đột (username hoặc email đã tồn tại)
+          throw new Error('Tên đăng nhập hoặc email đã được sử dụng cho cửa hàng khác.');
+        } else if (apiError.response && apiError.response.status === 401) {
+          // Lỗi xác thực
+          throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        } else {
+          // Các lỗi khác
+          if (apiError.message) {
+            throw new Error(`Lỗi khi tạo cửa hàng: ${apiError.message}`);
+          } else {
+            throw new Error('Không thể tạo cửa hàng. Vui lòng kiểm tra lại thông tin và thử lại sau.');
+          }
+        }
+      }
+      
+      // 6. Lưu danh mục cửa hàng (chỉ thực hiện nếu có shopId)
+      if (shopId) {
+        try {
+          await ApiService.post(`/shop-categories/${shopId}`, { categoryIds: selectedCategories });
+          console.log("Shop categories saved successfully");
+        } catch (err) {
+          console.error("Error saving shop categories:", err);
+          // Không throw lỗi, vì shop đã được tạo thành công
+        }
+      } else {
+        console.error("Cannot save shop categories: shopId is undefined");
       }
 
       // 7. Cập nhật thông tin người dùng
@@ -382,16 +499,22 @@ const ShopRegistration = () => {
 
       // 8. Chuyển hướng sau khi đăng ký thành công
       setTimeout(() => {
-        navigate('/shop/my-shop');
+        navigate('/');
       }, 3000);
 
     } catch (error) {
       console.error('Error in shop registration:', error);
-      setError(error.message || 'Có lỗi xảy ra khi đăng ký cửa hàng');
+      
+      // Đảm bảo error.message tồn tại trước khi sử dụng
+      const errorMessage = error && typeof error === 'object' && error.message ? 
+        error.message : 'Có lỗi xảy ra khi đăng ký cửa hàng';
+      setError(errorMessage);
 
-      if (error.message.includes('đăng nhập') ||
+      // Kiểm tra xem error.message có tồn tại không trước khi sử dụng includes
+      if (error && typeof error === 'object' && error.message && (
+        error.message.includes('đăng nhập') ||
         error.message.includes('token') ||
-        error.message.includes('Unauthorized')) {
+        error.message.includes('Unauthorized'))) {
         setTimeout(() => {
           navigate('/login', { state: { from: '/shop/register' } });
         }, 2000);
@@ -422,7 +545,7 @@ const ShopRegistration = () => {
         <CheckCircle className="mr-2 flex-shrink-0 mt-0.5" size={18} />
         <div>
           <p className="font-medium">Đăng ký cửa hàng thành công!</p>
-          <p>Chúng tôi đang xem xét thông tin của bạn và sẽ liên hệ trong vòng 24h. Bạn sẽ được chuyển hướng đến trang quản lý cửa hàng...</p>
+          <p>Chúng tôi đang xem xét thông tin của bạn và sẽ liên hệ trong vòng 24h. Bạn sẽ được chuyển hướng về trang chủ sau 5 giây...</p>
         </div>
       </div>
     );
@@ -499,19 +622,6 @@ const ShopRegistration = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập *</label>
-              <input
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">Tên đăng nhập phải là duy nhất, không chứa khoảng trắng và ký tự đặc biệt</p>
-            </div>
-
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả cửa hàng</label>
               <textarea
                 name="description"
@@ -531,7 +641,9 @@ const ShopRegistration = () => {
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 required
+                placeholder="Nhập 10 số, bắt đầu bằng số 0"
               />
+              <p className="text-xs text-gray-500 mt-1">Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0</p>
             </div>
 
             <div>
@@ -569,50 +681,9 @@ const ShopRegistration = () => {
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 required
+                placeholder="Nhập 12 chữ số"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-              <input
-                type="url"
-                name="website"
-                value={formData.website}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quốc gia</label>
-                <select
-                  name="nation_id"
-                  value={formData.nation_id || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Chọn quốc gia</option>
-                  <option value="1">Việt Nam</option>
-                  {/* Thêm các quốc gia khác nếu cần */}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tỉnh/Thành phố</label>
-                <select
-                  name="province_id"
-                  value={formData.province_id || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Chọn tỉnh/thành</option>
-                  <option value="1">Hà Nội</option>
-                  <option value="2">TP. Hồ Chí Minh</option>
-                  <option value="3">Đà Nẵng</option>
-                  {/* Thêm các tỉnh thành khác */}
-                </select>
-              </div>
+              <p className="text-xs text-gray-500 mt-1">Số CCCD phải có đúng 12 chữ số</p>
             </div>
           </div>
         </div>

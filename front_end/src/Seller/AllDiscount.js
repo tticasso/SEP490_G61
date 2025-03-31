@@ -1297,12 +1297,7 @@ const AllDiscount = () => {
           )}
 
           {/* Floating Add Button */}
-          <button
-            className="fixed bottom-8 right-8 bg-red-500 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:bg-red-600"
-            onClick={handleCreateDiscount}
-          >
-            <Plus size={24} />
-          </button>
+          
         </div>
       </div>
 

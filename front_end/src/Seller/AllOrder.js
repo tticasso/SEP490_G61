@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, Eye, CheckCircle, X, Loader } from 'lucide-react';
+import { Search, ArrowLeft, Eye, CheckCircle, X, Loader, AlertTriangle } from 'lucide-react';
 import Sidebar from './Sidebar';
 import ApiService from '../services/ApiService';
 import AuthService from '../services/AuthService';
@@ -77,6 +77,8 @@ const OrderDetailModal = ({ orderId, onClose }) => {
     });
   };
 
+  const effectiveStatus = orderData?.order?.order_status || orderData?.order?.status_id;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
@@ -115,8 +117,8 @@ const OrderDetailModal = ({ orderId, onClose }) => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Trạng thái:</p>
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full text-white ${getStatusClass(orderData.order.status_id)}`}>
-                    {translateStatus(orderData.order.status_id)}
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full text-white ${getStatusClass(effectiveStatus)}`}>
+                    {translateStatus(effectiveStatus)}
                   </span>
                 </div>
                 <div>
@@ -260,6 +262,44 @@ const OrderDetailModal = ({ orderId, onClose }) => {
   );
 };
 
+// Reject Order Confirmation Modal
+const RejectOrderModal = ({ onClose, onConfirm }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-medium">Xác nhận từ chối đơn hàng</h3>
+          <button
+            className="text-gray-400 hover:text-gray-600"
+            onClick={onClose}
+          >
+            <X size={24} />
+          </button>
+        </div>
+        
+        <div className="mb-6">
+          <p className="text-gray-600 mb-4">Bạn có chắc chắn muốn từ chối đơn hàng này không? Hành động này không thể hoàn tác.</p>
+        </div>
+        
+        <div className="flex justify-end space-x-3">
+          <button
+            className="px-4 py-2 border rounded-md hover:bg-gray-100"
+            onClick={onClose}
+          >
+            Hủy
+          </button>
+          <button
+            className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+            onClick={() => onConfirm()}
+          >
+            Xác nhận từ chối
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Main Component
 const AllOrders = () => {
   const navigate = useNavigate();
@@ -272,6 +312,7 @@ const AllOrders = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [rejectOrderId, setRejectOrderId] = useState(null);
 
   // Get seller shop ID from API
   const getShopId = async () => {
@@ -303,6 +344,118 @@ const AllOrders = () => {
       console.error("Error fetching shop:", error);
       setError("Không tìm thấy thông tin shop. Vui lòng đăng nhập lại.");
       return null;
+    }
+  };
+
+  // Helper function to translate status
+  const translateStatus = (statusId) => {
+    const statusMap = {
+      'pending': 'Chờ xác nhận',
+      'processing': 'Đang xử lý',
+      'shipped': 'Đang vận chuyển',
+      'delivered': 'Đã giao hàng',
+      'cancelled': 'Đã hủy'
+    };
+    return statusMap[statusId] || statusId;
+  };
+
+  // Helper function to determine status class for styling
+  const getStatusClass = (statusId) => {
+    const statusClassMap = {
+      'pending': 'bg-yellow-500',
+      'processing': 'bg-blue-500',
+      'shipped': 'bg-purple-500',
+      'delivered': 'bg-green-500',
+      'cancelled': 'bg-red-500'
+    };
+    return statusClassMap[statusId] || 'bg-gray-500';
+  };
+
+  // Format price to VND
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('vi-VN', { 
+      style: 'currency', 
+      currency: 'VND',
+      maximumFractionDigits: 0
+    }).format(price).replace('₫', 'đ');
+  };
+
+  // Refresh orders function
+  const refreshOrders = async () => {
+    try {
+      setLoading(true);
+      const shopId = await getShopId();
+      
+      if (!shopId) {
+        setLoading(false);
+        return;
+      }
+      
+      let response;
+      try {
+        response = await ApiService.get(`/order/shop/${shopId}`);
+      } catch (endpointError) {
+        console.log(`First endpoint failed, trying alternative: ${endpointError}`);
+        try {
+          response = await ApiService.get(`/order/shop/${shopId}`);
+        } catch (altEndpointError) {
+          console.log(`Alternative endpoint failed: ${altEndpointError}`);
+          response = await ApiService.get('/orders/my-orders');
+        }
+      }
+      
+      console.log("Orders refreshed:", response);
+      
+      if (!response || response.length === 0) {
+        setOrders([]);
+        setTotalOrders(0);
+        setTotalPages(1);
+        setLoading(false);
+        return;
+      }
+
+      const shopOrders = response.map(item => {
+        const formattedDate = new Date(item.order.created_at).toLocaleString('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+
+        const sellerTotal = item.orderDetails.reduce((sum, detail) => {
+          return sum + (detail.price * detail.quantity);
+        }, 0);
+        
+        // IMPORTANT: Check both status fields to determine the true status
+        const effectiveStatus = item.order.order_status || item.order.status_id;
+        
+        return {
+          id: item.order.id,
+          orderId: item.order._id,
+          status: translateStatus(effectiveStatus),
+          statusId: effectiveStatus,
+          discount: item.order.discount_id ? "Có" : "Không",
+          orderTime: formattedDate,
+          total: formatPrice(sellerTotal),
+          statusClass: getStatusClass(effectiveStatus),
+          customerName: item.order.customer_id ? 
+            `${item.order.customer_id.firstName} ${item.order.customer_id.lastName}` : 
+            "Không có thông tin",
+          isConfirmed: item.order.is_confirmed || effectiveStatus !== 'pending',
+          rawData: item
+        };
+      });
+
+      setOrders(shopOrders);
+      setTotalOrders(shopOrders.length);
+      setTotalPages(Math.ceil(shopOrders.length / itemsPerPage));
+      
+    } catch (error) {
+      console.error("Error refreshing orders:", error);
+      setError("Không thể tải lại danh sách đơn hàng.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -364,19 +517,23 @@ const AllOrders = () => {
           const sellerTotal = item.orderDetails.reduce((sum, detail) => {
             return sum + (detail.price * detail.quantity);
           }, 0);
+          
+          // IMPORTANT: Check both status fields to determine the true status
+          const effectiveStatus = item.order.order_status || item.order.status_id;
 
           return {
             id: item.order.id,
             orderId: item.order._id, // MongoDB ObjectId
-            status: translateStatus(item.order.status_id),
+            status: translateStatus(effectiveStatus),
+            statusId: effectiveStatus, // Use effective status
             discount: item.order.discount_id ? "Có" : "Không",
             orderTime: formattedDate,
             total: formatPrice(sellerTotal),
-            statusClass: getStatusClass(item.order.status_id),
+            statusClass: getStatusClass(effectiveStatus),
             customerName: item.order.customer_id ? 
               `${item.order.customer_id.firstName} ${item.order.customer_id.lastName}` : 
               "Không có thông tin",
-            isConfirmed: item.order.is_confirmed || false, // Add confirmation status
+            isConfirmed: item.order.is_confirmed || effectiveStatus !== 'pending',
             rawData: item // Keep raw data for detailed view
           };
         });
@@ -394,39 +551,6 @@ const AllOrders = () => {
 
     fetchOrders();
   }, []);
-
-  // Helper function to translate status
-  const translateStatus = (statusId) => {
-    const statusMap = {
-      'pending': 'Chờ xác nhận',
-      'processing': 'Đang xử lý',
-      'shipped': 'Đang vận chuyển',
-      'delivered': 'Đã giao hàng',
-      'cancelled': 'Đã hủy'
-    };
-    return statusMap[statusId] || statusId;
-  };
-
-  // Helper function to determine status class for styling
-  const getStatusClass = (statusId) => {
-    const statusClassMap = {
-      'pending': 'bg-yellow-500',
-      'processing': 'bg-blue-500',
-      'shipped': 'bg-purple-500',
-      'delivered': 'bg-green-500',
-      'cancelled': 'bg-red-500'
-    };
-    return statusClassMap[statusId] || 'bg-gray-500';
-  };
-
-  // Format price to VND
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', { 
-      style: 'currency', 
-      currency: 'VND',
-      maximumFractionDigits: 0
-    }).format(price).replace('₫', 'đ');
-  };
 
   // Filter orders based on search term
   const filteredOrders = orders.filter(order => {
@@ -460,60 +584,56 @@ const AllOrders = () => {
     try {
       console.log(`Xác nhận đơn hàng: ${orderId}`);
       
-      // Sử dụng đúng endpoint và status_id hợp lệ
-      // Từ lỗi và code trước đó, ta thấy 'confirmed' không hợp lệ
-      // Giá trị hợp lệ phải là: 'pending', 'processing', 'shipped', 'delivered', 'cancelled'
+      // Get shop ID
+      const shopId = await getShopId();
+      
+      // FIXED: Use correct field name 'order_status' instead of 'status_id'
       const response = await ApiService.put(`/order/status/${orderId}`, {
-        status_id: 'processing', // Sử dụng trạng thái hợp lệ
-        shop_id: await getShopId()
+        order_status: 'processing', // Changed from status_id to order_status
+        shop_id: shopId
       });
       
       console.log("Xác nhận đơn hàng thành công:", response);
       
-      // Cập nhật state để hiển thị trạng thái đã xác nhận
-      setOrders(orders.map(order => {
-        if (order.orderId === orderId) {
-          return {
-            ...order,
-            isConfirmed: true,
-            status: translateStatus('processing'), // Translate để hiển thị tiếng Việt
-            statusClass: getStatusClass('processing')
-          };
-        }
-        return order;
-      }));
-      
-      // Hiển thị thông báo thành công
+      // Show success message
       alert(`Đã xác nhận đơn hàng thành công`);
+      
+      // Refresh orders to get the updated data from the server
+      await refreshOrders();
+      
     } catch (error) {
       console.error("Lỗi khi xác nhận đơn hàng:", error);
       alert(`Lỗi khi xác nhận đơn hàng: ${error.message || "Đã xảy ra lỗi"}`);
     }
   };
 
-  // Handle update order status
-  const handleUpdateStatus = async (orderId, newStatus) => {
+  // Handle reject order
+  const handleRejectOrder = (orderId) => {
+    setRejectOrderId(orderId);
+  };
+
+  // Handle confirm reject order
+  const handleConfirmReject = async () => {
     try {
-      await ApiService.put(`/orders/status/${orderId}`, {
-        status_id: newStatus
-      });
+      console.log(`Từ chối đơn hàng: ${rejectOrderId}`);
       
-      // Update local state to reflect the change
-      setOrders(orders.map(order => {
-        if (order.orderId === orderId) {
-          return {
-            ...order,
-            status: translateStatus(newStatus),
-            statusClass: getStatusClass(newStatus)
-          };
-        }
-        return order;
-      }));
+      // Use the dedicated seller rejection endpoint
+      const response = await ApiService.put(`/order/reject/${rejectOrderId}`);
+      
+      console.log("Từ chối đơn hàng thành công:", response);
       
       // Show success message
-      alert(`Đã cập nhật trạng thái đơn hàng thành ${translateStatus(newStatus)}`);
+      alert(`Đã từ chối đơn hàng thành công`);
+      
+      // Close the modal
+      setRejectOrderId(null);
+      
+      // Refresh orders to get the updated status from the server
+      await refreshOrders();
+      
     } catch (error) {
-      alert(`Lỗi khi cập nhật trạng thái: ${error}`);
+      console.error("Lỗi khi từ chối đơn hàng:", error);
+      alert(`Lỗi khi từ chối đơn hàng: ${error.message || "Đã xảy ra lỗi"}`);
     }
   };
 
@@ -629,15 +749,25 @@ const AllOrders = () => {
                             <Eye size={18} />
                           </button>
                           
-                          {/* Confirm order button - only show if status is pending */}
-                          {order.status === 'Chờ xác nhận' && (
-                            <button 
-                              className="text-green-600 hover:text-green-900"
-                              onClick={() => handleConfirmOrder(order.orderId)}
-                              title="Xác nhận đơn hàng"
-                            >
-                              <CheckCircle size={18} />
-                            </button>
+                          {/* Confirm & Reject buttons - only show if status is pending */}
+                          {order.statusId === 'pending' && (
+                            <>
+                              <button 
+                                className="text-green-600 hover:text-green-900"
+                                onClick={() => handleConfirmOrder(order.orderId)}
+                                title="Xác nhận đơn hàng"
+                              >
+                                <CheckCircle size={18} />
+                              </button>
+                              
+                              <button 
+                                className="text-red-600 hover:text-red-900"
+                                onClick={() => handleRejectOrder(order.orderId)}
+                                title="Từ chối đơn hàng"
+                              >
+                                <AlertTriangle size={18} />
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -706,6 +836,14 @@ const AllOrders = () => {
         <OrderDetailModal 
           orderId={selectedOrderId} 
           onClose={() => setSelectedOrderId(null)} 
+        />
+      )}
+
+      {/* Reject order confirmation modal */}
+      {rejectOrderId && (
+        <RejectOrderModal
+          onClose={() => setRejectOrderId(null)}
+          onConfirm={handleConfirmReject}
         />
       )}
     </div>

@@ -24,6 +24,9 @@ orderRouter.put("/status/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdminOrSeller
 // Hủy đơn hàng
 orderRouter.put("/cancel/:id", [VerifyJwt.verifyToken], orderController.cancelOrder)
 
+//  Từ chối đơn hàng (dành cho seller)
+orderRouter.put("/reject/:id", [VerifyJwt.verifyToken, VerifyJwt.isSeller], orderController.rejectOrderBySeller)
+
 // Xóa đơn hàng (xóa mềm) (chỉ admin có quyền)
 orderRouter.delete("/delete/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], orderController.deleteOrder)
 

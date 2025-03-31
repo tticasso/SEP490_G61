@@ -134,7 +134,7 @@ const createProduct = async (req, res) => {
         } = req.body;
 
         console.log("Received request body:", req.body);
-        
+
 
         // Sử dụng URL Cloudinary từ request.file.path
         // Lưu ý: Trong trường hợp upload qua middleware Cloudinary, file.path sẽ chứa URL đầy đủ
@@ -568,7 +568,49 @@ const getProductWithVariants = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+// Toggle product status (active/inactive)
+const toggleProductStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { is_active } = req.body;
 
+        if (is_active === undefined) {
+            return res.status(400).json({ message: "is_active status is required" });
+        }
+
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({ message: "Product not found" });
+        }
+
+        // Check permissions (only shop owner or admin)
+        const shop = await Shop.findById(product.shop_id);
+        if (!shop) {
+            return res.status(404).json({ message: "Shop not found for this product" });
+        }
+
+        if (!req.isAdmin && shop.user_id.toString() !== req.userId.toString()) {
+            return res.status(403).json({ message: "You don't have permission to update this product" });
+        }
+
+        // Update the product status
+        product.is_active = is_active;
+        product.updated_at = Date.now();
+        if (req.userId) {
+            product.updated_by = req.userId;
+        }
+
+        await product.save();
+
+        res.status(200).json({
+            message: `Product status updated to ${is_active ? 'active' : 'inactive'}`,
+            product
+        });
+    } catch (error) {
+        console.error("Error toggling product status:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
 const productController = {
     getAllProducts,
     getProductById,
@@ -582,6 +624,7 @@ const productController = {
     restoreProduct,
     bulkSoftDeleteProducts,
     bulkRestoreProducts,
+    toggleProductStatus,
     handleProductImageUpload // Export the middleware for routes
 };
 

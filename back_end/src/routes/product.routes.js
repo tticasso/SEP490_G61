@@ -32,4 +32,5 @@ ProductRouter.put("/restore/:id", [VerifyJwt.verifyToken], productController.res
 ProductRouter.post("/bulk-soft-delete", [VerifyJwt.verifyToken], productController.bulkSoftDeleteProducts);
 ProductRouter.post("/bulk-restore", [VerifyJwt.verifyToken], productController.bulkRestoreProducts);
 
+ProductRouter.put("/toggle-status/:id", [VerifyJwt.verifyToken], productController.toggleProductStatus);
 module.exports = ProductRouter

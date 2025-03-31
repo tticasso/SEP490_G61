@@ -49,13 +49,29 @@ async function isSeller(req, res, next) {
         if (!existUser) {
             throw createHttpError.Forbidden("User not found");
         }
+        
         const roles = await Role.find({ _id: { $in: existUser.roles } });
         if (!roles) {
             throw createHttpError.Forbidden("Forbidden access");
         }
+        
         if (roles.some(role => role.name === "SELLER")) {
+            // Find the seller's shop and attach its ID to the request
+            try {
+                const shop = await Shop.findOne({ user_id: req.userId });
+                if (shop) {
+                    req.shop_id = shop._id.toString();
+                    console.log(`Seller middleware: Found shop ID ${req.shop_id} for user ${req.userId}`);
+                } else {
+                    console.log(`Seller middleware: No shop found for user ${req.userId}`);
+                }
+            } catch (shopError) {
+                console.error("Error finding seller's shop:", shopError);
+            }
+            
             return next(); 
         }
+        
         throw createHttpError.Unauthorized("Require Seller role!");
     } catch (error) {
         next(error);

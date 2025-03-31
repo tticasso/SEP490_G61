@@ -730,6 +730,141 @@ const getOrdersByShopId = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+// Từ chối đơn hàng bởi người bán (seller)
+const rejectOrderBySeller = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Check if shop_id exists in request
+        if (!req.shop_id) {
+            console.error("Shop ID not found in request");
+            return res.status(403).json({
+                message: "Không thể xác định shop của bạn. Vui lòng thử lại."
+            });
+        }
+
+        console.log(`Processing rejection for order ${id} by shop ${req.shop_id}`);
+
+        // Kiểm tra đơn hàng có tồn tại không
+        const order = await Order.findById(id);
+        if (!order) {
+            return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+        }
+
+        // Kiểm tra trạng thái đơn hàng
+        if (order.status_id !== 'pending' && order.order_status !== 'pending') {
+            return res.status(400).json({
+                message: "Chỉ có thể từ chối đơn hàng ở trạng thái chờ xác nhận"
+            });
+        }
+
+        // Kiểm tra xem seller có quyền từ chối đơn hàng này không
+        const orderDetails = await OrderDetail.find({ order_id: order._id })
+            .populate({
+                path: 'product_id',
+                select: 'shop_id name'
+            });
+
+        console.log(`Found ${orderDetails.length} order details`);
+
+        // Log each product to debug
+        orderDetails.forEach((detail, index) => {
+            console.log(`Product ${index + 1}:`,
+                detail.product_id ?
+                    `ID: ${detail.product_id._id}, Name: ${detail.product_id.name}, Shop: ${detail.product_id.shop_id}` :
+                    'No product_id');
+        });
+
+        // Lọc ra các sản phẩm thuộc về shop của seller
+        const shopProducts = orderDetails.filter(detail =>
+            detail.product_id &&
+            detail.product_id.shop_id &&
+            detail.product_id.shop_id.toString() === req.shop_id
+        );
+
+        console.log(`Found ${shopProducts.length} products belonging to shop ${req.shop_id}`);
+
+        if (shopProducts.length === 0) {
+            return res.status(403).json({
+                message: "Bạn không có quyền từ chối đơn hàng này"
+            });
+        }
+
+        // Cập nhật trạng thái đơn hàng
+
+        order.order_status = 'cancelled';
+        order.updated_at = new Date();
+
+        await order.save();
+        console.log(`Order ${id} status updated to cancelled`);
+
+        // Hoàn trả tồn kho cho các sản phẩm của seller
+        for (const detail of shopProducts) {
+            const product = await Product.findById(detail.product_id._id);
+            if (product) {
+                product.stock += detail.quantity;
+                await product.save();
+                console.log(`Restored ${detail.quantity} units to product ${product._id}`);
+            }
+
+            // Cập nhật tồn kho biến thể nếu có
+            if (detail.variant_id) {
+                try {
+                    const variant = await db.productVariant.findById(detail.variant_id);
+                    if (variant) {
+                        variant.stock += detail.quantity;
+                        await variant.save();
+                        console.log(`Restored ${detail.quantity} units to variant ${variant._id}`);
+                    }
+                } catch (err) {
+                    console.log(`Không thể cập nhật tồn kho biến thể: ${err.message}`);
+                }
+            }
+        }
+
+        // Hoàn trả lượt sử dụng mã giảm giá/coupon
+        if (shopProducts.length === orderDetails.length) {
+            if (order.discount_id) {
+                const discount = await Discount.findById(order.discount_id);
+                if (discount && discount.history && discount.history[order.customer_id]) {
+                    discount.history[order.customer_id] -= 1;
+                    if (discount.history[order.customer_id] <= 0) {
+                        delete discount.history[order.customer_id];
+                    }
+                    await discount.save();
+                    console.log(`Restored discount usage for customer ${order.customer_id}`);
+                }
+            }
+
+            if (order.coupon_id) {
+                const coupon = await Coupon.findById(order.coupon_id);
+                if (coupon && coupon.history && coupon.history.has(order.customer_id.toString())) {
+                    const currentCount = coupon.history.get(order.customer_id.toString());
+                    if (currentCount <= 1) {
+                        coupon.history.delete(order.customer_id.toString());
+                    } else {
+                        coupon.history.set(order.customer_id.toString(), currentCount - 1);
+                    }
+                    await coupon.save();
+                    console.log(`Restored coupon usage for customer ${order.customer_id}`);
+                }
+            }
+        }
+
+        res.status(200).json({
+            message: "Đã từ chối đơn hàng thành công",
+            order: {
+                id: order.id,
+                _id: order._id,
+                status_id: order.status_id,
+                order_status: order.order_status
+            }
+        });
+    } catch (error) {
+        console.error("Lỗi khi từ chối đơn hàng:", error);
+        res.status(500).json({ message: error.message || "Đã xảy ra lỗi khi từ chối đơn hàng" });
+    }
+};
 
 const orderController = {
     getAllOrders,
@@ -740,7 +875,8 @@ const orderController = {
     cancelOrder,
     deleteOrder,
     getOrderStatistics,
-    getOrdersByShopId
+    getOrdersByShopId,
+    rejectOrderBySeller
 };
 
 module.exports = orderController;

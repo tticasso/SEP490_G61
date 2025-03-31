@@ -435,6 +435,14 @@ const VariantFormModal = ({ variant, isEditing, onClose, onSave }) => {
       variant.attributes || {}
     )
   });
+  
+  // Validation state for form fields
+  const [validationErrors, setValidationErrors] = useState({
+    name: false,
+    price: false,
+    stock: false,
+    sku: false
+  });
 
   const [attrName, setAttrName] = useState('');
   const [attrValue, setAttrValue] = useState('');
@@ -497,10 +505,37 @@ const VariantFormModal = ({ variant, isEditing, onClose, onSave }) => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    const newValue = type === 'checkbox' ? checked : value;
+    
     setFormData({
       ...formData,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: newValue
     });
+    
+    // Clear validation errors when field is changed
+    if (validationErrors[name]) {
+      setValidationErrors({
+        ...validationErrors,
+        [name]: false
+      });
+    }
+    
+    // Live validation for price and stock
+    if (name === 'price') {
+      const priceValue = parseFloat(value);
+      setValidationErrors({
+        ...validationErrors,
+        price: isNaN(priceValue) || priceValue <= 0
+      });
+    }
+    
+    if (name === 'stock') {
+      const stockValue = parseInt(value, 10);
+      setValidationErrors({
+        ...validationErrors,
+        stock: isNaN(stockValue) || stockValue < 0
+      });
+    }
   };
 
   useEffect(() => {
@@ -561,21 +596,66 @@ const VariantFormModal = ({ variant, isEditing, onClose, onSave }) => {
     e.preventDefault();
     setError(null);
     setConnectionError(false);
+    
+    // Reset validation errors
+    const newValidationErrors = {
+      name: false,
+      price: false,
+      stock: false,
+      sku: false
+    };
+    
+    let hasError = false;
 
+    // Validate variant name
     if (!formData.name || !formData.name.trim()) {
       setError('Tên biến thể không được để trống');
-      return;
+      newValidationErrors.name = true;
+      hasError = true;
     }
 
-    if (!formData.price || parseFloat(formData.price) <= 0) {
-      setError('Giá phải lớn hơn 0');
-      return;
+    // Validate price - ensure it's a valid number greater than 0
+    if (!formData.price) {
+      setError('Vui lòng nhập giá sản phẩm');
+      newValidationErrors.price = true;
+      hasError = true;
+    } else {
+      const price = parseFloat(formData.price);
+      if (isNaN(price) || price <= 0) {
+        setError('Giá sản phẩm phải là số dương và lớn hơn 0');
+        newValidationErrors.price = true;
+        hasError = true;
+      }
     }
 
+    // Validate stock - ensure it's a valid number and not negative
+    if (formData.stock === undefined || formData.stock === null || formData.stock === '') {
+      setError('Vui lòng nhập số lượng tồn kho');
+      newValidationErrors.stock = true;
+      hasError = true;
+    } else {
+      const stock = parseInt(formData.stock, 10);
+      if (isNaN(stock) || stock < 0) {
+        setError('Số lượng tồn kho phải là số không âm');
+        newValidationErrors.stock = true;
+        hasError = true;
+      }
+    }
+
+    // Validate SKU
     if (!formData.sku || !formData.sku.trim()) {
       const newSku = generateSKU(variant.product_id, formData.name, formData.attributes);
       setFormData(prev => ({ ...prev, sku: newSku }));
       setError('Vui lòng cung cấp mã SKU');
+      newValidationErrors.sku = true;
+      hasError = true;
+    }
+    
+    // Update validation errors state
+    setValidationErrors(newValidationErrors);
+    
+    // If any validation error exists, stop form submission
+    if (hasError) {
       return;
     }
 
@@ -658,9 +738,12 @@ const VariantFormModal = ({ variant, isEditing, onClose, onSave }) => {
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className={`w-full px-3 py-2 border ${validationErrors.name ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                 required
               />
+              {validationErrors.name && (
+                <p className="text-xs text-red-500 mt-1">Tên biến thể không được để trống</p>
+              )}
             </div>
 
             {/* SKU với nút tạo mới */}
@@ -682,11 +765,14 @@ const VariantFormModal = ({ variant, isEditing, onClose, onSave }) => {
                 name="sku"
                 value={formData.sku}
                 onChange={handleSkuChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className={`w-full px-3 py-2 border ${validationErrors.sku ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                 placeholder="Mã SKU tự động"
                 required
               />
               <p className="text-xs text-gray-500 mt-1">SKU sẽ tự động cập nhật khi thay đổi thuộc tính</p>
+              {validationErrors.sku && (
+                <p className="text-xs text-red-500 mt-1">Vui lòng cung cấp mã SKU</p>
+              )}
             </div>
 
             {/* Màu sắc (tùy chọn) */}
@@ -732,23 +818,40 @@ const VariantFormModal = ({ variant, isEditing, onClose, onSave }) => {
                 name="price"
                 value={formData.price}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                min="0.01"
+                step="0.01"
+                className={`w-full px-3 py-2 border ${validationErrors.price ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                 required
+                placeholder="Nhập giá > 0"
               />
+              {validationErrors.price ? (
+                <p className="text-xs text-red-500 mt-1">Giá sản phẩm phải lớn hơn 0</p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">Giá phải lớn hơn 0</p>
+              )}
             </div>
 
             {/* Tồn kho */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tồn kho
+                Tồn kho <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
                 name="stock"
                 value={formData.stock}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                min="0"
+                step="1"
+                className={`w-full px-3 py-2 border ${validationErrors.stock ? 'border-red-500' : 'border-gray-300'} rounded-md`}
+                required
+                placeholder="Nhập số lượng ≥ 0"
               />
+              {validationErrors.stock ? (
+                <p className="text-xs text-red-500 mt-1">Số lượng phải là số không âm</p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">Số lượng phải là số không âm</p>
+              )}
             </div>
 
             {/* Các checkbox */}
@@ -1432,11 +1535,9 @@ const ProductList = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
-  const [categoryFilter, setCategoryFilter] = useState('Tất cả');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentView, setCurrentView] = useState('all'); // 'all' or 'trash'
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [viewProduct, setViewProduct] = useState(null);
   const [updatingProducts, setUpdatingProducts] = useState({});
@@ -1544,11 +1645,6 @@ const ProductList = () => {
   }, []);
 
   // Filtering and sorting
-  const categories = useMemo(() => {
-    const uniqueCategories = [...new Set(products.map(product => product.category))];
-    return ['Tất cả', ...uniqueCategories];
-  }, [products]);
-
   const activeProdCount = useMemo(() => {
     return products.filter(p => p.is_active === true).length;
   }, [products]);
@@ -1567,9 +1663,8 @@ const ProductList = () => {
       filteredProducts = filteredProducts.filter(product => product.is_active === false);
     }
     
-    // Apply category and search filters
-    filteredProducts = filteredProducts.filter(product =>
-      (categoryFilter === 'Tất cả' || product.category === categoryFilter) &&
+    // Apply search filter
+    filteredProducts = filteredProducts.filter(product => 
       product.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -1587,7 +1682,7 @@ const ProductList = () => {
     }
 
     return filteredProducts;
-  }, [products, sortConfig, categoryFilter, searchTerm, currentView]);
+  }, [products, sortConfig, searchTerm, currentView]);
 
   const handleSort = (key) => {
     let direction = 'ascending';
@@ -1751,7 +1846,6 @@ const ProductList = () => {
                   className="flex items-center border rounded px-3 py-2 cursor-pointer hover:bg-gray-50"
                   onClick={() => {
                     setIsSortDropdownOpen(!isSortDropdownOpen);
-                    setIsCategoryDropdownOpen(false);
                   }}
                 >
                   <span>Sắp xếp theo</span>
@@ -1780,36 +1874,6 @@ const ProductList = () => {
                       Ngày tạo
                       {getSortIcon('createdAt')}
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Chọn danh mục */}
-              <div className="relative">
-                <div
-                  className="flex items-center border rounded px-3 py-2 cursor-pointer hover:bg-gray-50"
-                  onClick={() => {
-                    setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                    setIsSortDropdownOpen(false);
-                  }}
-                >
-                  <span>{categoryFilter}</span>
-                  <ChevronDown size={16} className="ml-2" />
-                </div>
-                {isCategoryDropdownOpen && (
-                  <div className="absolute z-10 right-0 mt-2 w-48 bg-white border rounded shadow-lg">
-                    {categories.map((category) => (
-                      <div
-                        key={category}
-                        className="p-2 hover:bg-gray-100 cursor-pointer"
-                        onClick={() => {
-                          setCategoryFilter(category);
-                          setIsCategoryDropdownOpen(false);
-                        }}
-                      >
-                        {category}
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>

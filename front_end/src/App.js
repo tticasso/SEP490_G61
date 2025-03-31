@@ -35,6 +35,8 @@ import OrderConfirmation from './pages/orderConfirm/OrderConfirmation';
 import PaymentCallback from './pages/checkout/payment/PaymentCallback';
 import MessageBubble from './pages/UserProfile/components/messageBubble';
 
+import SellerSettings from './Seller/SellerChangePassword';
+
 function App() {
   const location = useLocation();
 
@@ -146,6 +148,11 @@ function App() {
           <Route path="/seller-dashboard/my-shop" element={
             <SellerRoute>
               <MyShop />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/settings" element={
+            <SellerRoute>
+              <SellerSettings />
             </SellerRoute>
           } />
 

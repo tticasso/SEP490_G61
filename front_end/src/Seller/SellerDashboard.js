@@ -9,55 +9,67 @@ const calculateTotalOrderValue = (orders) => {
   let total = 0;
   if (!Array.isArray(orders) || orders.length === 0) return total;
 
-  console.log("Calculating total value for orders:", JSON.stringify(orders));
-
   for (const orderItem of orders) {
     try {
       let orderValue = 0;
       
-      // Log để kiểm tra từng đơn hàng
-      console.log("Processing order item:", JSON.stringify(orderItem));
-      
       // Xử lý trường hợp order có cấu trúc khác nhau
       if (orderItem.order) {
         // Trường hợp đơn hàng có định dạng {order: {...}, orderDetails: [...]}
-        orderValue = Number(orderItem.order.total_price || 0);
-        console.log(`Order value from order.total_price: ${orderValue}`);
+        if (typeof orderItem.order.total_price === 'number') {
+          orderValue = orderItem.order.total_price;
+        } else if (typeof orderItem.order.total_price === 'string') {
+          orderValue = parseFloat(orderItem.order.total_price);
+        }
       } else if (orderItem.total_price) {
         // Trường hợp đơn hàng trực tiếp
-        orderValue = Number(orderItem.total_price || 0);
-        console.log(`Order value from total_price: ${orderValue}`);
+        if (typeof orderItem.total_price === 'number') {
+          orderValue = orderItem.total_price;
+        } else if (typeof orderItem.total_price === 'string') {
+          orderValue = parseFloat(orderItem.total_price);
+        }
       } else if (orderItem.total) {
         // Trường hợp đơn hàng đã chuyển đổi
-        orderValue = Number(orderItem.total || 0);
-        console.log(`Order value from total: ${orderValue}`);
+        if (typeof orderItem.total === 'number') {
+          orderValue = orderItem.total;
+        } else if (typeof orderItem.total === 'string') {
+          orderValue = parseFloat(orderItem.total);
+        }
       } else {
-        // Kiểm tra xem có giá trị nào khác không
-        const possibleKeys = ['price', 'amount', 'value'];
-        for (const key of possibleKeys) {
-          if (orderItem[key]) {
-            orderValue = Number(orderItem[key]);
-            console.log(`Order value from ${key}: ${orderValue}`);
-            break;
+        // Xử lý trường hợp khi orderDetails có sẵn
+        if (orderItem.orderDetails && Array.isArray(orderItem.orderDetails)) {
+          for (const detail of orderItem.orderDetails) {
+            const price = Number(detail.price || 0);
+            const quantity = Number(detail.quantity || 1);
+            orderValue += price * quantity;
+          }
+        } else {
+          // Kiểm tra xem có giá trị nào khác không
+          const possibleKeys = ['price', 'amount', 'value'];
+          for (const key of possibleKeys) {
+            if (orderItem[key]) {
+              if (typeof orderItem[key] === 'number') {
+                orderValue = orderItem[key];
+              } else if (typeof orderItem[key] === 'string') {
+                orderValue = parseFloat(orderItem[key]);
+              }
+              break;
+            }
           }
         }
       }
       
       // Đảm bảo orderValue là một số
       if (isNaN(orderValue)) {
-        console.log("Order value is NaN, setting to 0");
         orderValue = 0;
       }
       
-      console.log(`Adding order value to total: ${orderValue}`);
       total += orderValue;
-      console.log(`Current total: ${total}`);
     } catch (error) {
-      console.error("Lỗi khi tính tổng giá trị đơn hàng:", error);
+      console.error("Lỗi khi tính tổng giá trị đơn hàng:", error, orderItem);
     }
   }
   
-  console.log(`Final total: ${total}`);
   return total;
 };
 
@@ -73,289 +85,394 @@ const SellerDashboard = () => {
     pendingOrders: 0,
     successfulOrders: 0,
     followers: [],
-    newOrders: []
+    newOrders: [],
+    periodLabel: 'hôm nay'
   });
   const [currentDate] = useState(new Date());
+  
+  // Thêm state để lưu trữ khoảng thời gian được chọn
+  const [selectedPeriod, setSelectedPeriod] = useState('day'); // Mặc định là ngày hôm nay
+  const [useCustomDate, setUseCustomDate] = useState(false);
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const date = new Date();
+    date.setHours(23, 59, 59, 999);
+    return date;
+  });
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
+  // Hàm để lọc đơn hàng theo khoảng thời gian đã chọn
+  const filterOrdersByPeriod = (orders, period, customStartDate, customEndDate) => {
+    if (!Array.isArray(orders) || period === 'all') return orders;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return orders.filter(orderItem => {
       try {
-        setLoading(true);
-        const currentUser = AuthService.getCurrentUser();
+        let orderDate = new Date(
+          orderItem.order?.created_at || 
+          orderItem.created_at || 
+          orderItem.date || 
+          orderItem.transaction_date ||
+          new Date()
+        );
         
-        if (!currentUser) {
-          navigate('/login');
-          return;
+        // Đảm bảo orderDate là đối tượng Date hợp lệ
+        if (!(orderDate instanceof Date) || isNaN(orderDate)) {
+          return false;
         }
-
-        // Lấy thông tin shop từ endpoint chính xác
-        let shop = null;
-        let shopId = null;
-
-        try {
-          shop = await ApiService.get('/shops/my-shop');
-          shopId = shop._id || shop.id;
-          console.log("Shop data:", shop);
+        
+        orderDate.setHours(0, 0, 0, 0);
+        
+        if (period === 'custom') {
+          const start = new Date(customStartDate);
+          start.setHours(0, 0, 0, 0);
           
-          if (!shopId) {
-            throw new Error('Không tìm thấy ID của shop');
-          }
-        } catch (shopError) {
-          console.error("Error fetching user's shop:", shopError);
+          const end = new Date(customEndDate);
+          end.setHours(23, 59, 59, 999);
+          
+          return orderDate >= start && orderDate <= end;
+        } else if (period === 'day') {
+          return orderDate.getTime() === today.getTime();
+        } else if (period === 'week') {
+          const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - dayOfWeek);
+          startOfWeek.setHours(0, 0, 0, 0);
+          return orderDate >= startOfWeek;
+        } else if (period === 'month') {
+          return orderDate.getMonth() === today.getMonth() && 
+                 orderDate.getFullYear() === today.getFullYear();
+        }
+        
+        return true;
+      } catch (error) {
+        console.error("Lỗi khi lọc đơn hàng theo thời gian:", error);
+        return false;
+      }
+    });
+  };
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const currentUser = AuthService.getCurrentUser();
+      
+      if (!currentUser) {
+        navigate('/login');
+        return;
+      }
+
+      // Lấy thông tin shop từ endpoint chính xác
+      let shop = null;
+      let shopId = null;
+
+      try {
+        shop = await ApiService.get('/shops/my-shop');
+        shopId = shop._id || shop.id;
+        
+        if (!shopId) {
+          throw new Error('Không tìm thấy ID của shop');
+        }
+      } catch (shopError) {
+        console.error("Error fetching user's shop:", shopError);
+        
+        // Thử lấy shop ID từ user
+        const user = AuthService.getCurrentUser();
+        if (user && (user.shop_id || user.shopId)) {
+          shopId = user.shop_id || user.shopId;
+        } else {
           setError("Không thể lấy thông tin cửa hàng. Vui lòng thử lại sau.");
           setLoading(false);
           return;
         }
+      }
 
-        // Fetch shop revenue statistics
-        let revenueStats = { summary: { total_revenue: 0, orders_count: 0 } };
-        try {
-          // Giữ nguyên endpoint này hoặc thay thế với endpoint thống kê từ order nếu cần
-          revenueStats = await ApiService.get(`/revenue/shop/${shopId}/stats?period=day`);
-          console.log("Revenue stats:", revenueStats);
-        } catch (revenueError) {
-          console.error("Error fetching shop revenue stats:", revenueError);
-        }
+      console.log("Found shop ID:", shopId);
 
-        // Fetch tất cả đơn hàng của shop - sử dụng đúng endpoint
-        let allOrders = [];
-        try {
-          // Sử dụng endpoint đúng như trong AllOrder.js
-          allOrders = await ApiService.get(`/order/shop/${shopId}`);
-          console.log("Orders data:", allOrders);
-        } catch (ordersError) {
-          console.error("Error fetching shop orders:", ordersError);
-          allOrders = []; // Đảm bảo là mảng rỗng nếu có lỗi
-        }
+      // Xác định endpoint API dựa trên khoảng thời gian đã chọn
+      let revenueEndpoint;
+      if (selectedPeriod === 'custom') {
+        const startFormatted = startDate.toISOString().split('T')[0];
+        const endFormatted = endDate.toISOString().split('T')[0];
+        revenueEndpoint = `/revenue/shop/${shopId}/stats?start_date=${startFormatted}&end_date=${endFormatted}`;
+      } else if (selectedPeriod === 'all') {
+        revenueEndpoint = `/revenue/shop/${shopId}/stats`;
+      } else {
+        revenueEndpoint = `/revenue/shop/${shopId}/stats?period=${selectedPeriod}`;
+      }
+      
+      // Gọi API lấy thống kê doanh thu
+      let revenueStats = { summary: { total_revenue: 0, total_earnings: 0, orders_count: 0 } };
+      let revenueApiSuccess = false;
+      
+      try {
+        console.log("Calling revenue API:", revenueEndpoint);
+        revenueStats = await ApiService.get(revenueEndpoint);
+        console.log(`Revenue API response for ${selectedPeriod}:`, revenueStats);
         
-        // Đảm bảo allOrders có cấu trúc phù hợp
-        let pendingOrders = [];
-        let successfulOrders = [];
-        
-        if (allOrders && Array.isArray(allOrders)) {
-          // Xử lý trường hợp đơn hàng trả về là mảng các object có order và orderDetails
-          if (allOrders.length > 0 && allOrders[0].order) {
-            pendingOrders = allOrders.filter(item => item.order.status_id === 'pending');
-            successfulOrders = allOrders.filter(item => item.order.status_id === 'delivered');
-            
-            // Chuyển đổi dữ liệu để phù hợp với giao diện hiển thị
-            pendingOrders = pendingOrders.map(item => ({
-              id: item.order.id || item.order._id,
-              date: new Date(item.order.created_at),
-              total: item.order.total_price || 0
-            }));
-            
-            console.log("Pending orders:", pendingOrders);
-          } else {
-            // Trường hợp allOrders là mảng đơn giản của các đơn hàng
-            pendingOrders = allOrders.filter(order => order.status_id === 'pending');
-            successfulOrders = allOrders.filter(order => order.status_id === 'delivered');
-          }
+        if (revenueStats && revenueStats.summary) {
+          revenueApiSuccess = true;
         }
+      } catch (revenueError) {
+        console.error("Error fetching shop revenue stats:", revenueError);
+        revenueApiSuccess = false;
+      }
 
-        // Fetch followers
-        let followers = [];
+      // Fetch tất cả đơn hàng của shop
+      let allOrders = [];
+      try {
+        allOrders = await ApiService.get(`/order/shop/${shopId}`);
+        console.log("All orders fetched:", allOrders);
+      } catch (ordersError) {
+        console.error("Error fetching shop orders:", ordersError);
+        // Thử endpoint thay thế
         try {
-          // Sử dụng endpoint chính xác
-          followers = await ApiService.get(`/shop-follow/followers/${shopId}`);
-          console.log("Followers data:", followers);
-        } catch (followersError) {
-          console.error("Error fetching followers:", followersError);
-          try {
-            // Thử endpoint thay thế
-            followers = await ApiService.get(`/followers/${shopId}`);
-            console.log("Followers data (alternate endpoint):", followers);
-          } catch (altFollowersError) {
-            console.error("Error fetching followers with alternate endpoint:", altFollowersError);
-            followers = [];
-          }
+          allOrders = await ApiService.get(`/orders/my-orders`);
+          console.log("Alternative endpoint orders:", allOrders);
+        } catch (altOrdersError) {
+          console.error("Alternative endpoint failed too:", altOrdersError);
+          allOrders = [];
         }
-
-        // Ghi log chi tiết followers để phân tích
-        console.log("Chi tiết followers:", JSON.stringify(followers));
-
-        // Đếm người theo dõi mới ĐÚNG CÁCH
-        let todayFollowers = 0;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        if (Array.isArray(followers)) {
-          // Mặc định coi follower từ API là follower mới nếu không có thông tin ngày
-          if (followers.length > 0 && !followers[0].created_at && !followers[0].createdAt && !followers[0].date) {
-            console.log("Không tìm thấy thông tin ngày trong dữ liệu followers, coi tất cả là mới");
-            todayFollowers = followers.length;
-          } else {
-            // Trường hợp có thông tin ngày, kiểm tra từng follower
-            for (const follower of followers) {
-              try {
-                // Log toàn bộ thông tin follower để debug
-                console.log("Kiểm tra follower:", JSON.stringify(follower));
-                
-                // Kiểm tra các trường ngày có thể có
-                const dateField = follower.created_at || follower.createdAt || follower.date;
-                
-                if (dateField) {
-                  const followerDate = new Date(dateField);
-                  console.log(`Ngày của follower: ${followerDate}`);
-                  
-                  // Kiểm tra xem ngày có hợp lệ không
-                  if (!isNaN(followerDate.getTime())) {
-                    followerDate.setHours(0, 0, 0, 0);
-                    const diffTime = Math.abs(today - followerDate);
-                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                    
-                    console.log(`Ngày hôm nay: ${today}, Ngày follower: ${followerDate}, Chênh lệch: ${diffDays} ngày`);
-                    
-                    if (diffDays === 0) {
-                      todayFollowers++;
-                      console.log(`Tìm thấy follower mới: ${follower.firstName || ''} ${follower.lastName || ''}`);
-                    }
-                  } else {
-                    console.error("Ngày không hợp lệ:", dateField);
-                  }
-                } else {
-                  console.log("Follower không có thông tin ngày, coi là mới");
-                  todayFollowers++;
-                }
-              } catch (error) {
-                console.error("Lỗi khi xử lý ngày follower:", error);
-              }
-            }
-          }
-        }
-
-        console.log(`Số lượng người theo dõi mới hôm nay: ${todayFollowers}`);
-        
-        // Chuyển đổi dữ liệu followers - cập nhật phần này để hiển thị thông tin đầy đủ
-        const formattedFollowers = Array.isArray(followers) ? followers.map(follower => {
-          // Nếu dữ liệu người dùng nằm trong user_id
-          if (follower.user_id) {
-            return {
-              id: follower._id || follower.id,
-              name: `${follower.user_id.firstName || ''} ${follower.user_id.lastName || ''}`.trim() || 'Người dùng',
-              email: follower.user_id.email,
-              avatar: follower.user_id.avatar,
-              date: follower.created_at || follower.createdAt || follower.date || new Date()
-            };
-          } 
-          // Nếu dữ liệu người dùng nằm trực tiếp trong đối tượng follower
-          else {
-            return {
-              id: follower._id || follower.id,
-              name: `${follower.firstName || ''} ${follower.lastName || ''}`.trim() || follower.name || 'Người dùng',
-              email: follower.email,
-              avatar: follower.avatar,
-              date: follower.created_at || follower.createdAt || follower.date || new Date()
-            };
-          }
-        }) : [];
-
-        // Bắt đầu tính doanh thu đơn hàng...
-        console.log("Bắt đầu tính doanh thu đơn hàng...");
-        console.log("Tất cả đơn hàng:", allOrders);
-
-        // Kiểm tra cấu trúc dữ liệu đơn hàng để log
-        if (allOrders.length > 0) {
-          console.log("Cấu trúc đơn hàng đầu tiên:", JSON.stringify(allOrders[0]));
-          
-          // Kiểm tra các trường khác nhau có thể chứa thông tin giá trị đơn hàng
-          if (allOrders[0].order) {
-            console.log("Giá trị đơn hàng từ order.total_price:", allOrders[0].order.total_price);
-          }
-          
-          if (allOrders[0].total_price) {
-            console.log("Giá trị đơn hàng từ total_price:", allOrders[0].total_price);
-          }
-          
-          if (allOrders[0].total) {
-            console.log("Giá trị đơn hàng từ total:", allOrders[0].total);
-          }
-        }
-
-        // Sử dụng trực tiếp pendingOrders để tính doanh thu
-        let orderRevenueValue = 0;
-
-        // Tính doanh thu dựa trên pendingOrders
-        if (pendingOrders && pendingOrders.length > 0) {
-          console.log("Đơn hàng chờ xác nhận:", pendingOrders);
-          orderRevenueValue = pendingOrders.reduce((sum, order) => {
-            const orderValue = Number(order.total || 0);
-            console.log(`Đơn hàng #${order.id}: ${orderValue}`);
-            return sum + orderValue;
-          }, 0);
-        } else {
-          // Fallback - tính toán từ allOrders nếu cần
-          const todayOrders = allOrders.filter(orderItem => {
-            try {
-              const orderDate = new Date(
-                orderItem.order?.created_at || 
-                orderItem.created_at || 
-                orderItem.date || 
-                new Date()
-              );
-              orderDate.setHours(0, 0, 0, 0);
-              return orderDate.getTime() === today.getTime();
-            } catch (error) {
-              console.error("Lỗi khi lọc đơn hàng theo ngày:", error);
-              return false;
-            }
+      }
+      
+      // Lọc đơn hàng theo khoảng thời gian đã chọn
+      const filteredOrders = filterOrdersByPeriod(allOrders, selectedPeriod, startDate, endDate);
+      console.log(`Filtered orders for ${selectedPeriod}:`, filteredOrders.length);
+      
+      // Xử lý đơn hàng
+      let pendingOrders = [];
+      let successfulOrders = [];
+      let processedOrders = [];
+      
+      if (filteredOrders && Array.isArray(filteredOrders)) {
+        // Xử lý trường hợp đơn hàng trả về là mảng các object có order và orderDetails
+        if (filteredOrders.length > 0 && filteredOrders[0].order) {
+          pendingOrders = filteredOrders.filter(item => {
+            const status = item.order.order_status || item.order.status_id;
+            return status === 'pending';
           });
-
-          console.log("Đơn hàng trong ngày (từ allOrders):", todayOrders);
-          orderRevenueValue = calculateTotalOrderValue(todayOrders);
+          
+          successfulOrders = filteredOrders.filter(item => {
+            const status = item.order.order_status || item.order.status_id;
+            return status === 'delivered';
+          });
+          
+          // Chuyển đổi dữ liệu để phù hợp với giao diện hiển thị
+          processedOrders = filteredOrders.map(item => ({
+            id: item.order.id || item.order._id,
+            date: new Date(item.order.created_at),
+            total: Number(item.order.total_price || 0),
+            status: item.order.order_status || item.order.status_id,
+            raw: item // Giữ lại dữ liệu gốc để debugging
+          }));
+          
+          pendingOrders = processedOrders.filter(order => order.status === 'pending');
+        } else {
+          // Trường hợp filteredOrders là mảng đơn giản của các đơn hàng
+          pendingOrders = filteredOrders.filter(order => order.status_id === 'pending' || order.order_status === 'pending');
+          successfulOrders = filteredOrders.filter(order => order.status_id === 'delivered' || order.order_status === 'delivered');
+          
+          processedOrders = filteredOrders.map(order => ({
+            id: order.id || order._id,
+            date: new Date(order.created_at),
+            total: Number(order.total_price || 0),
+            status: order.status_id || order.order_status,
+            raw: order // Giữ lại dữ liệu gốc để debugging
+          }));
         }
+      }
 
-        console.log("Doanh thu đơn hàng (tổng giá trị đơn hàng trong ngày):", orderRevenueValue);
+      // Fetch followers
+      let followers = [];
+      try {
+        followers = await ApiService.get(`/shop-follow/followers/${shopId}`);
+      } catch (followersError) {
+        console.error("Error fetching followers:", followersError);
+        try {
+          // Thử endpoint thay thế
+          followers = await ApiService.get(`/followers/${shopId}`);
+        } catch (altFollowersError) {
+          console.error("Error fetching followers with alternate endpoint:", altFollowersError);
+          followers = [];
+        }
+      }
 
-        // 2. Tính doanh thu trong ngày - chỉ tính đơn hàng đã thanh toán
-        const paidOrders = allOrders.filter(orderItem => {
+      // Đếm người theo dõi mới
+      let todayFollowers = 0;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (Array.isArray(followers)) {
+        // Nếu không có thông tin ngày trong dữ liệu followers
+        if (followers.length > 0 && !followers[0].created_at && !followers[0].createdAt && !followers[0].date) {
+          todayFollowers = followers.length;
+        } else {
+          // Trường hợp có thông tin ngày, kiểm tra từng follower
+          for (const follower of followers) {
+            try {
+              const dateField = follower.created_at || follower.createdAt || follower.date;
+              
+              if (dateField) {
+                const followerDate = new Date(dateField);
+                
+                if (!isNaN(followerDate.getTime())) {
+                  followerDate.setHours(0, 0, 0, 0);
+                  const diffTime = Math.abs(today - followerDate);
+                  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                  
+                  if (diffDays === 0) {
+                    todayFollowers++;
+                  }
+                }
+              } else {
+                todayFollowers++;
+              }
+            } catch (error) {
+              console.error("Lỗi khi xử lý ngày follower:", error);
+            }
+          }
+        }
+      }
+      
+      // Chuyển đổi dữ liệu followers để hiển thị
+      const formattedFollowers = Array.isArray(followers) ? followers.map(follower => {
+        // Nếu dữ liệu người dùng nằm trong user_id
+        if (follower.user_id) {
+          return {
+            id: follower._id || follower.id,
+            name: `${follower.user_id.firstName || ''} ${follower.user_id.lastName || ''}`.trim() || 'Người dùng',
+            email: follower.user_id.email,
+            avatar: follower.user_id.avatar,
+            date: follower.created_at || follower.createdAt || follower.date || new Date()
+          };
+        } 
+        // Nếu dữ liệu người dùng nằm trực tiếp trong đối tượng follower
+        else {
+          return {
+            id: follower._id || follower.id,
+            name: `${follower.firstName || ''} ${follower.lastName || ''}`.trim() || follower.name || 'Người dùng',
+            email: follower.email,
+            avatar: follower.avatar,
+            date: follower.created_at || follower.createdAt || follower.date || new Date()
+          };
+        }
+      }) : [];
+
+      // === TÍNH TOÁN DOANH THU (ĐÃ SỬA) ===
+      let periodRevenueValue = 0; // Đổi tên từ dailyRevenueValue thành periodRevenueValue
+      let orderRevenueValue = 0;
+
+      // Sử dụng dữ liệu từ API nếu có và không phải là tất cả 0
+      if (revenueApiSuccess && revenueStats && revenueStats.summary &&
+          (revenueStats.summary.total_revenue > 0 || revenueStats.summary.total_earnings > 0)) {
+        console.log(`Sử dụng dữ liệu API cho ${selectedPeriod}:`, revenueStats.summary);
+        
+        // Kiểm tra cả trường hợp số và chuỗi
+        if (typeof revenueStats.summary.total_revenue === 'number') {
+          orderRevenueValue = revenueStats.summary.total_revenue;
+        } else if (typeof revenueStats.summary.total_revenue === 'string') {
+          orderRevenueValue = parseFloat(revenueStats.summary.total_revenue);
+        }
+        
+        if (typeof revenueStats.summary.total_earnings === 'number') {
+          periodRevenueValue = revenueStats.summary.total_earnings;
+        } else if (typeof revenueStats.summary.total_earnings === 'string') {
+          periodRevenueValue = parseFloat(revenueStats.summary.total_earnings);
+        }
+        
+        // Đảm bảo giá trị là số hợp lệ
+        if (isNaN(orderRevenueValue)) orderRevenueValue = 0;
+        if (isNaN(periodRevenueValue)) periodRevenueValue = 0;
+      } else {
+        console.log(`Tính toán doanh thu từ đơn hàng cho ${selectedPeriod}`);
+        
+        // Tính tổng doanh thu từ đơn hàng đã lọc
+        orderRevenueValue = calculateTotalOrderValue(filteredOrders);
+        console.log(`Calculated order revenue for ${selectedPeriod}:`, orderRevenueValue);
+        
+        // Tính doanh thu từ đơn hàng đã thanh toán trong khoảng thời gian
+        const paidOrders = filteredOrders.filter(orderItem => {
           try {
-            const orderDate = new Date(
-              orderItem.order?.created_at || 
-              orderItem.created_at || 
-              orderItem.date || 
-              new Date()
-            );
-            orderDate.setHours(0, 0, 0, 0);
-            
-            // Kiểm tra ngày và trạng thái thanh toán
             const isPaid = orderItem.order?.status_id === 'delivered' || 
                           orderItem.order?.payment_status === 'paid' ||
                           orderItem.status_id === 'delivered' ||
-                          orderItem.payment_status === 'paid';
-            
-            return orderDate.getTime() === today.getTime() && isPaid;
+                          orderItem.payment_status === 'paid' ||
+                          orderItem.order?.order_status === 'delivered';
+            return isPaid;
           } catch (error) {
-            console.error("Lỗi khi lọc đơn hàng đã thanh toán:", error);
             return false;
           }
         });
-
-        console.log("Đơn hàng đã thanh toán trong ngày:", paidOrders);
-        const dailyRevenueValue = calculateTotalOrderValue(paidOrders);
-        console.log("Doanh thu trong ngày (đơn hàng đã thanh toán):", dailyRevenueValue);
-
-        // Update dashboard data với các giá trị mới tính
-        setDashboardData({
-          totalOrders: revenueStats.summary?.orders_count || allOrders.length || 0,
-          newFollowers: todayFollowers,
-          dailyRevenue: dailyRevenueValue,
-          orderRevenue: orderRevenueValue,
-          pendingOrders: pendingOrders.length,
-          successfulOrders: successfulOrders.length,
-          followers: formattedFollowers.slice(0, 5), // Get 5 most recent followers
-          newOrders: pendingOrders.slice(0, 5) // Get 5 most recent pending orders
-        });
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-        setError(error.toString());
-      } finally {
-        setLoading(false);
+        
+        periodRevenueValue = calculateTotalOrderValue(paidOrders) * 0.9; // Trừ 10% hoa hồng
+        console.log(`Calculated period revenue after commission:`, periodRevenueValue);
       }
-    };
 
+      // Đảm bảo chúng ta có số đơn hàng đúng
+      const totalOrdersCount = revenueApiSuccess && revenueStats.summary?.orders_count ? 
+        revenueStats.summary.orders_count : filteredOrders.length;
+      
+      // Xác định nhãn thời gian dựa trên khoảng thời gian đã chọn
+      let periodLabel = 'hôm nay';
+      if (selectedPeriod === 'week') periodLabel = 'tuần này';
+      else if (selectedPeriod === 'month') periodLabel = 'tháng này';
+      else if (selectedPeriod === 'all') periodLabel = 'tất cả thời gian';
+      else if (selectedPeriod === 'custom') {
+        const startFormatted = startDate.toLocaleDateString('vi-VN');
+        const endFormatted = endDate.toLocaleDateString('vi-VN');
+        periodLabel = `từ ${startFormatted} đến ${endFormatted}`;
+      }
+
+      // Update dashboard data với các giá trị mới tính
+      setDashboardData({
+        totalOrders: totalOrdersCount,
+        newFollowers: todayFollowers,
+        dailyRevenue: periodRevenueValue, // Giữ tên cũ để không phải thay đổi phần render
+        orderRevenue: orderRevenueValue,
+        pendingOrders: pendingOrders.length,
+        successfulOrders: successfulOrders.length,
+        followers: formattedFollowers.slice(0, 5), // Get 5 most recent followers
+        newOrders: pendingOrders.slice(0, 5), // Get 5 most recent pending orders
+        periodLabel
+      });
+      
+      console.log("Dashboard data set:", {
+        totalOrders: totalOrdersCount,
+        orderRevenue: orderRevenueValue,
+        periodRevenue: periodRevenueValue,
+        pendingOrders: pendingOrders.length,
+        successfulOrders: successfulOrders.length,
+        periodLabel
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      setError(error.toString());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Effect hook chạy khi component được mount hoặc khi selectedPeriod thay đổi
+  useEffect(() => {
     fetchDashboardData();
-  }, [navigate, currentDate]);
+  }, [navigate, selectedPeriod, useCustomDate]);
+
+  // Xử lý khi người dùng thay đổi khoảng thời gian
+  const handlePeriodChange = (e) => {
+    const newPeriod = e.target.value;
+    setSelectedPeriod(newPeriod);
+    setUseCustomDate(newPeriod === 'custom');
+  };
+
+  // Xử lý khi người dùng áp dụng khoảng thời gian tùy chỉnh
+  const handleApplyCustomDate = () => {
+    fetchDashboardData();
+  };
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -434,10 +551,59 @@ const SellerDashboard = () => {
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-auto">
         <div className="flex-1 p-6">
-          {/* Header */}
+          {/* Header với bộ chọn thời gian */}
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">Bảng điều khiển</h2>
-            <div className="text-gray-500">{formatDate(currentDate)}</div>
+            
+            <div className="flex items-center gap-4">
+              <div className="bg-white rounded-lg shadow py-1 px-2">
+                <select 
+                  className="border-none focus:ring-0 text-sm" 
+                  value={selectedPeriod}
+                  onChange={handlePeriodChange}
+                >
+                  <option value="day">Hôm nay</option>
+                  <option value="week">Tuần này</option>
+                  <option value="month">Tháng này</option>
+                  <option value="all">Tất cả thời gian</option>
+                  <option value="custom">Tùy chỉnh...</option>
+                </select>
+              </div>
+              
+              {useCustomDate && (
+                <div className="flex items-center gap-2 bg-white rounded-lg shadow py-1 px-2">
+                  <span className="text-sm text-gray-500">Từ</span>
+                  <input 
+                    type="date" 
+                    className="text-sm border-none focus:ring-0" 
+                    value={startDate.toISOString().split('T')[0]}
+                    onChange={(e) => setStartDate(new Date(e.target.value))}
+                  />
+                  <span className="text-sm text-gray-500">đến</span>
+                  <input 
+                    type="date" 
+                    className="text-sm border-none focus:ring-0" 
+                    value={endDate.toISOString().split('T')[0]} 
+                    onChange={(e) => setEndDate(new Date(e.target.value))}
+                  />
+                  <button 
+                    className="bg-blue-500 text-white px-2 py-1 rounded text-xs"
+                    onClick={handleApplyCustomDate}
+                  >
+                    Áp dụng
+                  </button>
+                </div>
+              )}
+              
+              <div className="text-gray-500">{formatDate(currentDate)}</div>
+            </div>
+          </div>
+
+          {/* Hiển thị khoảng thời gian đã chọn */}
+          <div className="mb-4">
+            <div className="text-sm text-gray-500">
+              Đang xem dữ liệu <span className="font-medium">{dashboardData.periodLabel}</span>
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -446,7 +612,7 @@ const SellerDashboard = () => {
               { 
                 value: dashboardData.totalOrders.toString(), 
                 label: 'Tổng số đơn hàng', 
-                subtext: 'Số đơn hàng được đặt trong ngày' 
+                subtext: `Số đơn hàng ${dashboardData.periodLabel}` 
               },
               { 
                 value: dashboardData.newFollowers.toString(), 
@@ -455,8 +621,8 @@ const SellerDashboard = () => {
               },
               { 
                 value: formatCurrency(dashboardData.dailyRevenue), 
-                label: 'Doanh thu trong ngày', 
-                subtext: 'Doanh thu khi đơn hàng được thanh toán' 
+                label: 'Thu nhập từ đơn hàng đã hoàn thành', 
+                subtext: `Số tiền shop nhận được ${dashboardData.periodLabel} sau khi trừ phí hoa hồng` 
               }
             ].map((stat, index) => (
               <div key={index} className="bg-white p-4 rounded-lg shadow">
@@ -472,8 +638,8 @@ const SellerDashboard = () => {
             {[
               { 
                 value: formatCurrency(dashboardData.orderRevenue), 
-                label: 'Doanh thu đơn hàng', 
-                subtext: 'Tổng doanh thu đơn hàng trong ngày' 
+                label: 'Tổng doanh thu đơn hàng', 
+                subtext: `Tổng giá trị đơn hàng ${dashboardData.periodLabel} trước khi trừ phí hoa hồng` 
               },
               { 
                 value: dashboardData.pendingOrders.toString(), 
@@ -545,9 +711,6 @@ const SellerDashboard = () => {
                           {order.date ? formatDatetime(new Date(order.date)) : ''}
                         </span>
                         <span className="font-medium text-green-600">{formatCurrency(order.total || 0)}</span>
-                      </div>
-                      <div className="mt-1">
-                        
                       </div>
                     </div>
                   ))}

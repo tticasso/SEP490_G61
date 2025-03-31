@@ -304,6 +304,7 @@ const RejectOrderModal = ({ onClose, onConfirm }) => {
 const AllOrders = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [orders, setOrders] = useState([]);
@@ -552,16 +553,23 @@ const AllOrders = () => {
     fetchOrders();
   }, []);
 
-  // Filter orders based on search term
+  // Filter orders based on search term and status filter
   const filteredOrders = orders.filter(order => {
     // Ensure all these properties exist before trying to use toLowerCase()
     const orderId = order.id ? order.id.toString().toLowerCase() : '';
     const customerName = order.customerName ? order.customerName.toLowerCase() : '';
     const status = order.status ? order.status.toLowerCase() : '';
+    const statusId = order.statusId ? order.statusId.toLowerCase() : '';
     
-    return orderId.includes(searchTerm.toLowerCase()) ||
-           customerName.includes(searchTerm.toLowerCase()) ||
-           status.includes(searchTerm.toLowerCase());
+    // Filter by search term
+    const matchesSearch = orderId.includes(searchTerm.toLowerCase()) ||
+                         customerName.includes(searchTerm.toLowerCase()) ||
+                         status.includes(searchTerm.toLowerCase());
+    
+    // Filter by status if a status filter is selected
+    const matchesStatus = !statusFilter || statusId === statusFilter;
+    
+    return matchesSearch && matchesStatus;
   });
 
   // Get current orders based on pagination
@@ -572,6 +580,19 @@ const AllOrders = () => {
   // Change page
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
+  };
+  
+  // Handle status filter change
+  const handleStatusFilterChange = (status) => {
+    setStatusFilter(status);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
+  
+  // Clear all filters
+  const clearFilters = () => {
+    setStatusFilter('');
+    setSearchTerm('');
+    setCurrentPage(1);
   };
 
   // Handle view order details
@@ -646,18 +667,85 @@ const AllOrders = () => {
       <div className="flex-1 overflow-auto">
         <div className="p-6 bg-gray-50 min-h-screen">
           {/* Header và công cụ tìm kiếm */}
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">Đơn hàng của Shop</h1>
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h1 className="text-2xl font-bold">Đơn hàng của Shop</h1>
+              
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="Tìm kiếm..." 
+                  className="border rounded-md px-10 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <Search size={20} className="absolute left-3 top-2.5 text-gray-400" />
+              </div>
+            </div>
             
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Tìm kiếm..." 
-                className="border rounded-md px-10 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <Search size={20} className="absolute left-3 top-2.5 text-gray-400" />
+            {/* Status Filter */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="font-medium text-gray-700">Lọc theo trạng thái:</div>
+              <div className="flex flex-wrap gap-2">
+                <button 
+                  className={`px-3 py-1 rounded-full text-sm ${statusFilter === '' 
+                    ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                  onClick={() => handleStatusFilterChange('')}
+                >
+                  Tất cả
+                </button>
+                <button 
+                  className={`px-3 py-1 rounded-full text-sm ${statusFilter === 'pending' 
+                    ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                  onClick={() => handleStatusFilterChange('pending')}
+                >
+                  Chờ xác nhận
+                </button>
+                <button 
+                  className={`px-3 py-1 rounded-full text-sm ${statusFilter === 'processing' 
+                    ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                  onClick={() => handleStatusFilterChange('processing')}
+                >
+                  Đang xử lý
+                </button>
+                <button 
+                  className={`px-3 py-1 rounded-full text-sm ${statusFilter === 'shipped' 
+                    ? 'bg-purple-100 text-purple-800 border border-purple-300' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                  onClick={() => handleStatusFilterChange('shipped')}
+                >
+                  Đang vận chuyển
+                </button>
+                <button 
+                  className={`px-3 py-1 rounded-full text-sm ${statusFilter === 'delivered' 
+                    ? 'bg-green-100 text-green-800 border border-green-300' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                  onClick={() => handleStatusFilterChange('delivered')}
+                >
+                  Đã giao hàng
+                </button>
+                <button 
+                  className={`px-3 py-1 rounded-full text-sm ${statusFilter === 'cancelled' 
+                    ? 'bg-red-100 text-red-800 border border-red-300' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                  onClick={() => handleStatusFilterChange('cancelled')}
+                >
+                  Đã hủy
+                </button>
+              </div>
+              
+              {/* Only show clear filters button if there are active filters */}
+              {(statusFilter || searchTerm) && (
+                <button 
+                  className="px-3 py-1 rounded-full text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 ml-auto"
+                  onClick={clearFilters}
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
             </div>
           </div>
 
@@ -824,6 +912,9 @@ const AllOrders = () => {
                   </select>
                   <span>/</span>
                   <span className="ml-2">{totalOrders} Đơn hàng</span>
+                  <span className="ml-2 text-gray-500">
+                    {statusFilter && `(đang lọc: ${translateStatus(statusFilter)})`}
+                  </span>
                 </div>
               </div>
             </div>

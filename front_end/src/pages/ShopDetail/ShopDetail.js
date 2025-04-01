@@ -84,8 +84,13 @@ const ShopDetail = () => {
                 try {
                     const productsData = await ApiService.get(`/product/shop/${shopId}`, false);
                     
-                    // Xử lý đường dẫn ảnh cho các sản phẩm
-                    const productsWithImages = productsData.map(product => ({
+                    // Lọc sản phẩm có trạng thái is_active = true
+                    const activeProducts = productsData.filter(product => 
+                        product.is_active === true || product.is_active === 'true' || product.is_active === 1
+                    );
+                    
+                    // Xử lý đường dẫn ảnh cho các sản phẩm active
+                    const productsWithImages = activeProducts.map(product => ({
                         ...product,
                         thumbnail: getImagePath(product.thumbnail)
                     }));
@@ -290,7 +295,7 @@ const ShopDetail = () => {
         address: shopDetails.address || 'Không có địa chỉ',
         phone: shopDetails.phone || 'Không có số điện thoại',
         followers: shopDetails.follower || 0,
-        products: shopProducts.length || 0,
+        products: shopProducts.length || 0, // Đã cập nhật để chỉ đếm sản phẩm active
         joinedDaysAgo: joinInfo.days,
         soldProduct: shopDetails.total_sold || 0,
         joinedDay: joinInfo.days,

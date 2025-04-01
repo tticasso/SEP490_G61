@@ -13,7 +13,8 @@ import {
   ToggleLeft,
   ToggleRight,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Filter
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import ApiService from '../services/ApiService';
@@ -974,23 +975,10 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
         const [categoriesResponse, brandsResponse] = await Promise.all([
           ApiService.get('/categories'),
           ApiService.get('/brand')
-        ]).catch(() => {
-          return [
-            [
-              { _id: 'phone', name: 'Điện thoại' },
-              { _id: 'skincare', name: 'Chăm sóc da' },
-              { _id: 'electronics', name: 'Thiết bị điện tử' }
-            ],
-            [
-              { _id: 'apple', name: 'Apple' },
-              { _id: 'samsung', name: 'Samsung' },
-              { _id: 'xiaomi', name: 'Xiaomi' }
-            ]
-          ];
-        });
+        ]);
 
-        setCategories(categoriesResponse);
-        setBrands(brandsResponse);
+        setCategories(categoriesResponse || []);
+        setBrands(brandsResponse || []);
 
         if (product) {
           setEditingProduct({
@@ -1005,17 +993,8 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
         setFormErrors({
           submit: 'Lỗi khi tải dữ liệu danh mục và thương hiệu'
         });
-
-        setCategories([
-          { _id: 'phone', name: 'Điện thoại' },
-          { _id: 'skincare', name: 'Chăm sóc da' },
-          { _id: 'electronics', name: 'Thiết bị điện tử' }
-        ]);
-        setBrands([
-          { _id: 'apple', name: 'Apple' },
-          { _id: 'samsung', name: 'Samsung' },
-          { _id: 'xiaomi', name: 'Xiaomi' }
-        ]);
+        setCategories([]);
+        setBrands([]);
       } finally {
         setLoadingData(false);
       }
@@ -1047,13 +1026,23 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
     });
   };
 
+  // Thay đổi từ multi-select dropdown sang checkbox
   const handleCategoryChange = (e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions).map(option => option.value);
-
-    setEditingProduct({
-      ...editingProduct,
-      category_id: selectedOptions
-    });
+    const { value, checked } = e.target;
+    
+    if (checked) {
+      // Add the category to the array if checked
+      setEditingProduct({
+        ...editingProduct,
+        category_id: [...editingProduct.category_id, value]
+      });
+    } else {
+      // Remove the category from the array if unchecked
+      setEditingProduct({
+        ...editingProduct,
+        category_id: editingProduct.category_id.filter(catId => catId !== value)
+      });
+    }
 
     if (formErrors.category_id) {
       setFormErrors({
@@ -1307,27 +1296,34 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
                 </select>
               </div>
 
-              {/* Danh mục */}
+              {/* Danh mục - CHANGED to checkboxes */}
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Danh mục <span className="text-red-500">*</span>
                 </label>
-                <select
-                  multiple
-                  name="category_id"
-                  value={editingProduct.category_id || []}
-                  onChange={handleCategoryChange}
-                  className={`w-full px-3 py-2 border ${formErrors.category_id ? 'border-red-500' : 'border-gray-300'} rounded-md h-32`}
-                >
-                  {categories.map((category) => (
-                    <option key={category._id} value={category._id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Giữ phím Ctrl (hoặc Command trên Mac) để chọn nhiều danh mục
-                </p>
+                <div className={`p-3 border ${formErrors.category_id ? 'border-red-500' : 'border-gray-300'} rounded-md bg-white max-h-60 overflow-y-auto`}>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {categories.map((category) => (
+                      <div key={category._id} className="flex items-start mb-2">
+                        <input
+                          type="checkbox"
+                          id={`category-${category._id}`}
+                          name="category_id"
+                          value={category._id}
+                          checked={editingProduct.category_id.includes(category._id)}
+                          onChange={handleCategoryChange}
+                          className="h-4 w-4 mt-1 mr-2"
+                        />
+                        <label 
+                          htmlFor={`category-${category._id}`}
+                          className="text-sm text-gray-700 cursor-pointer"
+                        >
+                          {category.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 {formErrors.category_id && (
                   <p className="mt-1 text-sm text-red-500">{formErrors.category_id}</p>
                 )}
@@ -1536,8 +1532,9 @@ const ProductList = () => {
   const [currentProduct, setCurrentProduct] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentView, setCurrentView] = useState('all'); // 'all' or 'trash'
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [viewProduct, setViewProduct] = useState(null);
   const [updatingProducts, setUpdatingProducts] = useState({});
@@ -1580,10 +1577,21 @@ const ProductList = () => {
         }
 
         const shopId = shop._id;
-        const fetchedProducts = await ApiService.get(`/product/shop/${shopId}`);
+        
+        // Fetch all products for the shop - regardless of status
+        const allProductsUrl = `/product`;
+        const fetchedProducts = await ApiService.get(allProductsUrl);
+        
+        // Filter by shop ID (since /product returns products from all shops)
+        const shopProducts = fetchedProducts.filter(product => 
+          (product.shop_id === shopId) || 
+          (product.shop_id?._id === shopId) ||
+          (typeof product.shop_id === 'object' && product.shop_id.toString() === shopId)
+        );
+        
         if (!isMounted) return;
 
-        const formattedProducts = fetchedProducts.map(product => ({
+        const formattedProducts = shopProducts.map(product => ({
           id: product._id,
           _id: product._id,
           name: product.name,
@@ -1628,6 +1636,7 @@ const ProductList = () => {
         setProductVariants(variantsMap);
         setError(null);
       } catch (err) {
+        console.error("Error fetching products:", err);
         setError('Không thể tải dữ liệu sản phẩm. Vui lòng thử lại sau.');
       } finally {
         if (isMounted) {
@@ -1646,29 +1655,41 @@ const ProductList = () => {
 
   // Filtering and sorting
   const activeProdCount = useMemo(() => {
-    return products.filter(p => p.is_active === true).length;
+    return products.filter(p => p.is_active === true && p.is_delete === false).length;
   }, [products]);
 
-  const trashProdCount = useMemo(() => {
-    return products.filter(p => p.is_active === false).length;
+  const inactiveProdCount = useMemo(() => {
+    return products.filter(p => p.is_active === false && p.is_delete === false).length;
+  }, [products]);
+
+  const deletedProdCount = useMemo(() => {
+    return products.filter(p => p.is_delete === true).length;
+  }, [products]);
+
+  const totalProdCount = useMemo(() => {
+    return products.filter(p => p.is_delete === false).length;
   }, [products]);
 
   const sortedProducts = useMemo(() => {
-    // Filter by active status based on currentView
+    // Lọc sản phẩm theo trạng thái và trạng thái xóa
     let filteredProducts = [...products];
     
-    if (currentView === 'all') {
+    // Chỉ hiển thị các sản phẩm không bị xóa hoàn toàn
+    filteredProducts = filteredProducts.filter(product => !product.is_delete);
+    
+    // Lọc theo trạng thái hoạt động
+    if (statusFilter === 'active') {
       filteredProducts = filteredProducts.filter(product => product.is_active === true);
-    } else if (currentView === 'trash') {
+    } else if (statusFilter === 'inactive') {
       filteredProducts = filteredProducts.filter(product => product.is_active === false);
     }
     
-    // Apply search filter
+    // Áp dụng lọc tìm kiếm
     filteredProducts = filteredProducts.filter(product => 
       product.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Apply sorting
+    // Áp dụng sắp xếp
     if (sortConfig.key) {
       filteredProducts.sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -1682,7 +1703,7 @@ const ProductList = () => {
     }
 
     return filteredProducts;
-  }, [products, sortConfig, searchTerm, currentView]);
+  }, [products, sortConfig, searchTerm, statusFilter]);
 
   const handleSort = (key) => {
     let direction = 'ascending';
@@ -1732,9 +1753,9 @@ const ProductList = () => {
       });
 
       if (currentStatus) {
-        alert('Sản phẩm đã được chuyển vào thùng rác');
+        alert('Sản phẩm đã được ẩn khỏi cửa hàng');
       } else {
-        alert('Sản phẩm đã được khôi phục từ thùng rác');
+        alert('Sản phẩm đã được hiển thị lại trên cửa hàng');
       }
 
       setProducts(prevProducts =>
@@ -1747,18 +1768,9 @@ const ProductList = () => {
         )
       );
 
-      if (currentView === 'trash' && newStatus === true) {
-        const remainingInTrash = products.filter(
-          p => p.id !== productId && p.is_active === false
-        ).length;
-        
-        if (remainingInTrash === 0) {
-          setTimeout(() => setCurrentView('all'), 500);
-        }
-      }
-
       setError(null);
     } catch (err) {
+      console.error("Error toggling product status:", err);
       setError(`Không thể cập nhật trạng thái sản phẩm.`);
       alert('Không thể cập nhật trạng thái sản phẩm. Vui lòng thử lại sau.');
     } finally {
@@ -1769,18 +1781,33 @@ const ProductList = () => {
     }
   };
 
-  const handleDeleteProduct = useCallback(async (productId) => {
+  const handleDeleteProduct = async (productId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) {
+      return;
+    }
+    
     try {
       setLoading(true);
       await ApiService.delete(`/product/delete/${productId}`);
-      setProducts(prevProducts => prevProducts.filter(product => product.id !== productId));
+      
+      // Thay vì xóa sản phẩm khỏi danh sách, chúng ta đánh dấu nó đã xóa
+      setProducts(prevProducts => 
+        prevProducts.map(product => 
+          product.id === productId ? 
+            { ...product, is_delete: true } : 
+            product
+        )
+      );
+      
       setError(null);
+      alert('Sản phẩm đã được xóa thành công');
     } catch (err) {
+      console.error("Error deleting product:", err);
       setError('Không thể xóa sản phẩm. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   // Render the component
   return (
@@ -1795,33 +1822,8 @@ const ProductList = () => {
           <div className="p-4 border-b flex justify-between items-center">
             <div className="flex items-center space-x-4">
               <span className="font-semibold">
-                {currentView === 'all' ? 'Tất cả sản phẩm' : 'Thùng rác'}
-                ({sortedProducts.length})
+                Sản phẩm ({totalProdCount})
               </span>
-              
-              {/* Bộ lọc tab được cải thiện */}
-              <div className="ml-6 border rounded-lg overflow-hidden flex">
-                <button 
-                  className={`px-4 py-2 text-sm font-medium ${
-                    currentView === 'all' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                  onClick={() => setCurrentView('all')}
-                >
-                  Hiển thị ({activeProdCount})
-                </button>
-                <button 
-                  className={`px-4 py-2 text-sm font-medium ${
-                    currentView === 'trash' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                  onClick={() => setCurrentView('trash')}
-                >
-                  Thùng rác ({trashProdCount})
-                </button>
-              </div>
             </div>
             <button
               className="bg-blue-600 text-white px-4 py-2 rounded flex items-center hover:bg-blue-700 transition-colors"
@@ -1835,17 +1837,69 @@ const ProductList = () => {
           {/* Functionality Bar */}
           <div className="p-4 border-b flex justify-between items-center">
             <div className="text-gray-600">
-              {currentView === 'all' 
-                ? 'Sản phẩm đang hiển thị trên gian hàng của bạn' 
-                : 'Sản phẩm đã bị ẩn khỏi gian hàng của bạn'}
+              {statusFilter === 'all' 
+                ? 'Hiển thị tất cả sản phẩm' 
+                : statusFilter === 'active'
+                  ? 'Sản phẩm đang hiển thị trên gian hàng của bạn'
+                  : 'Sản phẩm đang bị ẩn khỏi gian hàng của bạn'}
             </div>
             <div className="flex space-x-4">
+              {/* Bộ lọc trạng thái */}
+              <div className="relative">
+                <div
+                  className="flex items-center border rounded px-3 py-2 cursor-pointer hover:bg-gray-50"
+                  onClick={() => {
+                    setIsFilterDropdownOpen(!isFilterDropdownOpen);
+                    setIsSortDropdownOpen(false);
+                  }}
+                >
+                  <Filter size={16} className="mr-2" />
+                  <span>Lọc theo trạng thái</span>
+                  <ChevronDown size={16} className="ml-2" />
+                </div>
+                {isFilterDropdownOpen && (
+                  <div className="absolute z-10 right-0 mt-2 w-56 bg-white border rounded shadow-lg">
+                    <div
+                      className={`p-2 hover:bg-gray-100 flex justify-between items-center cursor-pointer ${statusFilter === 'all' ? 'bg-blue-50 text-blue-600' : ''}`}
+                      onClick={() => {
+                        setStatusFilter('all');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                    >
+                      Tất cả sản phẩm
+                      <span className="text-xs text-gray-500">({totalProdCount})</span>
+                    </div>
+                    <div
+                      className={`p-2 hover:bg-gray-100 flex justify-between items-center cursor-pointer ${statusFilter === 'active' ? 'bg-blue-50 text-blue-600' : ''}`}
+                      onClick={() => {
+                        setStatusFilter('active');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                    >
+                      Đang hiển thị
+                      <span className="text-xs text-gray-500">({activeProdCount})</span>
+                    </div>
+                    <div
+                      className={`p-2 hover:bg-gray-100 flex justify-between items-center cursor-pointer ${statusFilter === 'inactive' ? 'bg-blue-50 text-blue-600' : ''}`}
+                      onClick={() => {
+                        setStatusFilter('inactive');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                    >
+                      Đang ẩn
+                      <span className="text-xs text-gray-500">({inactiveProdCount})</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Sắp xếp theo */}
               <div className="relative">
                 <div
                   className="flex items-center border rounded px-3 py-2 cursor-pointer hover:bg-gray-50"
                   onClick={() => {
                     setIsSortDropdownOpen(!isSortDropdownOpen);
+                    setIsFilterDropdownOpen(false);
                   }}
                 >
                   <span>Sắp xếp theo</span>
@@ -1922,36 +1976,24 @@ const ProductList = () => {
           {!loading && !error && sortedProducts.length === 0 && (
             <div className="p-16 text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                {currentView === 'all' ? (
-                  <Eye className="text-gray-400" size={24} />
-                ) : (
-                  <Trash2 className="text-gray-400" size={24} />
-                )}
+                <Eye className="text-gray-400" size={24} />
               </div>
               <h3 className="text-lg font-medium text-gray-700 mb-2">
-                {currentView === 'all' 
-                  ? 'Không có sản phẩm nào đang hiển thị' 
-                  : 'Không có sản phẩm nào trong thùng rác'}
+                Không có sản phẩm nào
               </h3>
               <p className="text-gray-500 mb-6">
-                {currentView === 'all' 
-                  ? 'Tất cả sản phẩm của bạn sẽ hiển thị ở đây khi được kích hoạt.' 
-                  : 'Các sản phẩm bị ẩn sẽ được hiển thị ở đây.'}
+                {statusFilter === 'all' 
+                  ? 'Không có sản phẩm nào trong cửa hàng của bạn.' 
+                  : statusFilter === 'active'
+                    ? 'Không có sản phẩm nào đang hiển thị.'
+                    : 'Không có sản phẩm nào đang bị ẩn.'}
               </p>
-              {currentView === 'trash' && activeProdCount > 0 && (
+              {statusFilter !== 'all' && (
                 <button
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                  onClick={() => setCurrentView('all')}
+                  onClick={() => setStatusFilter('all')}
                 >
-                  Xem sản phẩm đang hiển thị
-                </button>
-              )}
-              {currentView === 'all' && trashProdCount > 0 && (
-                <button
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
-                  onClick={() => setCurrentView('trash')}
-                >
-                  Xem thùng rác
+                  Xem tất cả sản phẩm
                 </button>
               )}
             </div>
@@ -2062,17 +2104,17 @@ const ProductList = () => {
                           </button>
                           
                           <button
-                            className={`p-1 ${currentView === 'trash' ? 'text-green-500 hover:bg-green-50' : 'text-red-500 hover:bg-red-50'} rounded-full transition-colors`}
+                            className={`p-1 ${product.is_active ? 'text-red-500 hover:bg-red-50' : 'text-green-500 hover:bg-green-50'} rounded-full transition-colors`}
                             onClick={() => handleToggleProductStatus(product.id, product.is_active)}
                             disabled={updatingProducts[product.id]}
-                            title={currentView === 'trash' ? "Khôi phục sản phẩm từ thùng rác" : "Chuyển vào thùng rác"}
+                            title={product.is_active ? "Ẩn sản phẩm khỏi cửa hàng" : "Hiển thị sản phẩm trên cửa hàng"}
                           >
                             {updatingProducts[product.id] ? (
                               <Loader size={20} className="animate-spin" />
-                            ) : currentView === 'trash' ? (
-                              <ToggleRight size={20} />
+                            ) : product.is_active ? (
+                              <ToggleLeft size={20} />
                             ) : (
-                              <Trash2 size={20} />
+                              <ToggleRight size={20} />
                             )}
                           </button>
                         </div>

@@ -71,12 +71,15 @@ const TroocEcommerce = () => {
                 // Lấy danh sách sản phẩm
                 const productsData = await ApiService.get('/product', false);
 
-                // Xử lý đường dẫn ảnh cho tất cả sản phẩm
-                const productsWithImages = productsData.map(product => ({
+                // Lọc sản phẩm theo trạng thái is_active = true
+                const activeProducts = productsData.filter(product => 
+                    product.is_active === true || product.is_active === 'true' || product.is_active === 1
+                );
+
+                // Xử lý đường dẫn ảnh cho các sản phẩm đang active
+                const productsWithImages = activeProducts.map(product => ({
                     ...product,
                     thumbnail: getImagePath(product.thumbnail),
-                    // Nếu có các hình ảnh khác thì xử lý tương tự
-                    // images: product.images?.map(img => getImagePath(img))
                 }));
 
                 setProducts(productsWithImages);
@@ -85,13 +88,13 @@ const TroocEcommerce = () => {
                 const categoriesData = await ApiService.get('/categories', false);
                 setCategories(categoriesData);
 
-                // Lọc sản phẩm mới - sử dụng productsWithImages thay vì productsData
+                // Lọc sản phẩm mới - chỉ lấy từ sản phẩm đang active
                 const sortedByDate = [...productsWithImages].sort((a, b) =>
                     new Date(b.created_at) - new Date(a.created_at)
                 );
                 setNewProducts(sortedByDate.slice(0, 5));
 
-                // Lọc sản phẩm đề xuất - sử dụng productsWithImages thay vì productsData
+                // Lọc sản phẩm đề xuất - chỉ từ sản phẩm đang active
                 const featuredProducts = productsWithImages.filter(product => product.is_feature);
                 const hotProducts = productsWithImages.filter(product => product.is_hot);
                 const sortedBySold = [...productsWithImages].sort((a, b) => b.sold - a.sold);
@@ -141,7 +144,13 @@ const TroocEcommerce = () => {
             // Fetch variants để kiểm tra xem sản phẩm có biến thể hay không
             try {
                 const variants = await ApiService.get(`/product-variant/product/${product._id}`, false);
-                const hasVariants = variants && variants.length > 0;
+                
+                // Lọc ra các variant đang active
+                const activeVariants = variants.filter(variant => 
+                    variant.is_active === true || variant.is_active === 'true' || variant.is_active === 1
+                );
+                
+                const hasVariants = activeVariants && activeVariants.length > 0;
 
                 // Nếu sản phẩm có biến thể nhưng chưa chọn biến thể
                 if (hasVariants && !selectedVariant) {
@@ -235,12 +244,29 @@ const TroocEcommerce = () => {
     };
 
     // Handle opening product modal
-    const handleProductClick = (product) => {
-        
-        setSelectedProduct(product);
-        setShowProductModal(true);
-        setProductQuantity(1); // Reset quantity when opening modal
-        setSelectedVariant(null); // Reset selected variant
+    const handleProductClick = async (product) => {
+        // Kiểm tra lại xem sản phẩm còn active không trước khi mở modal
+        try {
+            const updatedProduct = await ApiService.get(`/product/${product._id}`, false);
+            if (updatedProduct.is_active === true || updatedProduct.is_active === 'true' || updatedProduct.is_active === 1) {
+                setSelectedProduct(updatedProduct);
+                setShowProductModal(true);
+                setProductQuantity(1); // Reset quantity when opening modal
+                setSelectedVariant(null); // Reset selected variant
+            } else {
+                setAddCartMessage("Sản phẩm này hiện không có sẵn.");
+                setShowMessage(true);
+                setTimeout(() => {
+                    setShowMessage(false);
+                }, 3000);
+            }
+        } catch (error) {
+            console.error("Error fetching product details:", error);
+            setSelectedProduct(product);
+            setShowProductModal(true);
+            setProductQuantity(1);
+            setSelectedVariant(null);
+        }
     };
 
     // Hiển thị loading

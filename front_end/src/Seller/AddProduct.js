@@ -69,39 +69,27 @@ const AddProduct = () => {
           userShop = await ApiService.get('/shops/my-shop');
           setShop(userShop);
         } catch (err) {
-          console.warn('Không thể tải thông tin shop:', err);
-          // Sử dụng shop mẫu
-          userShop = { _id: 'sample-shop-id', name: 'Shop mẫu' };
-          setShop(userShop);
+          console.error('Không thể tải thông tin shop:', err);
+          setShop(null);
         }
 
         try {
-          // Thử lấy categories
+          // Lấy danh mục
           fetchedCategories = await ApiService.get('/categories');
+          setCategories(fetchedCategories || []);
         } catch (err) {
-          console.warn('Không thể tải danh mục:', err);
-          // Sử dụng danh mục mẫu
-          fetchedCategories = [
-            { _id: 'phone', name: 'Điện thoại' },
-            { _id: 'skincare', name: 'Chăm sóc da' },
-            { _id: 'electronics', name: 'Thiết bị điện tử' }
-          ];
+          console.error('Không thể tải danh mục:', err);
+          setCategories([]);
         }
-        setCategories(fetchedCategories || []);
 
         try {
-          // Thử lấy brands
+          // Lấy thương hiệu
           fetchedBrands = await ApiService.get('/brand');
+          setBrands(fetchedBrands || []);
         } catch (err) {
-          console.warn('Không thể tải thương hiệu:', err);
-          // Sử dụng thương hiệu mẫu
-          fetchedBrands = [
-            { _id: 'apple', name: 'Apple' },
-            { _id: 'samsung', name: 'Samsung' },
-            { _id: 'xiaomi', name: 'Xiaomi' }
-          ];
+          console.error('Không thể tải thương hiệu:', err);
+          setBrands([]);
         }
-        setBrands(fetchedBrands || []);
 
         // If in edit mode, fetch the product details
         if (editMode && editProductId) {
@@ -190,15 +178,23 @@ const AddProduct = () => {
     });
   };
 
-  // Handle category select change (multiple)
+  // Handle category checkbox change
   const handleCategoryChange = (e) => {
-    // Convert selected options to array of values
-    const selectedOptions = Array.from(e.target.selectedOptions).map(option => option.value);
-
-    setNewProduct({
-      ...newProduct,
-      category_id: selectedOptions
-    });
+    const { value, checked } = e.target;
+    
+    if (checked) {
+      // Add the category to the array if checked
+      setNewProduct({
+        ...newProduct,
+        category_id: [...newProduct.category_id, value]
+      });
+    } else {
+      // Remove the category from the array if unchecked
+      setNewProduct({
+        ...newProduct,
+        category_id: newProduct.category_id.filter(catId => catId !== value)
+      });
+    }
 
     // Clear error for this field
     if (formErrors.category_id) {
@@ -297,9 +293,13 @@ const AddProduct = () => {
       formData.append('is_delete', newProduct.is_delete);
 
       // Thêm shop_id và thông tin user
-      formData.append('shop_id', shop?._id || 'sample-shop');
-      formData.append('created_by', currentUser?.id || 'sample-user');
-      formData.append('updated_by', currentUser?.id || 'sample-user');
+      if (shop?._id) {
+        formData.append('shop_id', shop._id);
+      }
+      if (currentUser?.id) {
+        formData.append('created_by', currentUser.id);
+        formData.append('updated_by', currentUser.id);
+      }
 
       // Xử lý danh mục (category_id là mảng)
       if (newProduct.category_id && newProduct.category_id.length > 0) {
@@ -499,27 +499,34 @@ const AddProduct = () => {
                   )}
                 </div>
 
-                {/* Danh mục */}
+                {/* Danh mục - CHANGED to checkboxes */}
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Danh mục <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    multiple
-                    name="category_id"
-                    value={newProduct.category_id}
-                    onChange={handleCategoryChange}
-                    className={`w-full px-3 py-2 border ${formErrors.category_id ? 'border-red-500' : 'border-gray-300'} rounded-md h-32`}
-                  >
-                    {categories.map((category) => (
-                      <option key={category._id} value={category._id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Giữ phím Ctrl (hoặc Command trên Mac) để chọn nhiều danh mục
-                  </p>
+                  <div className={`p-3 border ${formErrors.category_id ? 'border-red-500' : 'border-gray-300'} rounded-md bg-white max-h-60 overflow-y-auto`}>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {categories.map((category) => (
+                        <div key={category._id} className="flex items-start mb-2">
+                          <input
+                            type="checkbox"
+                            id={`category-${category._id}`}
+                            name="category_id"
+                            value={category._id}
+                            checked={newProduct.category_id.includes(category._id)}
+                            onChange={handleCategoryChange}
+                            className="h-4 w-4 mt-1 mr-2"
+                          />
+                          <label 
+                            htmlFor={`category-${category._id}`}
+                            className="text-sm text-gray-700 cursor-pointer"
+                          >
+                            {category.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   {formErrors.category_id && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.category_id}</p>
                   )}

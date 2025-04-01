@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import ApiService from "../../../services/ApiService";
 import AuthService from "../../../services/AuthService";
 import { BE_API_URL } from "../../../config/config";
+import { MapPin, AlertCircle, PlusCircle } from "lucide-react";
 
 const ShippingAddresses = () => {
   const [showAddAddressPopup, setShowAddAddressPopup] = useState(false);
@@ -62,23 +63,6 @@ const ShippingAddresses = () => {
     try {
       setLoading(true);
 
-      // Kiểm tra môi trường phát triển - ưu tiên ghi đè biến isDevelopment để dễ debug
-      const isDevelopment = false; // Ghi đè - set false để luôn gọi API, true để sử dụng dữ liệu mẫu
-
-      if (isDevelopment) {
-        console.log("Đang chạy ở chế độ DEV - Sử dụng dữ liệu mẫu");
-
-        // Delay giả lập API để tạo trải nghiệm thực tế
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Sử dụng dữ liệu mẫu
-        setAddresses(mockAddresses);
-        setError(null);
-        setLoading(false);
-        return;
-      }
-
-      // Kiểm tra userId
       if (!userId) {
         throw new Error("User ID không tồn tại");
       }
@@ -87,8 +71,8 @@ const ShippingAddresses = () => {
 
       // Kiểm tra các endpoints khác nhau mà backend có thể đã đăng ký
       const possibleEndpoints = [
-        `/address/list`, // Lấy tất cả địa chỉ rồi lọc phía client
-        `/user-address/list`, // Lấy tất cả địa chỉ rồi lọc phía client  
+        `/address/list`,
+        `/user-address/list`,
         `/user-address/user/${userId}`,
         `/address/user/${userId}`
       ];
@@ -107,47 +91,35 @@ const ShippingAddresses = () => {
             const allAddresses = Array.isArray(response) ? response :
               (response.data && Array.isArray(response.data)) ? response.data : [];
 
-            console.log("All addresses before filtering:", allAddresses);
-
-            // Lọc địa chỉ theo userId - chuyển đổi cả hai thành chuỗi để so sánh chắc chắn
+            // Lọc địa chỉ theo userId
             const filteredAddresses = allAddresses.filter(addr =>
               String(addr.user_id) === String(userId)
             );
-
-            console.log("Filtered addresses for userId", userId, ":", filteredAddresses);
 
             if (filteredAddresses.length > 0) {
               setAddresses(filteredAddresses);
               foundData = true;
               setError(null);
-              console.log(`Endpoint ${endpoint} hoạt động và tìm thấy ${filteredAddresses.length} địa chỉ!`);
               break;
-            } else {
-              console.log(`Endpoint ${endpoint} hoạt động nhưng không tìm thấy địa chỉ cho userId ${userId}`);
             }
           } else {
             // Nếu là endpoint user, sử dụng dữ liệu trực tiếp
-            console.log("Direct response from user endpoint:", response);
-            processApiResponse(response);
+            if (Array.isArray(response)) {
+              setAddresses(response);
+            } else if (response && typeof response === 'object' && Array.isArray(response.data)) {
+              setAddresses(response.data);
+            } else if (response && typeof response === 'object' && response.addresses && Array.isArray(response.addresses)) {
+              setAddresses(response.addresses);
+            } else if (response && typeof response === 'object' && !Array.isArray(response)) {
+              setAddresses([response]);
+            }
             foundData = true;
             setError(null);
-            console.log(`Endpoint ${endpoint} hoạt động!`);
             break;
           }
         } catch (apiError) {
-          console.log(`Endpoint ${endpoint} không hoạt động:`, apiError.message);
           lastError = apiError;
         }
-      }
-
-      // Nếu không tìm thấy dữ liệu từ bất kỳ endpoint nào
-      if (!foundData) {
-        // Nếu không tìm thấy dữ liệu, sử dụng dữ liệu mẫu trong môi trường phát triển
-        console.log("Không tìm thấy dữ liệu từ API, sử dụng dữ liệu mẫu");
-        setAddresses(mockAddresses);
-
-        // Thông báo lỗi nhưng vẫn hiển thị dữ liệu mẫu
-        setError("Không tìm thấy API, hiển thị dữ liệu mẫu. Lỗi: " + (lastError?.message || "API không tồn tại"));
       }
 
     } catch (err) {
@@ -171,6 +143,7 @@ const ShippingAddresses = () => {
 
       setError(errorMessage);
       setAddresses([]);
+      setError("Không thể tải danh sách địa chỉ");
     } finally {
       setLoading(false);
     }
@@ -178,13 +151,6 @@ const ShippingAddresses = () => {
 
   // Khởi tạo state ban đầu
   useEffect(() => {
-    // In ra thông tin user hiện tại để debug
-    console.log("Current user object:", currentUser);
-    console.log("User ID being used:", userId);
-
-    // Hiển thị thông tin tên người dùng
-    console.log("User name:", getUserName());
-
     if (userId) {
       fetchAddresses();
     } else {
@@ -270,7 +236,8 @@ const ShippingAddresses = () => {
         user_id: userId,
         address_line1: newAddressData.address,
         address_line2: newAddressData.address_line2 || "",
-        city: newAddressData.province,
+        // Combine location components properly
+        city: `${newAddressData.ward}, ${newAddressData.district}, ${newAddressData.province}`,
         country: newAddressData.country,
         phone: newAddressData.phone,
         status: true
@@ -332,17 +299,20 @@ const ShippingAddresses = () => {
       alert("Không thể lưu địa chỉ. Vui lòng kiểm tra lại thông tin và thử lại.");
     }
   };
+  const handleRefreshData = () => {
+    fetchAddresses();
+  };
 
   const handleUpdateAddress = async (updatedAddressData) => {
     try {
       if (!currentAddress || !currentAddress._id) {
         throw new Error("Không tìm thấy ID địa chỉ để cập nhật");
       }
-
+  
       const formattedAddress = {
         address_line1: updatedAddressData.address,
         address_line2: updatedAddressData.address_line2 || "",
-        city: updatedAddressData.province,
+        city: `${updatedAddressData.ward || ''}, ${updatedAddressData.district || ''}, ${updatedAddressData.province || ''}`,
         country: updatedAddressData.country,
         phone: updatedAddressData.phone,
         status: true
@@ -488,20 +458,20 @@ const ShippingAddresses = () => {
 
   // Chuyển đổi dữ liệu địa chỉ từ DB sang định dạng hiển thị
   const formatAddressForDisplay = (addressItem) => {
-    // Lấy tên người dùng
     const name = getUserName();
-
+    
+    // Xử lý địa chỉ
+    const addressLine1 = addressItem.address_line1 || '';
+    const city = addressItem.city || '';
+    
     return {
       id: addressItem._id,
       name: name,
       phone: addressItem.phone,
-      address: `${addressItem.address_line1}${addressItem.address_line2 ? ', ' + addressItem.address_line2 : ''}${addressItem.city ? ', ' + addressItem.city : ''}${addressItem.country ? ', ' + addressItem.country : ''}`
+      addressLine1: addressLine1,
+      city: city,
+      country: addressItem.country || 'Việt Nam'
     };
-  };
-
-  // Thêm button để refresh dữ liệu
-  const handleRefreshData = () => {
-    fetchAddresses();
   };
 
   return (
@@ -518,59 +488,72 @@ const ShippingAddresses = () => {
 
       {loading ? (
         <div className="text-center py-4">Đang tải...</div>
-      ) : error ? (
-        <div className="text-red-500 text-center py-4">
-          {error}
-          <div className="mt-2">
-            <button
-              onClick={handleRefreshData}
-              className="text-purple-600 hover:underline"
-            >
-              Thử lại
-            </button>
-          </div>
-        </div>
       ) : (
         <div className="space-y-4">
+          {/* Hiển thị thông báo không có địa chỉ */}
           {addresses.length === 0 ? (
-            <div className="text-center py-4 text-gray-500">Bạn chưa có địa chỉ nào. Hãy thêm địa chỉ mới.</div>
+            <div className="bg-white p-8 rounded-lg shadow-md text-center">
+              <MapPin size={48} className="mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium mb-2">Bạn chưa có địa chỉ giao hàng nào</h3>
+              <p className="text-gray-500 mb-4">Hãy thêm địa chỉ để đặt hàng thuận tiện hơn</p>
+              <button
+                onClick={handleAddAddress}
+                className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center mx-auto"
+              >
+                <PlusCircle size={16} className="mr-2" />
+                Thêm địa chỉ
+              </button>
+            </div>
           ) : (
-            addresses.map((addressItem) => {
-              const displayAddress = formatAddressForDisplay(addressItem);
-              return (
-                <div key={displayAddress.id} className="border p-4 rounded-md">
-                  <div className="flex justify-between items-center mb-2">
-                    <div>
-                      <p className="font-semibold">{displayAddress.name}</p>
-                      <p className="text-gray-600">{displayAddress.phone}</p>
+            // Hiển thị danh sách địa chỉ
+            <>
+              {addresses.map((addressItem) => {
+                const displayAddress = formatAddressForDisplay(addressItem);
+                return (
+                  <div key={displayAddress.id} className="border p-4 rounded-md shadow-sm">
+                    <div className="flex justify-between items-center mb-2">
+                      <div>
+                        <p className="font-semibold">{displayAddress.name}</p>
+                        <p className="text-gray-600">{displayAddress.phone}</p>
+                      </div>
+                      <div className="space-x-2">
+                        <button
+                          className="text-purple-600 hover:underline"
+                          onClick={() => handleEditAddress(addressItem)}
+                        >
+                          Sửa
+                        </button>
+                        <button
+                          className="text-red-600 hover:underline"
+                          onClick={() => handleDeleteAddress(displayAddress.id)}
+                        >
+                          Xóa
+                        </button>
+                      </div>
                     </div>
-                    <div className="space-x-2">
-                      <button
-                        className="text-purple-600 hover:underline"
-                        onClick={() => handleEditAddress(addressItem)}
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        className="text-red-600 hover:underline"
-                        onClick={() => handleDeleteAddress(displayAddress.id)}
-                      >
-                        Xóa
-                      </button>
+                    <div>
+                      <p className="text-gray-700 font-medium">{displayAddress.addressLine1}</p>
+                      {/* <p className="text-gray-600 text-sm">
+                        {displayAddress.city && displayAddress.city}
+                        {displayAddress.country && displayAddress.country !== 'Việt Nam' ?
+                          `, ${displayAddress.country}` : ''}
+                      </p> */}
                     </div>
                   </div>
-                  <p>{displayAddress.address}</p>
-                </div>
-              );
-            })
+                );
+              })}
+
+              <button
+                className="w-full border-2 border-purple-600 text-purple-600 py-2 rounded-md hover:bg-purple-50 flex items-center justify-center"
+                onClick={handleAddAddress}
+              >
+                <PlusCircle size={16} className="mr-2" />
+                Thêm địa chỉ
+              </button>
+            </>
           )}
 
-          <button
-            className="w-full border-2 border-purple-600 text-purple-600 py-2 rounded-md hover:bg-purple-50"
-            onClick={handleAddAddress}
-          >
-            + Thêm địa chỉ
-          </button>
+
         </div>
       )}
 
@@ -751,9 +734,13 @@ const AddAddressPopup = ({ onClose, onSave }) => {
 
     onSave({
       phone: formData.phone,
-      address: fullAddress,
+      address: formData.address,
       address_line2: formData.address_line2,
+      // Store just the city/province name without duplication
       province: formData.provinceName,
+      // Ensure we pass ward and district separately
+      district: formData.districtName,
+      ward: formData.wardName,
       country: formData.country
     });
   };
@@ -1083,9 +1070,9 @@ const EditAddressPopup = ({ address, onClose, onSave }) => {
 
     onSave({
       phone: formData.phone,
-      address: fullAddress,
+      address: formData.address, // Just the street address
       address_line2: formData.address_line2,
-      province: formData.provinceName,
+      province: `${formData.wardName}, ${formData.districtName}, ${formData.provinceName}`, // Combine location elements
       country: formData.country
     });
   };

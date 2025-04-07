@@ -377,7 +377,7 @@ const AddProduct = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex  bg-gray-100 ">
       {/* Sidebar */}
       <Sidebar onNavigate={(path) => navigate(path)} />
 

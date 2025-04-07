@@ -119,24 +119,7 @@ const Footer = () => {
         </div>
       </div>
 
-      {/* Payment Methods */}
-      <div className="bg-gray-100 py-4">
-        <div className="mx-auto max-w-7xl flex justify-between items-center">
-          <p className="text-gray-700">
-            Copyright © TROOC Đã đăng ký Bản quyền. Được cung cấp bởi VŨ ĐỊNH
-          </p>
-          <div className="flex space-x-4">
-            {paymentMethods.map((method) => (
-              <img 
-                key={method}
-                src={`/payment-icons/${method}.png`} 
-                alt={method}
-                className="h-8 w-auto"
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+      
     </footer>
   );
 };

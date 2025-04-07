@@ -27,4 +27,13 @@ ProductReviewRouter.put('/edit/:id', [VerifyJwt.verifyToken], productReviewContr
 // Xóa đánh giá (yêu cầu đăng nhập)
 ProductReviewRouter.delete('/delete/:id', [VerifyJwt.verifyToken], productReviewController.deleteProductReview);
 
+// MỚI: Thêm phản hồi đánh giá (chỉ dành cho seller)
+ProductReviewRouter.post('/reply/:id', [VerifyJwt.verifyToken, VerifyJwt.isSeller], productReviewController.addReviewReply);
+
+// MỚI: Cập nhật phản hồi đánh giá (chỉ dành cho seller)
+ProductReviewRouter.put('/reply/:id', [VerifyJwt.verifyToken, VerifyJwt.isSeller], productReviewController.updateReviewReply);
+
+// MỚI: Xóa phản hồi đánh giá (chỉ dành cho seller hoặc admin)
+ProductReviewRouter.delete('/reply/:id', [VerifyJwt.verifyToken, VerifyJwt.isAdminOrSeller], productReviewController.deleteReviewReply);
+
 module.exports = ProductReviewRouter;

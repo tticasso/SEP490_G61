@@ -36,6 +36,8 @@ import PaymentCallback from './pages/checkout/payment/PaymentCallback';
 import MessageBubble from './pages/UserProfile/components/messageBubble';
 
 import SellerSettings from './Seller/SellerChangePassword';
+import ProductReviews from './Seller/ProductReview';
+import ReviewDetail from './Seller/ReviewDetails';
 
 function App() {
   const location = useLocation();
@@ -153,6 +155,16 @@ function App() {
           <Route path="/seller-dashboard/settings" element={
             <SellerRoute>
               <SellerSettings />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/reviews" element={
+            <SellerRoute>
+              <ProductReviews />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/reviews/:id" element={
+            <SellerRoute>
+              <ReviewDetail />
             </SellerRoute>
           } />
 

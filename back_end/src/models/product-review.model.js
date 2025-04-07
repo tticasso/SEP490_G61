@@ -24,6 +24,18 @@ const productReviewSchema = new Schema({
     comment: {
         type: String
     },
+    // Thêm trường reply để lưu trữ phản hồi của seller
+    reply: {
+        text: {
+            type: String
+        },
+        created_at: {
+            type: Date
+        },
+        updated_at: {
+            type: Date
+        }
+    },
     created_at: {
         type: Date,
         default: Date.now

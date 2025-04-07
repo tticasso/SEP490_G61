@@ -1,6 +1,9 @@
 const db = require("../models");
 const ProductReview = db.productReview;
 const mongoose = require("mongoose");
+
+// [Keeping all existing functions from product-review.controller.js]
+
 // Lấy tất cả đánh giá sản phẩm
 const getAllProductReviews = async (req, res) => {
     try {
@@ -73,7 +76,8 @@ const getProductReviewsBySellerId = async (req, res) => {
 // Thêm đánh giá mới
 const createProductReview = async (req, res) => {
     try {
-        const { product_id, user_id, seller_id, rating, comment } = req.body;
+        const { product_id, seller_id, rating, comment } = req.body;
+        const user_id = req.userId; // Lấy user_id từ token đã được xác thực
 
         // Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
         const existingReview = await ProductReview.findOne({ product_id, user_id });
@@ -104,8 +108,25 @@ const createProductReview = async (req, res) => {
 const updateProductReview = async (req, res) => {
     try {
         const { rating, comment } = req.body;
+        const reviewId = req.params.id;
+        const userId = req.userId; // Lấy user_id từ token
+
+        // Tìm đánh giá 
+        const review = await ProductReview.findById(reviewId);
+        
+        // Kiểm tra xem đánh giá có tồn tại không
+        if (!review) {
+            return res.status(404).json({ message: "Review not found" });
+        }
+        
+        // Kiểm tra xem người dùng có phải là chủ sở hữu của đánh giá không
+        if (review.user_id.toString() !== userId) {
+            return res.status(403).json({ message: "You can only update your own reviews" });
+        }
+
+        // Cập nhật đánh giá
         const updatedProductReview = await ProductReview.findByIdAndUpdate(
-            req.params.id,
+            reviewId,
             {
                 rating,
                 comment,
@@ -113,10 +134,6 @@ const updateProductReview = async (req, res) => {
             },
             { new: true }
         );
-
-        if (!updatedProductReview) {
-            return res.status(404).json({ message: "Review not found" });
-        }
 
         // Cập nhật rating trung bình cho sản phẩm
         await updateProductAverageRating(updatedProductReview.product_id);
@@ -130,14 +147,26 @@ const updateProductReview = async (req, res) => {
 // Xóa đánh giá
 const deleteProductReview = async (req, res) => {
     try {
-        const productReview = await ProductReview.findById(req.params.id);
-        if (!productReview) {
+        const reviewId = req.params.id;
+        const userId = req.userId; // Lấy user_id từ token
+        
+        // Tìm đánh giá
+        const review = await ProductReview.findById(reviewId);
+        
+        // Kiểm tra xem đánh giá có tồn tại không
+        if (!review) {
             return res.status(404).json({ message: "Review not found" });
         }
+        
+        // Kiểm tra nếu người dùng là chủ sở hữu của đánh giá hoặc là admin
+        if (review.user_id.toString() !== userId && !req.isAdmin) {
+            return res.status(403).json({ message: "You can only delete your own reviews" });
+        }
 
-        const product_id = productReview.product_id;
+        const product_id = review.product_id;
 
-        await ProductReview.findByIdAndDelete(req.params.id);
+        // Xóa đánh giá
+        await ProductReview.findByIdAndDelete(reviewId);
 
         // Cập nhật rating trung bình cho sản phẩm
         await updateProductAverageRating(product_id);
@@ -171,6 +200,128 @@ const updateProductAverageRating = async (productId) => {
     }
 };
 
+// MỚI: Thêm phản hồi đánh giá (từ seller)
+const addReviewReply = async (req, res) => {
+    try {
+        const reviewId = req.params.id;
+        const { replyText } = req.body;
+        const sellerId = req.userId; // Lấy seller_id từ token đã được xác thực
+
+        // Tìm đánh giá
+        const review = await ProductReview.findById(reviewId);
+
+        // Kiểm tra xem đánh giá có tồn tại không
+        if (!review) {
+            return res.status(404).json({ message: "Review not found" });
+        }
+
+        // Kiểm tra xem người dùng hiện tại có phải là seller của sản phẩm trong đánh giá này không
+        if (review.seller_id.toString() !== sellerId) {
+            return res.status(403).json({ message: "You can only reply to reviews of your products" });
+        }
+
+        // Cập nhật đánh giá với phản hồi
+        const updatedReview = await ProductReview.findByIdAndUpdate(
+            reviewId,
+            {
+                reply: {
+                    text: replyText,
+                    created_at: Date.now(),
+                    updated_at: Date.now()
+                },
+                updated_at: Date.now()
+            },
+            { new: true }
+        );
+
+        res.status(200).json(updatedReview);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// MỚI: Cập nhật phản hồi đánh giá
+const updateReviewReply = async (req, res) => {
+    try {
+        const reviewId = req.params.id;
+        const { replyText } = req.body;
+        const sellerId = req.userId; // Lấy seller_id từ token đã được xác thực
+
+        // Tìm đánh giá
+        const review = await ProductReview.findById(reviewId);
+
+        // Kiểm tra xem đánh giá có tồn tại không
+        if (!review) {
+            return res.status(404).json({ message: "Review not found" });
+        }
+
+        // Kiểm tra xem phản hồi có tồn tại không
+        if (!review.reply || !review.reply.text) {
+            return res.status(404).json({ message: "Reply not found" });
+        }
+
+        // Kiểm tra xem người dùng hiện tại có phải là seller của sản phẩm trong đánh giá này không
+        if (review.seller_id.toString() !== sellerId) {
+            return res.status(403).json({ message: "You can only update replies to reviews of your products" });
+        }
+
+        // Cập nhật đánh giá với phản hồi đã chỉnh sửa
+        const updatedReview = await ProductReview.findByIdAndUpdate(
+            reviewId,
+            {
+                'reply.text': replyText,
+                'reply.updated_at': Date.now(),
+                updated_at: Date.now()
+            },
+            { new: true }
+        );
+
+        res.status(200).json(updatedReview);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// MỚI: Xóa phản hồi đánh giá
+const deleteReviewReply = async (req, res) => {
+    try {
+        const reviewId = req.params.id;
+        const sellerId = req.userId; // Lấy seller_id từ token đã được xác thực
+
+        // Tìm đánh giá
+        const review = await ProductReview.findById(reviewId);
+
+        // Kiểm tra xem đánh giá có tồn tại không
+        if (!review) {
+            return res.status(404).json({ message: "Review not found" });
+        }
+
+        // Kiểm tra xem phản hồi có tồn tại không
+        if (!review.reply || !review.reply.text) {
+            return res.status(404).json({ message: "Reply not found" });
+        }
+
+        // Kiểm tra xem người dùng hiện tại có phải là seller của sản phẩm trong đánh giá này không
+        if (review.seller_id.toString() !== sellerId && !req.isAdmin) {
+            return res.status(403).json({ message: "You can only delete replies to reviews of your products" });
+        }
+
+        // Cập nhật đánh giá, xóa phản hồi
+        const updatedReview = await ProductReview.findByIdAndUpdate(
+            reviewId,
+            {
+                $unset: { reply: 1 },
+                updated_at: Date.now()
+            },
+            { new: true }
+        );
+
+        res.status(200).json({ message: "Reply deleted successfully", review: updatedReview });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 const productReviewController = {
     getAllProductReviews,
     getProductReviewById,
@@ -178,7 +329,11 @@ const productReviewController = {
     getProductReviewsBySellerId,
     createProductReview,
     updateProductReview,
-    deleteProductReview
+    deleteProductReview,
+    // Thêm các hàm mới vào Controller
+    addReviewReply,
+    updateReviewReply,
+    deleteReviewReply
 };
 
 module.exports = productReviewController;

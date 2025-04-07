@@ -14,7 +14,9 @@ import {
   ToggleRight,
   Calendar,
   AlertCircle,
-  Filter
+  Filter,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import ApiService from '../services/ApiService';
@@ -1539,6 +1541,11 @@ const ProductList = () => {
   const [viewProduct, setViewProduct] = useState(null);
   const [updatingProducts, setUpdatingProducts] = useState({});
   
+  // Thêm state cho phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  
   // UI helpers
   const handleViewProduct = (product) => {
     setViewProduct(product);
@@ -1653,6 +1660,12 @@ const ProductList = () => {
     };
   }, []);
 
+  // Hàm xử lý chuyển trang
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo(0, 0); // Cuộn lên đầu trang khi chuyển trang
+  };
+
   // Filtering and sorting
   const activeProdCount = useMemo(() => {
     return products.filter(p => p.is_active === true && p.is_delete === false).length;
@@ -1704,6 +1717,23 @@ const ProductList = () => {
 
     return filteredProducts;
   }, [products, sortConfig, searchTerm, statusFilter]);
+
+  // Cập nhật tổng số trang mỗi khi sortedProducts thay đổi
+  useEffect(() => {
+    setTotalPages(Math.ceil(sortedProducts.length / itemsPerPage));
+  }, [sortedProducts, itemsPerPage]);
+
+  // Áp dụng phân trang cho danh sách sản phẩm đã lọc và sắp xếp
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return sortedProducts.slice(startIndex, endIndex);
+  }, [sortedProducts, currentPage, itemsPerPage]);
+
+  // Reset currentPage về 1 khi có thay đổi bộ lọc
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const handleSort = (key) => {
     let direction = 'ascending';
@@ -1809,14 +1839,16 @@ const ProductList = () => {
     }
   };
 
-  // Render the component
+  // Cấu trúc đã được cập nhật để khắc phục vấn đề hai thanh cuộn
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar onNavigate={(path) => navigate(path)} />
+    <div className="flex bg-gray-100">
+      {/* Sidebar với chiều cao cố định */}
+      <div className="w-64 flex-shrink-0 h-screen">
+        <Sidebar onNavigate={(path) => navigate(path)} />
+      </div>
 
-      {/* Main content */}
-      <div className="flex-1 p-6 overflow-auto">
+      {/* Main content - không có overflow */}
+      <div className="flex-1 p-6">
         <div className="bg-white rounded-lg shadow-md">
           {/* Header */}
           <div className="p-4 border-b flex justify-between items-center">
@@ -2041,7 +2073,7 @@ const ProductList = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedProducts.map((product) => (
+                  {paginatedProducts.map((product) => (
                     <tr key={product.id} className="border-b hover:bg-gray-50">
                       <td className="p-4 w-12">
                         <input type="checkbox" className="rounded" />
@@ -2123,6 +2155,65 @@ const ProductList = () => {
                   ))}
                 </tbody>
               </table>
+              
+              {/* Thêm phân trang */}
+              <div className="px-4 py-3 flex justify-between items-center border-t">
+                <div className="flex items-center">
+                  <button
+                    className={`p-1 rounded-md border ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    // Hiển thị 5 trang xung quanh trang hiện tại
+                    const pageNumber = totalPages <= 5 
+                      ? i + 1 
+                      : Math.max(1, Math.min(currentPage - 2 + i, totalPages));
+                      
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => handlePageChange(pageNumber)}
+                        className={`mx-1 px-3 py-1 rounded-md ${currentPage === pageNumber ? 'bg-blue-600 text-white' : 'border hover:bg-gray-100'}`}
+                      >
+                        {pageNumber}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    className={`p-1 rounded-md border ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+                
+                <div className="flex items-center text-sm">
+                  <span>Trang {currentPage} / {totalPages}</span>
+                  <span className="mx-4">-</span>
+                  <span>Hiển thị</span>
+                  <select 
+                    className="mx-2 border rounded p-1" 
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1); // Reset về trang đầu tiên khi thay đổi số mục hiển thị
+                    }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                  <span>/</span>
+                  <span className="ml-2">{sortedProducts.length} sản phẩm</span>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -2146,5 +2237,6 @@ const ProductList = () => {
     </div>
   );
 };
+
 
 export default ProductList;

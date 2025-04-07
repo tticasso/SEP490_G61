@@ -8,7 +8,8 @@ import {
   HelpCircle, 
   ChevronDown, 
   ChevronRight,
-  Store
+  Store,
+  Star // Thêm icon Star cho phần đánh giá và phản hồi
 } from 'lucide-react';
 
 const Sidebar = ({ onNavigate }) => {
@@ -25,10 +26,14 @@ const Sidebar = ({ onNavigate }) => {
   
   const isInInventorySection = location.pathname.includes('/inventory');
   
+  const isInReviewSection = location.pathname.includes('/reviews') ||
+                           location.pathname.includes('/feedback');
+  
   const [openMenu, setOpenMenu] = useState(
     isInProductSection ? 'Sản phẩm' : 
     isInPromotionSection ? 'Khuyến mại' : 
-    isInInventorySection ? 'Quản lý kho hàng' : null
+    isInInventorySection ? 'Quản lý kho hàng' : 
+    isInReviewSection ? 'Đánh giá & Phản hồi' : null
   );
 
   const toggleMenu = (menuName) => {
@@ -63,7 +68,6 @@ const Sidebar = ({ onNavigate }) => {
         { label: 'Tất cả sản phẩm', path: '/seller-dashboard/product' },
         { label: 'Thêm mới sản phẩm', path: '/seller-dashboard/add-product' },
         { label: 'Giảm giá sản phẩm', path: '/seller-dashboard/discount-product' },
-        { label: 'Danh sách biến thể', path: '/seller-dashboard/variants' }
       ]
     },
     { 
@@ -75,17 +79,17 @@ const Sidebar = ({ onNavigate }) => {
         { label: 'Tạo mã giảm giá', path: '/seller-dashboard/add-discount' }
       ]
     },
-    { 
-      icon: <Package className="mr-3 text-gray-500" />, 
-      label: 'Quản lý kho hàng', 
-      expandable: true,
-      subItems: [
-        { label: 'Thống kê hàng tồn kho', path: '/seller-dashboard/inventory-stock' },
-        { label: 'Lịch sử nhập hàng', path: '/seller-dashboard/import-history' },
-        { label: 'Lịch sử xuất hàng', path: '/seller-dashboard/export-history' },
-        { label: 'Nhập thêm hàng', path: '/seller-dashboard/create-import' }
-      ]
-    },
+    // { 
+    //   icon: <Package className="mr-3 text-gray-500" />, 
+    //   label: 'Quản lý kho hàng', 
+    //   expandable: true,
+    //   subItems: [
+    //     { label: 'Thống kê hàng tồn kho', path: '/seller-dashboard/inventory-stock' },
+    //     { label: 'Lịch sử nhập hàng', path: '/seller-dashboard/import-history' },
+    //     { label: 'Lịch sử xuất hàng', path: '/seller-dashboard/export-history' },
+    //     { label: 'Nhập thêm hàng', path: '/seller-dashboard/create-import' }
+    //   ]
+    // },
     { 
       icon: <Users className="mr-3 text-gray-500" />, 
       label: 'Khách hàng',
@@ -93,6 +97,15 @@ const Sidebar = ({ onNavigate }) => {
       subItems: [
         { label: 'Khách hàng đăng ký', path: '/seller-dashboard/registed-user' },
         { label: 'Hỗ trợ', path: '/seller-dashboard/support' }
+      ]
+    },
+    // Thêm mục "Đánh giá & Phản hồi" sau phần Khách hàng
+    { 
+      icon: <Star className="mr-3 text-gray-500" />, 
+      label: 'Đánh giá & Phản hồi',
+      expandable: true,
+      subItems: [
+        { label: 'Tất cả đánh giá', path: '/seller-dashboard/reviews' },
       ]
     },
     { 

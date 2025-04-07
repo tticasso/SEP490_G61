@@ -61,8 +61,17 @@ const flashingAnimation = `
   }
 }
 
+@keyframes scrollHorizontal {
+  0% {
+    transform: translateX(20%);
+  }
+  100% {
+    transform: translateX(-20%);  
+  }
+}
+
 .flashing-text {
-  animation: flash 2s infinite, bounce 1.5s infinite;
+  animation: flash 2s infinite, bounce 1.5s infinite, scrollHorizontal 5s linear infinite alternate;
   font-weight: bold;
   background-size: 200% 200%;
   color: white;
@@ -71,11 +80,14 @@ const flashingAnimation = `
   align-items: center;
   gap: 8px;
   transition: all 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .flashing-text:hover {
   background-position: right center;
   transform: scale(1.05);
+  animation-play-state: paused;
 }
 
 .piggy-bank-icon {

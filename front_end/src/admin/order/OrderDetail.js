@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Truck, CreditCard, User, MapPin, Package, ShoppingBag } from 'lucide-react';
+import { ChevronLeft, Truck, CreditCard, User, MapPin, Package, ShoppingBag, Store } from 'lucide-react';
 import ApiService from '../../services/ApiService';
 import ShopOwner from '../../assets/ShopOwner.png'; // Fallback image
 
@@ -17,6 +17,7 @@ const OrderDetail = ({ orderId, onBack }) => {
   const [customerData, setCustomerData] = useState(null);
   const [addressData, setAddressData] = useState(null);
   const [productImages, setProductImages] = useState({});
+  const [shopData, setShopData] = useState({}); // New state for shop data
 
   // State for variant data
   const [variantDetails, setVariantDetails] = useState({});
@@ -75,6 +76,8 @@ const OrderDetail = ({ orderId, onBack }) => {
       fetchProductDetails(orderDetails);
       // Add new function call to fetch variant details
       fetchVariantDetails(orderDetails);
+      // Add new function call to fetch shop details
+      fetchShopDetails(orderDetails);
     }
   }, [orderDetails]); // Only re-run when orderDetails changes
 
@@ -167,6 +170,67 @@ const OrderDetail = ({ orderId, onBack }) => {
     } catch (error) {
       console.error("Error fetching product details:", error);
     }
+  };
+
+  // New function: Fetch shop details for products
+  const fetchShopDetails = async (orderDetails) => {
+    try {
+      const shopIds = [];
+      
+      // First, collect all unique shop IDs from the products
+      orderDetails.forEach(item => {
+        if (item.product_id && item.product_id.shop_id) {
+          // Handle shop_id whether it's an object or string
+          const shopId = typeof item.product_id.shop_id === 'object' 
+            ? item.product_id.shop_id._id 
+            : item.product_id.shop_id;
+          
+          if (shopId && !shopIds.includes(shopId)) {
+            shopIds.push(shopId);
+          }
+        }
+      });
+
+      // Get shop information for each unique shop ID
+      const newShopData = {};
+      
+      await Promise.all(shopIds.map(async (shopId) => {
+        try {
+          const shopInfo = await ApiService.get(`/shops/public/${shopId}`, false);
+          if (shopInfo) {
+            newShopData[shopId] = shopInfo;
+          }
+        } catch (error) {
+          console.error(`Error fetching shop data for shop ${shopId}:`, error);
+        }
+      }));
+      
+      setShopData(newShopData);
+    } catch (error) {
+      console.error("Error fetching shop details:", error);
+    }
+  };
+
+  // New function: Get shop name for a product
+  const getShopName = (productItem) => {
+    if (!productItem || !productItem.shop_id) {
+      return "Không xác định";
+    }
+    
+    const shopId = typeof productItem.shop_id === 'object' 
+      ? productItem.shop_id._id 
+      : productItem.shop_id;
+    
+    if (shopData[shopId]) {
+      return shopData[shopId].name;
+    }
+    
+    // Fallback to product's shop_id.name if available
+    if (typeof productItem.shop_id === 'object' && productItem.shop_id.name) {
+      return productItem.shop_id.name;
+    }
+    
+    return "Không xác định";
   };
 
   // New function: Fetch variant details
@@ -332,7 +396,7 @@ const OrderDetail = ({ orderId, onBack }) => {
 
   // Handle cancel order
   const handleCancelOrder = async () => {
-    if (window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
+    if (window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')) {
       try {
         setIsUpdating(true);
 
@@ -595,6 +659,56 @@ const OrderDetail = ({ orderId, onBack }) => {
               <div className="mt-4 p-3 bg-red-100 text-red-700 rounded text-center">
                 Đơn hàng đã bị hủy
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Products section - UPDATED to show shop information */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <ShoppingBag size={20} className="mr-2" />
+            Sản phẩm
+          </h2>
+          <div className="bg-white rounded-md border border-gray-200 p-4">
+            {orderDetails.length > 0 ? (
+              <div className="divide-y divide-gray-200">
+                {orderDetails.map((item) => (
+                  <div key={item._id} className="py-4 flex">
+                    <div className="w-16 h-16 rounded-md overflow-hidden">
+                      <img 
+                        src={getItemImage(item)} 
+                        alt={item.product_id?.name || "Product"} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="ml-4 flex-grow">
+                      <h3 className="font-medium">{item.product_id?.name || "Sản phẩm"}</h3>
+                      
+                      {/* Hiển thị thông tin shop */}
+                      <div className="flex items-center text-sm text-gray-600 mt-1">
+                        <Store size={14} className="mr-1 text-blue-600" />
+                        <span>Cửa hàng: {getShopName(item.product_id)}</span>
+                      </div>
+                      
+                      {/* Hiển thị thuộc tính biến thể */}
+                      {item._id && variantDetails[item._id] && renderVariantAttributes(variantDetails[item._id])}
+                      
+                      <div className="flex justify-between mt-1">
+                        <div className="text-sm text-gray-600">
+                          <span>Số lượng: {item.quantity}</span>
+                          <span className="mx-2">|</span>
+                          <span>Đơn giá: {formatPrice(item.price)}</span>
+                        </div>
+                        <div className="font-medium text-blue-600">
+                          {formatPrice(item.price * item.quantity)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>Không có dữ liệu chi tiết sản phẩm</p>
             )}
           </div>
         </div>

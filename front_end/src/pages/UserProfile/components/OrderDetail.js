@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Truck, Package, Calendar, MapPin, CreditCard, Clock, AlertTriangle, CheckCircle, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Truck, Package, Calendar, MapPin, CreditCard, Clock, AlertTriangle, CheckCircle, ShoppingBag, Store } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ApiService from '../../../services/ApiService';
 import AuthService from '../../../services/AuthService';
@@ -9,6 +9,7 @@ const OrderDetail = () => {
     const [orderDetails, setOrderDetails] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [shopData, setShopData] = useState({});  // State để lưu thông tin shop
 
     const { id } = useParams();
     const navigate = useNavigate();
@@ -19,7 +20,7 @@ const OrderDetail = () => {
 
     useEffect(() => {
         const fetchOrderDetails = async () => {
-            
+
             try {
                 setLoading(true);
 
@@ -34,12 +35,19 @@ const OrderDetail = () => {
                 }
 
                 // Kiểm tra xem đơn hàng có thuộc về người dùng hiện tại không
-                if (orderData.order.customer_id._id !== userId ) {
+                if (orderData.order.customer_id._id !== userId) {
                     throw new Error("Bạn không có quyền xem đơn hàng này");
                 }
 
                 setOrder(orderData.order);
-                setOrderDetails(orderData.orderDetails || []);
+
+                // Lấy chi tiết đơn hàng và thêm thông tin shop
+                const details = orderData.orderDetails || [];
+                setOrderDetails(details);
+
+                // Lấy thông tin shop cho mỗi sản phẩm nếu cần
+                await fetchShopDetails(details);
+
                 setLoading(false);
             } catch (err) {
                 console.error("Error fetching order details:", err);
@@ -50,6 +58,34 @@ const OrderDetail = () => {
 
         fetchOrderDetails();
     }, [id, userId]);
+
+    // Hàm lấy thông tin shop cho các sản phẩm
+    const fetchShopDetails = async (details) => {
+        const newShopData = { ...shopData };
+
+        // Dùng Promise.all để lấy thông tin shop cho tất cả sản phẩm cùng lúc
+        await Promise.all(details.map(async (item) => {
+            if (item.product_id && item.product_id.shop_id) {
+                const shopId = typeof item.product_id.shop_id === 'object'
+                    ? item.product_id.shop_id._id
+                    : item.product_id.shop_id;
+
+                // Kiểm tra nếu đã lấy thông tin shop này rồi thì không cần lấy lại
+                if (!newShopData[shopId]) {
+                    try {
+                        const shopInfo = await ApiService.get(`/shops/public/${shopId}`, false);
+                        if (shopInfo) {
+                            newShopData[shopId] = shopInfo;
+                        }
+                    } catch (error) {
+                        console.error(`Không thể lấy thông tin shop ${shopId}:`, error);
+                    }
+                }
+            }
+        }));
+
+        setShopData(newShopData);
+    };
 
     // Xử lý hủy đơn hàng
     const handleCancelOrder = async () => {
@@ -271,10 +307,11 @@ const OrderDetail = () => {
                             <ShoppingBag size={20} className="mr-2 text-purple-600" />
                             Sản phẩm ({getTotalItems()})
                         </h2>
-                        {(order.order_status === 'delivered') && (
+                        {/* Nút đánh giá chỉ hiển thị khi order_status là 'delivered' */}
+                        {order.order_status === 'delivered' && (
                             <button
-                                onClick={() => navigate(`/review/order/${order._id}`)}
-                                className="px-3 py-1 border border-purple-600 text-purple-600 rounded-md hover:bg-purple-50 text-sm"
+                                onClick={() => navigate(`/user-profile/review/order/${order._id}`)}
+                                className="px-4 py-2 border border-purple-600 text-purple-600 rounded-md hover:bg-purple-50"
                             >
                                 Đánh giá sản phẩm
                             </button>
@@ -284,44 +321,68 @@ const OrderDetail = () => {
                     <div className="space-y-4 mb-6">
                         {orderDetails.length > 0 ? (
                             <div className="divide-y divide-gray-100">
-                                {orderDetails.map((item) => (
-                                    <div key={item._id} className="flex py-4">
-                                        <div className="w-20 h-20">
-                                            <img
-                                                src={item.product_id?.thumbnail || item.product_id?.image || '/placeholder-product.png'}
-                                                alt={item.product_id?.name || "Sản phẩm"}
-                                                className="w-full h-full object-cover rounded"
-                                            />
-                                        </div>
-                                        <div className="ml-4 flex-grow">
-                                            <h3 className="font-medium text-gray-800">{item.product_id?.name || "Sản phẩm"}</h3>
-                                            <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-x-4 text-sm text-gray-600">
-                                                <p>Mã sản phẩm: <span className="font-medium">{item.product_id?.id || 'N/A'}</span></p>
-                                                <p>Đơn giá: <span className="font-medium">{formatPrice(item.price || (item.product_id?.price || 0))}</span></p>
-                                                <p>Số lượng: <span className="font-medium">{item.quantity}</span></p>
-                                                {item.discount_id && (
-                                                    <p>Giảm giá: <span className="font-medium text-red-600">{item.discount_id.name || 'Có giảm giá'}</span></p>
+                                {orderDetails.map((item) => {
+                                    // Lấy thông tin shop cho sản phẩm này
+                                    let shopInfo = null;
+                                    if (item.product_id && item.product_id.shop_id) {
+                                        const shopId = typeof item.product_id.shop_id === 'object'
+                                            ? item.product_id.shop_id._id
+                                            : item.product_id.shop_id;
+                                        shopInfo = shopData[shopId];
+                                    }
+
+                                    return (
+                                        <div key={item._id} className="flex py-4">
+                                            <div className="">
+                                                <img
+                                                    src={item.product_id?.thumbnail || item.product_id?.image || '/placeholder-product.png'}
+                                                    alt={item.product_id?.name || "Sản phẩm"}
+                                                    className="w-full h-full object-cover rounded"
+                                                />
+                                            </div>
+                                            <div className="ml-4 flex-grow">
+                                                <h3 className="font-medium text-gray-800">{item.product_id?.name || "Sản phẩm"}</h3>
+
+                                                {/* Hiển thị tên cửa hàng */}
+                                                <div className="flex items-center mt-1 text-sm text-gray-600">
+                                                    <Store size={14} className="mr-1 text-purple-600" />
+                                                    <span className="font-medium">
+                                                        {shopInfo ? shopInfo.name : (
+                                                            typeof item.product_id?.shop_id === 'object' && item.product_id?.shop_id.name
+                                                                ? item.product_id.shop_id.name
+                                                                : 'Không rõ cửa hàng'
+                                                        )}
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-x-4 text-sm text-gray-600">
+                                                    <p>Mã sản phẩm: <span className="font-medium">{item.product_id?.id || 'N/A'}</span></p>
+                                                    <p>Đơn giá: <span className="font-medium">{formatPrice(item.price || (item.product_id?.price || 0))}</span></p>
+                                                    <p>Số lượng: <span className="font-medium">{item.quantity}</span></p>
+                                                    {item.discount_id && (
+                                                        <p>Giảm giá: <span className="font-medium text-red-600">{item.discount_id.name || 'Có giảm giá'}</span></p>
+                                                    )}
+                                                </div>
+                                                {item.product_id?.description && (
+                                                    <p className="mt-1 text-sm text-gray-500 line-clamp-2">{item.product_id.description}</p>
                                                 )}
                                             </div>
-                                            {item.product_id?.description && (
-                                                <p className="mt-1 text-sm text-gray-500 line-clamp-2">{item.product_id.description}</p>
-                                            )}
+                                            <div className="ml-4 text-right">
+                                                <p className="font-semibold text-purple-700">
+                                                    {formatPrice((item.price || (item.product_id?.price || 0)) * item.quantity)}
+                                                </p>
+                                                {order.order_status === 'delivered' && (
+                                                    <button
+                                                        onClick={() => navigate(`/product/${item.product_id?._id}`)}
+                                                        className="mt-2 text-sm text-purple-600 hover:text-purple-800"
+                                                    >
+                                                        Mua lại
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="ml-4 text-right">
-                                            <p className="font-semibold text-purple-700">
-                                                {formatPrice((item.price || (item.product_id?.price || 0)) * item.quantity)}
-                                            </p>
-                                            {order.order_status === 'delivered' && (
-                                                <button 
-                                                    onClick={() => navigate(`/product/${item.product_id?._id}`)}
-                                                    className="mt-2 text-sm text-purple-600 hover:text-purple-800"
-                                                >
-                                                    Mua lại
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ) : (
                             <p className="text-gray-600">Không có thông tin chi tiết sản phẩm</p>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Clock, Heart, Share2 } from 'lucide-react';
+import { MapPin, Clock, Heart, Store } from 'lucide-react';
 import dongho from '../../assets/ProductDetail.png';
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
@@ -47,13 +47,13 @@ const ProductDetail = () => {
         if (imgPath.startsWith('http')) return imgPath;
         // Kiểm tra nếu imgPath là đường dẫn tương đối
         if (imgPath.startsWith('/uploads')) return `${BE_API_URL}${imgPath}`;
-        
+
         // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
         if (imgPath.includes('shops')) {
             const fileName = imgPath.split("\\").pop();
             return `${BE_API_URL}/uploads/shops/${fileName}`;
         }
-        
+
         // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
         const fileName = imgPath.split("\\").pop();
         return `${BE_API_URL}/uploads/products/${fileName}`;
@@ -62,6 +62,16 @@ const ProductDetail = () => {
     // Check if user is logged in
     const isLoggedIn = AuthService.isLoggedIn();
     const currentUser = AuthService.getCurrentUser();
+
+    const fetchProductReviews = async (productId) => {
+        try {
+            const reviews = await ApiService.get(`/product-review/product/${productId}`, false);
+            return reviews;
+        } catch (error) {
+            console.error("Error fetching product reviews:", error);
+            return [];
+        }
+    };
 
     // Get product ID from URL
     useEffect(() => {
@@ -103,7 +113,7 @@ const ProductDetail = () => {
                             ...variant,
                             images: variant.images?.map(img => getImagePath(img)) || []
                         }));
-                        
+
                         setVariants(processedVariants);
 
                         // Find default variant or use the first one
@@ -148,7 +158,7 @@ const ProductDetail = () => {
 
             // Fetch shop data
             const shopData = await ApiService.get(`/shops/public/${shopId}`, false);
-            
+
             // Xử lý ảnh logo và ảnh bìa cho shop
             if (shopData) {
                 if (shopData.logo) {
@@ -158,7 +168,7 @@ const ProductDetail = () => {
                     shopData.image_cover = getImagePath(shopData.image_cover);
                 }
             }
-            
+
             setShopData(shopData);
 
             // Fetch shop owner data if available
@@ -231,7 +241,7 @@ const ProductDetail = () => {
                         }
                     })
                     .slice(0, 5); // Get up to 5 similar products
-                
+
                 // Xử lý đường dẫn ảnh cho các sản phẩm tương tự
                 const productsWithImages = filtered.map(product => ({
                     ...product,
@@ -686,6 +696,7 @@ const ProductDetail = () => {
                     variants={variants}
                     formatPrice={formatPrice}
                     safeRender={safeRender}
+                    formatDate={formatDate}
                 />
 
                 {/* Similar products */}

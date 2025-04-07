@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, ChevronRight, ChevronDown, Package, Search, Filter } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import ApiService from '../../../services/ApiService';
 import AuthService from '../../../services/AuthService';
 
@@ -12,6 +13,7 @@ const UserOrders = () => {
     const [error, setError] = useState(null);
     const [filter, setFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const navigate = useNavigate();
 
     // Lấy thông tin người dùng
     const currentUser = AuthService.getCurrentUser();
@@ -502,7 +504,7 @@ const UserOrders = () => {
                                         {/* Nút đánh giá chỉ hiển thị khi order_status là 'delivered' */}
                                         {order.order_status === 'delivered' && (
                                             <button
-                                                onClick={() => window.location.href = `/review/order/${order._id}`}
+                                                onClick={() => navigate(`/user-profile/review/order/${order._id}`)}
                                                 className="px-4 py-2 border border-purple-600 text-purple-600 rounded-md hover:bg-purple-50"
                                             >
                                                 Đánh giá

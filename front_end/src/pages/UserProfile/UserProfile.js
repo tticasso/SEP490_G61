@@ -10,6 +10,7 @@ import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import UserOrders from './components/UserOrders';
 import OrderDetail from './components/OrderDetail';
+import OrderReview from './components/OrderReview';
 
 // Main UserProfile Component
 const UserProfile = () => {
@@ -165,6 +166,7 @@ const UserProfile = () => {
             {/* Thêm routes cho đơn hàng */}
             <Route path="/orders" element={<UserOrders />} />
             <Route path="/order-detail/:id" element={<OrderDetail />} />
+            <Route path="/review/order/:id" element={<OrderReview />} />
           </Routes>
         </div>
       </div>

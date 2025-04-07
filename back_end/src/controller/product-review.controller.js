@@ -9,8 +9,8 @@ const getAllProductReviews = async (req, res) => {
     try {
         const productReviews = await ProductReview.find()
             .populate('product_id', 'name slug thumbnail')
-            .populate('user_id', 'lastName email')
-            .populate('seller_id', 'lastName email');
+            .populate('user_id', 'firstName lastName email')
+            .populate('seller_id', 'firstName lastName email');
         res.status(200).json(productReviews);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -22,8 +22,8 @@ const getProductReviewById = async (req, res) => {
     try {
         const productReview = await ProductReview.findById(req.params.id)
             .populate('product_id', 'name slug thumbnail')
-            .populate('user_id', 'lastName email')
-            .populate('seller_id', 'lastName email');
+            .populate('user_id', 'firstName lastName email')
+            .populate('seller_id', 'firstName lastName email');
         if (!productReview) {
             return res.status(404).json({ message: "Review not found" });
         }
@@ -37,8 +37,8 @@ const getProductReviewById = async (req, res) => {
 const getProductReviewsByProductId = async (req, res) => {
     try {
         const productReviews = await ProductReview.find({ product_id: req.params.productId })
-            .populate('user_id', 'lastName email')
-            .populate('seller_id', 'lastName email');
+            .populate('user_id', 'firstName lastName email')
+            .populate('seller_id', 'firstName lastName email');
         res.status(200).json(productReviews);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -50,7 +50,7 @@ const getProductReviewsBySellerId = async (req, res) => {
     try {
         const sellerReviews = await ProductReview.find({ seller_id: req.params.sellerId })
             .populate('product_id', 'name slug thumbnail')
-            .populate('user_id', 'lastName email');
+            .populate('user_id', 'firstName lastName email');
 
         // Tính toán rating trung bình của seller
         const sellerRating = await ProductReview.aggregate([

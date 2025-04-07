@@ -508,9 +508,13 @@ const OrderManagement = () => {
                         </td>
                         {/* Trạng thái thanh toán */}
                         <td className="py-4 px-4">
-                          <span className={`px-3 py-1 truncate text-xs font-medium rounded ${getPaymentStatusClass(order.status_id)}`}>
-                            {order.status_id === 'paid' ? 'ĐÃ THANH TOÁN' : 'CHƯA THANH TOÁN'}
-                          </span>
+                          {isOnlinePayment(order) ? (
+                            <span className={`px-3 py-1 truncate text-xs font-medium rounded ${getPaymentStatusClass(order.status_id)}`}>
+                              {order.status_id === 'paid' ? 'ĐÃ THANH TOÁN' : 'CHƯA THANH TOÁN'}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">Không áp dụng</span>
+                          )}
                         </td>
                         {/* Chi tiết thanh toán */}
                         <td className="py-4 px-4">

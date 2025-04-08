@@ -66,8 +66,8 @@ const Sidebar = ({ onNavigate }) => {
       expandable: true,
       subItems: [
         { label: 'Tất cả sản phẩm', path: '/seller-dashboard/product' },
-        { label: 'Thêm mới sản phẩm', path: '/seller-dashboard/add-product' },
-        { label: 'Giảm giá sản phẩm', path: '/seller-dashboard/discount-product' },
+        // { label: 'Thêm mới sản phẩm', path: '/seller-dashboard/add-product' },
+        // { label: 'Giảm giá sản phẩm', path: '/seller-dashboard/discount-product' },
       ]
     },
     { 
@@ -76,7 +76,7 @@ const Sidebar = ({ onNavigate }) => {
       expandable: true,
       subItems: [
         { label: 'Tất cả khuyến mại', path: '/seller-dashboard/discounts' },
-        { label: 'Tạo mã giảm giá', path: '/seller-dashboard/add-discount' }
+        // { label: 'Tạo mã giảm giá', path: '/seller-dashboard/add-discount' }
       ]
     },
     // { 
@@ -96,7 +96,7 @@ const Sidebar = ({ onNavigate }) => {
       expandable: true,
       subItems: [
         { label: 'Khách hàng đăng ký', path: '/seller-dashboard/registed-user' },
-        { label: 'Hỗ trợ', path: '/seller-dashboard/support' }
+        
       ]
     },
     // Thêm mục "Đánh giá & Phản hồi" sau phần Khách hàng

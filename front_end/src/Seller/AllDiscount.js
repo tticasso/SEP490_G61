@@ -1067,8 +1067,17 @@ const AllDiscount = () => {
       {/* Main content */}
       <div className="flex-1 overflow-auto">
         <div className="p-6 bg-gray-100 min-h-screen">
-          {/* Page title */}
-          <h1 className="text-2xl font-semibold mb-6">Quản lý mã giảm giá</h1>
+          {/* Page title and add button */}
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-semibold">Quản lý mã giảm giá</h1>
+            <button
+              className="bg-blue-600 text-white px-4 py-2 rounded flex items-center hover:bg-blue-700 transition-colors"
+              onClick={() => navigate('/seller-dashboard/add-discount')}
+            >
+              <Plus size={20} className="mr-2" />
+              Thêm mới
+            </button>
+          </div>
 
           {/* Function bar */}
           <div className="flex justify-between items-center mb-4">
@@ -1297,7 +1306,7 @@ const AllDiscount = () => {
           )}
 
           {/* Floating Add Button */}
-          
+
         </div>
       </div>
 

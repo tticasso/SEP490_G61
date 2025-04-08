@@ -17,17 +17,22 @@ import {
   Upload,
   Save,
   ChevronRight,
-  Package
+  Package,
+  Loader,
+  Image,
+  X
 } from 'lucide-react';
 import ApiService from '../services/ApiService';
 import AuthService from '../services/AuthService';
-import Sidebar from './Sidebar'; // Import Sidebar component
+import Sidebar from './Sidebar';
 import { BE_API_URL } from '../config/config';
 
 const MyShop = () => {
   const navigate = useNavigate();
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [error, setError] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
@@ -47,12 +52,17 @@ const MyShop = () => {
   // Tạo URL preview cho ảnh được chọn
   const [logoPreview, setLogoPreview] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
+  
+  // Thêm các state cho lỗi cụ thể
+  const [logoError, setLogoError] = useState(null);
+  const [coverError, setCoverError] = useState(null);
 
-  // Hàm lấy đường dẫn ảnh
+  // Hàm lấy đường dẫn ảnh - cập nhật để xử lý URL Cloudinary
   const getImagePath = (imgPath) => {
     if (!imgPath) return "";
-    // Kiểm tra nếu đường dẫn đã là URL đầy đủ
-    if (imgPath.startsWith('http')) return imgPath;
+    
+    // Kiểm tra nếu đường dẫn đã là URL Cloudinary hoặc URL đầy đủ
+    if (imgPath.includes('cloudinary') || imgPath.startsWith('http')) return imgPath;
     
     // Xử lý đường dẫn từ backend
     const fileName = imgPath.split("\\").pop().split("/").pop();
@@ -80,6 +90,7 @@ const MyShop = () => {
 
     if (!isSeller) {
       setError('Bạn không có quyền truy cập trang này');
+      setLoading(false);
       return;
     }
 
@@ -120,71 +131,173 @@ const MyShop = () => {
     }));
   };
 
-  // Xử lý thay đổi file
+  // Xử lý thay đổi file - đã cập nhật với validation tốt hơn
   const handleFileChange = (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    // Reset error messages
+    if (type === 'logo') setLogoError(null);
+    else setCoverError(null);
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      const errorMsg = `Kích thước file quá lớn (${(file.size / (1024 * 1024)).toFixed(2)}MB). Tối đa 5MB.`;
+      if (type === 'logo') setLogoError(errorMsg);
+      else setCoverError(errorMsg);
+      e.target.value = null; // Reset input
+      return;
+    }
+    
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      const errorMsg = `Định dạng file không hợp lệ. Chỉ chấp nhận JPEG, JPG, PNG, GIF, WEBP.`;
+      if (type === 'logo') setLogoError(errorMsg);
+      else setCoverError(errorMsg);
+      e.target.value = null; // Reset input
+      return;
+    }
 
     if (type === 'logo') {
+      // Hủy URL preview cũ nếu có để tránh memory leak
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+      
       setNewLogo(file);
       setLogoPreview(URL.createObjectURL(file));
     } else if (type === 'cover') {
+      // Hủy URL preview cũ nếu có
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
+      
       setNewCover(file);
       setCoverPreview(URL.createObjectURL(file));
     }
   };
 
-  // Xử lý lưu thông tin cửa hàng
+  // Xử lý upload riêng cho logo
+  const handleUploadLogo = async () => {
+    if (!newLogo) return;
+    
+    setUploadingLogo(true);
+    setLogoError(null);
+    
+    try {
+      const logoFormData = new FormData();
+      logoFormData.append('image', newLogo);
+      logoFormData.append('field', 'logo');
+      
+      const response = await ApiService.uploadFile(`/shops/upload/${shop._id}`, logoFormData);
+      
+      // Cập nhật state với logo mới
+      setShop({...shop, logo: response.logo});
+      
+      // Cleanup
+      URL.revokeObjectURL(logoPreview);
+      setNewLogo(null);
+      setLogoPreview(null);
+      
+      return true;
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      setLogoError(error.message || 'Lỗi khi tải lên logo. Vui lòng thử lại.');
+      return false;
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  // Xử lý upload riêng cho cover
+  const handleUploadCover = async () => {
+    if (!newCover) return;
+    
+    setUploadingCover(true);
+    setCoverError(null);
+    
+    try {
+      const coverFormData = new FormData();
+      coverFormData.append('image', newCover);
+      coverFormData.append('field', 'image_cover');
+      
+      const response = await ApiService.uploadFile(`/shops/upload/${shop._id}`, coverFormData);
+      
+      // Cập nhật state với cover mới
+      setShop({...shop, image_cover: response.image_cover});
+      
+      // Cleanup
+      URL.revokeObjectURL(coverPreview);
+      setNewCover(null);
+      setCoverPreview(null);
+      
+      return true;
+    } catch (error) {
+      console.error('Error uploading cover:', error);
+      setCoverError(error.message || 'Lỗi khi tải lên ảnh bìa. Vui lòng thử lại.');
+      return false;
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  // Xử lý lưu thông tin cửa hàng - đã tối ưu hóa
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setUpdateSuccess(false);
-
+    
     try {
       // 1. Cập nhật thông tin cơ bản
       await ApiService.put(`/shops/edit/${shop._id}`, formData);
-
-      // 2. Upload logo nếu có
-      if (newLogo) {
-        const logoFormData = new FormData();
-        logoFormData.append('image', newLogo);
-        logoFormData.append('field', 'logo');
-        await ApiService.uploadFile(`/shops/upload/${shop._id}`, logoFormData);
-      }
-
-      // 3. Upload ảnh bìa nếu có
-      if (newCover) {
-        const coverFormData = new FormData();
-        coverFormData.append('image', newCover);
-        coverFormData.append('field', 'image_cover');
-        await ApiService.uploadFile(`/shops/upload/${shop._id}`, coverFormData);
-      }
-
-      // Fetch lại dữ liệu cửa hàng sau khi cập nhật
-      const updatedShop = await ApiService.get(`/shops/my-shop`);
-      setShop(updatedShop);
       
-      // Reset file previews
+      // 2. Upload logo nếu có (sử dụng hàm upload riêng)
+      let logoSuccess = true;
       if (newLogo) {
-        URL.revokeObjectURL(logoPreview);
-        setNewLogo(null);
-        setLogoPreview(null);
+        logoSuccess = await handleUploadLogo();
       }
       
+      // 3. Upload ảnh bìa nếu có (sử dụng hàm upload riêng)
+      let coverSuccess = true;
       if (newCover) {
-        URL.revokeObjectURL(coverPreview);
-        setNewCover(null);
-        setCoverPreview(null);
+        coverSuccess = await handleUploadCover();
       }
-
-      setUpdateSuccess(true);
-      setEditMode(false);
+      
+      if (logoSuccess && coverSuccess) {
+        // Fetch lại dữ liệu cửa hàng sau khi cập nhật thành công
+        const updatedShop = await ApiService.get(`/shops/my-shop`);
+        setShop(updatedShop);
+        
+        setUpdateSuccess(true);
+        setEditMode(false);
+      } else {
+        // Nếu một trong hai upload thất bại, vẫn giữ edit mode
+        setError('Đã cập nhật thông tin cơ bản, nhưng tải lên ảnh gặp vấn đề.');
+      }
     } catch (error) {
       console.error('Error updating shop:', error);
-      setError('Có lỗi xảy ra khi cập nhật thông tin cửa hàng');
+      
+      // Thông báo lỗi chi tiết hơn
+      if (error.message && error.message.includes('Network')) {
+        setError('Lỗi kết nối. Vui lòng kiểm tra lại kết nối internet của bạn.');
+      } else {
+        setError('Có lỗi xảy ra khi cập nhật thông tin cửa hàng. ' + (error.message || ''));
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Xóa ảnh đã chọn
+  const handleClearImage = (type) => {
+    if (type === 'logo') {
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+      setNewLogo(null);
+      setLogoPreview(null);
+      setLogoError(null);
+    } else if (type === 'cover') {
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
+      setNewCover(null);
+      setCoverPreview(null);
+      setCoverError(null);
     }
   };
 
@@ -269,7 +382,7 @@ const MyShop = () => {
           </div>
         )}
 
-        {/* Hiển thị lỗi nếu có */}
+        {/* Hiển thị lỗi chung nếu có */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex">
@@ -295,15 +408,29 @@ const MyShop = () => {
           ) : (
             <div className="flex space-x-2">
               <button
-                onClick={() => setEditMode(false)}
+                onClick={() => {
+                  setEditMode(false);
+                  // Clear any selected images and preview URLs
+                  handleClearImage('logo');
+                  handleClearImage('cover');
+                  // Reset form data to current shop data
+                  setFormData({
+                    name: shop.name || '',
+                    phone: shop.phone || '',
+                    email: shop.email || '',
+                    address: shop.address || '',
+                    description: shop.description || '',
+                    website: shop.website || ''
+                  });
+                }}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 Hủy
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={loading}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                disabled={loading || uploadingLogo || uploadingCover}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-70"
               >
                 {loading ? (
                   <>
@@ -323,7 +450,7 @@ const MyShop = () => {
 
         {/* Ảnh bìa cửa hàng */}
         <div className="relative h-64 rounded-lg overflow-hidden mb-6 bg-gray-100">
-          {(shop.image_cover || coverPreview) ? (
+          {(coverPreview || shop.image_cover) ? (
             <img
               src={coverPreview || getImagePath(shop.image_cover)}
               alt={`${shop.name} cover`}
@@ -335,22 +462,53 @@ const MyShop = () => {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400">
-              <Store size={64} />
+              <Image size={64} />
             </div>
           )}
           
           {editMode && (
-            <div className="absolute bottom-4 right-4">
-              <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 bg-opacity-70 hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 cursor-pointer">
-                <Upload className="mr-2" size={16} />
-                Thay đổi ảnh bìa
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={(e) => handleFileChange(e, 'cover')}
-                />
-              </label>
+            <div className="absolute bottom-4 right-4 flex space-x-2">
+              {/* Hiển thị loading indicator trong khi upload */}
+              {uploadingCover ? (
+                <div className="inline-flex items-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 bg-opacity-70">
+                  <Loader className="animate-spin mr-2" size={16} />
+                  Đang tải...
+                </div>
+              ) : (
+                <>
+                  {/* Nút xóa ảnh cover đã chọn */}
+                  {coverPreview && (
+                    <button
+                      onClick={() => handleClearImage('cover')}
+                      className="inline-flex items-center px-2 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-red-600 bg-opacity-80 hover:bg-opacity-100 focus:outline-none"
+                      title="Xóa ảnh đã chọn"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                  {/* Nút chọn ảnh cover */}
+                  <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 bg-opacity-70 hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 cursor-pointer">
+                    <Upload className="mr-2" size={16} />
+                    {coverPreview ? 'Đổi ảnh bìa khác' : 'Tải lên ảnh bìa'}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={(e) => handleFileChange(e, 'cover')}
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          )}
+          
+          {/* Hiển thị lỗi upload cover nếu có */}
+          {coverError && (
+            <div className="absolute bottom-4 left-4 bg-red-100 bg-opacity-90 text-red-800 text-sm p-2 rounded">
+              <div className="flex items-start">
+                <AlertCircle size={16} className="mr-1 mt-0.5 flex-shrink-0" />
+                <span>{coverError}</span>
+              </div>
             </div>
           )}
         </div>
@@ -423,34 +581,61 @@ const MyShop = () => {
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-start mb-6">
                   <div className="relative h-24 w-24 rounded-lg overflow-hidden border bg-white flex-shrink-0 mr-6">
-                    {(logoPreview || shop.logo) ? (
-                      <img
-                        src={logoPreview || getImagePath(shop.logo)}
-                        alt={`${shop.name} logo`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = "/api/placeholder/50/50";
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
-                        <Store size={36} />
+                    {uploadingLogo ? (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                        <Loader className="animate-spin text-purple-600" size={24} />
                       </div>
+                    ) : (
+                      <>
+                        {(logoPreview || shop.logo) ? (
+                          <img
+                            src={logoPreview || getImagePath(shop.logo)}
+                            alt={`${shop.name} logo`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = "/api/placeholder/50/50";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                            <Store size={36} />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="flex space-x-1">
+                            {logoPreview && (
+                              <button 
+                                onClick={() => handleClearImage('logo')} 
+                                className="p-1 bg-red-600 rounded-full text-white hover:bg-red-700"
+                                title="Xóa ảnh đã chọn"
+                              >
+                                <X size={16} />
+                              </button>
+                            )}
+                            <label className="cursor-pointer p-1 bg-white rounded-full text-gray-700 hover:bg-gray-100">
+                              <Upload size={16} />
+                              <input 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                                onChange={(e) => handleFileChange(e, 'logo')}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </>
                     )}
-                    <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <label className="cursor-pointer p-2 text-white">
-                        <Upload size={20} />
-                        <input 
-                          type="file" 
-                          className="hidden" 
-                          accept="image/*"
-                          onChange={(e) => handleFileChange(e, 'logo')}
-                        />
-                      </label>
-                    </div>
                   </div>
                   <div className="flex-1">
+                    {logoError && (
+                      <div className="mb-2 bg-red-50 text-red-600 text-sm p-2 rounded">
+                        <div className="flex items-start">
+                          <AlertCircle size={16} className="mr-1 mt-0.5 flex-shrink-0" />
+                          <span>{logoError}</span>
+                        </div>
+                      </div>
+                    )}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Tên cửa hàng
@@ -601,56 +786,20 @@ const MyShop = () => {
               </div>
             </div>
 
-            {/* <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="font-medium mb-4">Tác vụ nhanh</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={() => navigate('/seller-dashboard/product')}
-                  className="flex items-center justify-between w-full px-4 py-2 text-left text-sm rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    <ShoppingBag className="text-purple-600 mr-3" size={18} />
-                    <span>Quản lý sản phẩm</span>
-                  </div>
-                  <ChevronRight className="text-gray-400" size={16} />
-                </button>
-                <button
-                  onClick={() => navigate('/seller-dashboard/orders')}
-                  className="flex items-center justify-between w-full px-4 py-2 text-left text-sm rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    <Package className="text-purple-600 mr-3" size={18} />
-                    <span>Quản lý đơn hàng</span>
-                  </div>
-                  <ChevronRight className="text-gray-400" size={16} />
-                </button>
-                <button
-                  onClick={() => navigate('/seller-dashboard/discounts')}
-                  className="flex items-center justify-between w-full px-4 py-2 text-left text-sm rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    <Calendar className="text-purple-600 mr-3" size={18} />
-                    <span>Quản lý khuyến mãi</span>
-                  </div>
-                  <ChevronRight className="text-gray-400" size={16} />
-                </button>
-                <button
-                  onClick={() => navigate('/seller-dashboard/registed-user')}
-                  className="flex items-center justify-between w-full px-4 py-2 text-left text-sm rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    <Users className="text-purple-600 mr-3" size={18} />
-                    <span>Khách hàng đăng ký</span>
-                  </div>
-                  <ChevronRight className="text-gray-400" size={16} />
-                </button>
-              </div>
-            </div> */}
+            {/* Tác vụ nhanh - Comment out như file gốc */}
           </div>
         </div>
       </>
     );
   };
+
+  // Cleanup URLs khi component unmount để tránh memory leak
+  useEffect(() => {
+    return () => {
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
+    };
+  }, [logoPreview, coverPreview]);
 
   // Render chính của component
   return (

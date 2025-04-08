@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { productVariantController } = require('../controller');
 const VerifyJwt = require('../middlewares/verifyJwt');
+const uploadMiddleware = require('../middlewares/uploadMiddleware');
 
 const ProductVariantRouter = express.Router();
 ProductVariantRouter.use(bodyParser.json());
@@ -16,6 +17,14 @@ ProductVariantRouter.put("/edit/:id", [VerifyJwt.verifyToken], productVariantCon
 ProductVariantRouter.delete("/delete/:id", [VerifyJwt.verifyToken], productVariantController.deleteVariant);
 ProductVariantRouter.put("/stock/:id", [VerifyJwt.verifyToken], productVariantController.updateVariantStock);
 ProductVariantRouter.put("/product/:productId/default/:variantId", [VerifyJwt.verifyToken], productVariantController.setDefaultVariant);
+
+// Route xử lý upload ảnh cho variant
+ProductVariantRouter.post(
+  "/upload-images/:id",
+  [VerifyJwt.verifyToken],
+  uploadMiddleware.handleVariantImagesUpload,
+  productVariantController.uploadVariantImagesHandler
+);
 
 // Add new routes for soft delete and restore
 ProductVariantRouter.put("/soft-delete/:id", [VerifyJwt.verifyToken], productVariantController.softDeleteVariant);

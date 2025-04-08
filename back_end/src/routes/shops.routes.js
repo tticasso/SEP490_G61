@@ -5,14 +5,14 @@ const uploadMiddleware = require('../middlewares/uploadMiddleware');
 
 const shopRouter = express.Router();
 
-// === PUBLIC ROUTES ===
+//================ ROUTES CÔNG KHAI (PUBLIC) ================//
 // Lấy danh sách tất cả cửa hàng đang hoạt động (cho người dùng chưa đăng nhập)
 shopRouter.get("/public", shopController.getAllShops);
 
 // Lấy thông tin cửa hàng theo ID (cho người dùng chưa đăng nhập)
 shopRouter.get("/public/:id", shopController.getShopById);
 
-// === AUTHENTICATED ROUTES ===
+//================ ROUTES YÊU CẦU ĐĂNG NHẬP ================//
 // Tạo cửa hàng mới (bất kỳ ai đã đăng nhập)
 shopRouter.post("/create", VerifyJwt.verifyToken, shopController.createShop);
 
@@ -23,6 +23,7 @@ shopRouter.get("/my-shop", VerifyJwt.verifyToken, shopController.getShopByUserId
 shopRouter.put("/edit/:id", [VerifyJwt.verifyToken, VerifyJwt.isShopOwner], shopController.updateShop);
 
 // Upload hình ảnh cho cửa hàng (logo hoặc image_cover)
+// Sử dụng middleware đã cập nhật để xử lý upload qua Cloudinary
 shopRouter.post(
   "/upload/:id", 
   [VerifyJwt.verifyToken, VerifyJwt.isShopOwner], 
@@ -30,7 +31,7 @@ shopRouter.post(
   shopController.uploadShopImage
 );
 
-// === ADMIN ROUTES ===
+//================ ROUTES CHỈ CHO ADMIN ================//
 // Lấy tất cả cửa hàng (kể cả pending, chỉ admin)
 shopRouter.get("/list", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], shopController.getAllShops);
 
@@ -49,6 +50,7 @@ shopRouter.put("/approve/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], shopC
 // Từ chối duyệt cửa hàng (chỉ admin)
 shopRouter.put("/reject/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], shopController.rejectShop);
 
+// Mở khóa cửa hàng đã bị khóa (chỉ admin)
 shopRouter.put("/unlock/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], shopController.unlockShop);
 
 module.exports = shopRouter;

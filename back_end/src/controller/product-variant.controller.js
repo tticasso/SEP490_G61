@@ -427,7 +427,8 @@ const softDeleteVariant = async (req, res) => {
         if (variant.is_default) {
             const variantCount = await ProductVariant.countDocuments({
                 product_id: variant.product_id,
-                is_delete: false
+                is_delete: false,
+                _id: { $ne: id }
             });
 
             if (variantCount > 1) {
@@ -653,6 +654,72 @@ const bulkRestoreVariants = async (req, res) => {
     }
 };
 
+// Controller xử lý ảnh sau khi đã upload qua middleware
+const uploadVariantImagesHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Kiểm tra variant tồn tại không
+    const variant = await ProductVariant.findById(id);
+    if (!variant || variant.is_delete) {
+      // Xóa files đã upload nếu variant không tồn tại
+      if (req.files && req.files.length > 0) {
+        for (const file of req.files) {
+          await removeFile(file.path);
+        }
+      }
+      return res.status(404).json({ message: "Variant not found" });
+    }
+    
+    // Kiểm tra quyền (chỉ chủ shop hoặc admin)
+    const product = await Product.findById(variant.product_id);
+    const shop = await Shop.findById(product.shop_id);
+    
+    if (req.userId && shop.user_id.toString() !== req.userId.toString() && !req.isAdmin) {
+      // Xóa files đã upload nếu không có quyền
+      if (req.files && req.files.length > 0) {
+        for (const file of req.files) {
+          await removeFile(file.path);
+        }
+      }
+      return res.status(403).json({ message: "You don't have permission to update this variant" });
+    }
+    
+    // Xử lý files đã upload
+    const { keep_existing } = req.body;
+    let existingImages = [];
+    
+    // Nếu keep_existing=true, giữ lại ảnh cũ
+    if (keep_existing === 'true') {
+      existingImages = variant.images || [];
+    }
+    
+    // Lấy URLs mới từ Cloudinary
+    const newCloudinaryUrls = req.files ? req.files.map(file => file.path) : [];
+    
+    // Kết hợp hình ảnh cũ và hình ảnh mới
+    const updatedImages = [...existingImages, ...newCloudinaryUrls];
+    
+    // Cập nhật variant với ảnh mới
+    variant.images = updatedImages;
+    variant.updated_at = Date.now();
+    await variant.save();
+    
+    res.status(200).json({
+      message: "Variant images uploaded successfully",
+      variant
+    });
+  } catch (error) {
+    // Xử lý lỗi và xóa files đã upload nếu có
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        await removeFile(file.path);
+      }
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const productVariantController = {
     getVariantsByProductId,
     getVariantById,
@@ -666,7 +733,8 @@ const productVariantController = {
     restoreVariant,
     permanentDeleteVariant,
     bulkSoftDeleteVariants,
-    bulkRestoreVariants
+    bulkRestoreVariants,
+    uploadVariantImagesHandler
 };
 
 module.exports = productVariantController;

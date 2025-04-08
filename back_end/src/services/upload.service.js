@@ -33,6 +33,15 @@ const variantStorage = new CloudinaryStorage({
         resource_type: 'auto'
     }
 });
+const shopStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+      folder: 'trooc/shops',
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+      transformation: [{ width: 1000, crop: 'limit' }],
+      resource_type: 'auto'
+    }
+  });
 
 // Bộ lọc file - chỉ chấp nhận file hình ảnh
 const fileFilter = (req, file, cb) => {
@@ -74,6 +83,14 @@ const uploadVariantImages = multer({
     fileFilter: fileFilter
 }).array('images', 5); // Tối đa 5 hình ảnh cho mỗi biến thể
 
+const uploadShopImage = multer({
+    storage: shopStorage,
+    limits: {
+      fileSize: 5 * 1024 * 1024 // Giới hạn 5MB
+    },
+    fileFilter: fileFilter
+  }).single('image');
+
 // Hàm trợ giúp để xóa file từ Cloudinary
 const removeFile = async (fileUrl) => {
     if (!fileUrl) return;
@@ -105,5 +122,6 @@ module.exports = {
     uploadProductThumbnail,
     uploadVariantImages,
     removeFile,
+    uploadShopImage,
     cloudinary // Export cloudinary để có thể sử dụng ở nơi khác nếu cần
 };

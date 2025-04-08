@@ -2,6 +2,16 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const createHttpError = require('http-errors');
+const { 
+  uploadShopImage: cloudinaryUploadShopImage, 
+  uploadProductImage,
+  uploadProductThumbnail,
+  uploadVariantImages,
+  removeFile 
+} = require('../services/upload.service');
+
+// Chỉ giữ lại các cấu hình local storage cho backwards compatibility
+// và các trường hợp chưa chuyển sang Cloudinary
 
 // Tạo thư mục nếu chưa tồn tại
 const createDirectory = (dirPath) => {
@@ -11,18 +21,19 @@ const createDirectory = (dirPath) => {
   return dirPath;
 };
 
-// Cấu hình lưu trữ cho hình ảnh shop
-const shopStorage = multer.diskStorage({
+// Cấu hình lưu trữ cục bộ cho giấy tờ
+const documentStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = createDirectory(path.join(__dirname, '../uploads/shops'));
+    const uploadDir = createDirectory(path.join(__dirname, '../uploads/documents'));
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const shopId = req.params.id;
+    const userId = req.userId;
+    const documentType = req.body.documentType || 'identity';
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
     const fileExt = path.extname(file.originalname).toLowerCase();
-    cb(null, `shop-${shopId}-${timestamp}-${randomString}${fileExt}`);
+    cb(null, `${documentType}-${userId}-${timestamp}-${randomString}${fileExt}`);
   }
 });
 
@@ -42,46 +53,6 @@ const imageFileFilter = (req, file, cb) => {
     cb(createHttpError.BadRequest('Only image files are allowed (JPEG, JPG, PNG, GIF, WEBP)'), false);
   }
 };
-
-// Cấu hình multer cho upload ảnh shop
-const uploadShopConfig = multer({
-  storage: shopStorage,
-  fileFilter: imageFileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
-  }
-});
-
-// Middleware cho upload ảnh shop
-const uploadShopImage = (req, res, next) => {
-  uploadShopConfig.single('image')(req, res, function (err) {
-    if (err instanceof multer.MulterError) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return next(createHttpError.BadRequest('File size exceeds limit (5MB)'));
-      }
-      return next(createHttpError.BadRequest(`Upload error: ${err.message}`));
-    } else if (err) {
-      return next(err);
-    }
-    next();
-  });
-};
-
-// Cấu hình lưu trữ cho giấy tờ
-const documentStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = createDirectory(path.join(__dirname, '../uploads/documents'));
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const userId = req.userId;
-    const documentType = req.body.documentType || 'identity';
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(2, 15);
-    const fileExt = path.extname(file.originalname).toLowerCase();
-    cb(null, `${documentType}-${userId}-${timestamp}-${randomString}${fileExt}`);
-  }
-});
 
 // Bộ lọc file cho giấy tờ - chấp nhận ảnh và PDF
 const documentFileFilter = (req, file, cb) => {
@@ -143,8 +114,57 @@ const uploadMultipleDocuments = (req, res, next) => {
   });
 };
 
+// Middleware cho upload ảnh shop sử dụng Cloudinary
+const uploadShopImage = (req, res, next) => {
+  cloudinaryUploadShopImage(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return next(createHttpError.BadRequest('File size exceeds limit (5MB)'));
+      }
+      return next(createHttpError.BadRequest(`Upload error: ${err.message}`));
+    } else if (err) {
+      return next(err);
+    }
+    next();
+  });
+};
+
+// Middleware cho upload ảnh sản phẩm sử dụng Cloudinary
+const handleProductImageUpload = (req, res, next) => {
+  uploadProductThumbnail(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return next(createHttpError.BadRequest('File size exceeds limit (5MB)'));
+      }
+      return next(createHttpError.BadRequest(`Upload error: ${err.message}`));
+    } else if (err) {
+      return next(err);
+    }
+    next();
+  });
+};
+
+// Middleware cho upload nhiều ảnh biến thể sản phẩm
+const handleVariantImagesUpload = (req, res, next) => {
+  uploadVariantImages(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return next(createHttpError.BadRequest('File size exceeds limit (5MB)'));
+      } else if (err.code === 'LIMIT_FILE_COUNT') {
+        return next(createHttpError.BadRequest('Too many files. Maximum is 5 images.'));
+      }
+      return next(createHttpError.BadRequest(`Upload error: ${err.message}`));
+    } else if (err) {
+      return next(err);
+    }
+    next();
+  });
+};
+
 module.exports = {
-  uploadShopImage,
   uploadDocument,
-  uploadMultipleDocuments
+  uploadMultipleDocuments,
+  uploadShopImage,
+  handleProductImageUpload,
+  handleVariantImagesUpload
 };

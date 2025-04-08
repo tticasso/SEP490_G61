@@ -9,7 +9,6 @@ const RegisteredUsers = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedItems, setSelectedItems] = useState([]);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [sortBy, setSortBy] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -77,31 +76,7 @@ const RegisteredUsers = () => {
       } catch (err) {
         console.error('Error fetching followers data:', err);
         setError('Không thể tải danh sách người theo dõi. Vui lòng thử lại sau.');
-        
-        // For demo purposes, use sample data if API fails
-        setFollowers([
-          {
-            id: 1,
-            name: 'Nguyễn Văn A',
-            registered_time: '10:15 15/3/2025',
-            email: 'nguyenvana@example.com',
-            phone: '0901234567'
-          },
-          {
-            id: 2,
-            name: 'Trần Thị B',
-            registered_time: '14:30 12/3/2025',
-            email: 'tranthib@example.com',
-            phone: '0912345678'
-          },
-          {
-            id: 3,
-            name: 'Lê Văn C',
-            registered_time: '08:45 10/3/2025',
-            email: 'levanc@example.com',
-            phone: '0923456789'
-          }
-        ]);
+        setFollowers([]); // Set empty array instead of sample data
       } finally {
         // Update loading state only if component is still mounted
         if (isMounted) {
@@ -183,24 +158,6 @@ const RegisteredUsers = () => {
     }
   };
 
-  // Toggle select all followers
-  const toggleSelectAll = () => {
-    if (selectedItems.length > 0) {
-      setSelectedItems([]);
-    } else {
-      setSelectedItems(paginatedFollowers.map(follower => follower.id));
-    }
-  };
-
-  // Toggle select a single follower
-  const toggleUserSelection = (userId) => {
-    if (selectedItems.includes(userId)) {
-      setSelectedItems(selectedItems.filter(id => id !== userId));
-    } else {
-      setSelectedItems([...selectedItems, userId]);
-    }
-  };
-
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* Sidebar */}
@@ -267,14 +224,6 @@ const RegisteredUsers = () => {
               <table className="min-w-full">
                 <thead className="bg-gray-50 border-y">
                   <tr>
-                    <th className="px-6 py-3 text-left">
-                      <input 
-                        type="checkbox" 
-                        className="h-4 w-4"
-                        checked={selectedItems.length === paginatedFollowers.length && paginatedFollowers.length > 0}
-                        onChange={toggleSelectAll}
-                      />
-                    </th>
                     <th 
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                       onClick={() => handleSortChange('name')}
@@ -293,18 +242,12 @@ const RegisteredUsers = () => {
                     >
                       EMAIL {sortBy === 'email' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                      onClick={() => handleSortChange('phone')}
-                    >
-                      ĐIỆN THOẠI {sortBy === 'phone' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {paginatedFollowers.length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan="3" className="px-6 py-4 text-center text-gray-500">
                         Không có người theo dõi nào
                       </td>
                     </tr>
@@ -312,35 +255,13 @@ const RegisteredUsers = () => {
                     paginatedFollowers.map((follower) => (
                       <tr key={follower.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <input 
-                            type="checkbox" 
-                            className="h-4 w-4"
-                            checked={selectedItems.includes(follower.id)}
-                            onChange={() => toggleUserSelection(follower.id)}
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10">
-                              <img 
-                                className="h-10 w-10 rounded-full" 
-                                src="/api/placeholder/40/40" 
-                                alt=""
-                              />
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{follower.name}</div>
-                            </div>
-                          </div>
+                          <div className="text-sm font-medium text-gray-900">{follower.name}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {follower.registered_time}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {follower.email}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {follower.phone}
                         </td>
                       </tr>
                     ))

@@ -38,6 +38,7 @@ import MessageBubble from './pages/UserProfile/components/messageBubble';
 import SellerSettings from './Seller/SellerChangePassword';
 import ProductReviews from './Seller/ProductReview';
 import ReviewDetail from './Seller/ReviewDetails';
+import ShopRevenueDashboard from './Seller/ShopRevenueDashboard';
 
 function App() {
   const location = useLocation();
@@ -165,6 +166,11 @@ function App() {
           <Route path="/seller-dashboard/reviews/:id" element={
             <SellerRoute>
               <ReviewDetail />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/revenue" element={
+            <SellerRoute>
+              <ShopRevenueDashboard />
             </SellerRoute>
           } />
 

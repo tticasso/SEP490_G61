@@ -9,7 +9,9 @@ import {
   ChevronDown, 
   ChevronRight,
   Store,
-  Star // Thêm icon Star cho phần đánh giá và phản hồi
+  Star, // Thêm icon Star cho phần đánh giá và phản hồi
+  BarChart2, // Icon cho thống kê doanh thu
+  DollarSign // Icon thay thế cho doanh thu
 } from 'lucide-react';
 
 const Sidebar = ({ onNavigate }) => {
@@ -58,6 +60,13 @@ const Sidebar = ({ onNavigate }) => {
       icon: <Store className="mr-3 text-gray-500" />, 
       label: 'Cửa hàng của tôi', 
       path: '/seller-dashboard/my-shop',
+      expandable: false
+    },
+    // Thêm mục thống kê doanh thu
+    {
+      icon: <DollarSign className="mr-3 text-gray-500" />,
+      label: 'Thống kê doanh thu',
+      path: '/seller-dashboard/revenue',
       expandable: false
     },
     { 

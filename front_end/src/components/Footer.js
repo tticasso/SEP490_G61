@@ -16,11 +16,6 @@ const Footer = () => {
 
   const featuresData = [
     { 
-      icon: Truck, 
-      title: 'CHUYỂN PHÁT NHANH', 
-      description: 'Việt Nam & Mỹ' 
-    },
-    { 
       icon: Shield, 
       title: 'THANH TOÁN AN TOÀN', 
       description: '100% Bảo mật thanh toán' 

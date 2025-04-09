@@ -59,7 +59,7 @@ const OrderTotals = ({
             
             {/* Order Subtotal */}
             <div className="flex justify-between mt-4">
-                <span>Order Subtotal</span>
+                <span>Tổng giá tiền các sản phẩm</span>
                 <span>{subtotal.toLocaleString()}đ</span>
             </div>
             
@@ -68,7 +68,7 @@ const OrderTotals = ({
             {/* Coupon Discount */}
             <div className="flex justify-between mt-4">
                 <div className="flex items-center">
-                    <span>Coupon</span>
+                    <span>Mã Giảm giá đã áp dụng</span>
                     {renderCouponDetails()}
                 </div>
                 <span className="text-red-500">-{discount.toLocaleString()}đ</span>
@@ -78,7 +78,7 @@ const OrderTotals = ({
             
             {/* Shipping Cost */}
             <div className="flex justify-between mt-4">
-                <span>Shipping Fee</span>
+                <span>Phí vận chuyển</span>
                 <span>
                     {shippingCost.toLocaleString()}đ
                 </span>
@@ -88,7 +88,7 @@ const OrderTotals = ({
             
             {/* Order Total */}
             <div className="flex justify-between font-bold text-lg pt-2">
-                <span>Total</span>
+                <span>Tổng thanh toán</span>
                 <span className="text-purple-600">{total.toLocaleString()}đ</span>
             </div>
         </div>

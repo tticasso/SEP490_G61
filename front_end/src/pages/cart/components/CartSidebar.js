@@ -69,18 +69,9 @@ const CartSidebar = ({
 
             <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
 
-            <div className='mt-4'>
-                <p>Voucher applied</p>
-                <div className='flex gap-2 mt-2'>
-                    {/* This will be filled by data from the API */}
-                </div>
-            </div>
-
-            <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
-
             <div className="mt-4">
                 <div className="flex justify-between mb-2">
-                    <span>Total order:</span>
+                    <span>Tổng đơn hàng:</span>
                     <span className="font-bold">{totalAmount.toLocaleString()}đ</span>
                 </div>
                 <button 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SendHorizontal, Paperclip, Smile } from 'lucide-react';
+import { SendHorizontal, Paperclip, Smile, MessageSquare } from 'lucide-react';
 import donghoAvatar from '../../../assets/donghoAvatar.jpg';
 import ApiService from '../../../services/ApiService';
 import AuthService from '../../../services/AuthService';
@@ -151,7 +151,6 @@ const Message = () => {
     if (socketRef.current) {
       // Make sure we're listening to the correct event
       socketRef.current.on('user-status-changed', ({ userId, status }) => {
-        console.log('User status changed:', userId, status);
         setOnlineStatuses(prev => ({
           ...prev,
           [userId]: status
@@ -183,12 +182,7 @@ const Message = () => {
       const otherParticipantId = conversation.participantId;
       if (!otherParticipantId) return;
 
-      console.log("Fetching details for participant:", otherParticipantId);
-
       const response = await ApiService.get(`/user-status/participant/${otherParticipantId}`, true);
-
-      // Debug the API response
-      console.log("Participant API response:", response);
 
       // Store participant info
       setParticipants(prev => ({
@@ -421,49 +415,108 @@ const Message = () => {
     conv => conv.id === selectedConversation
   );
 
+  // Cuộn đến tin nhắn mới khi người dùng nhấn nút cuộn
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="flex h-[90vh] bg-gray-100">
-      {/* Conversations List */}
-      <div className="w-1/4 bg-white border-r">
-        <div className="bg-purple-600 text-white p-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold">Nhắn tin</h2>
-          <button>-</button>
+    <div className="h-full">
+      <div className="flex h-full">
+        {/* Conversations List */}
+        <div className="w-1/3 border-r overflow-hidden flex flex-col">
+          <div className="bg-purple-600 text-white p-4 flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Nhắn tin</h2>
+            <button>-</button>
+          </div>
+
+          <div className="flex-grow overflow-y-auto">
+            {loading && conversations.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">Đang tải...</div>
+            ) : error ? (
+              <div className="p-4 text-center text-red-500">{error}</div>
+            ) : conversations.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">Không có cuộc trò chuyện nào</div>
+            ) : (
+              conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  className={`p-4 flex items-center hover:bg-gray-100 cursor-pointer ${
+                    selectedConversation === conv.id ? 'bg-gray-100' : ''
+                  }`}
+                  onClick={() => setSelectedConversation(conv.id)}
+                >
+                  <div className="relative flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-200 shadow-sm bg-gray-50 flex items-center justify-center">
+                      {conv.image ? (
+                        <img
+                          src={conv.image}
+                          className="w-full h-full object-cover"
+                          alt={conv.name}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = donghoAvatar; // Fallback to default avatar on error
+                          }}
+                        />
+                      ) : (
+                        <div className="bg-purple-100 text-purple-600 w-full h-full flex items-center justify-center text-lg font-semibold">
+                          {conv.name?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                      )}
+                    </div>
+                    {/* Hiển thị số lượng tin nhắn chưa đọc */}
+                    {unreadCounts[conv.id] && unreadCounts[conv.id] > 0 && (
+                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-white">
+                        {unreadCounts[conv.id] > 9 ? '9+' : unreadCounts[conv.id]}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-grow min-w-0 ml-3">
+                    <h3 className="font-semibold text-gray-800 truncate">{conv.name}</h3>
+                    <p className="text-gray-500 w-[100px] text-sm truncate">{conv.lastMessage}</p>
+                    <p className="text-gray-400 text-xs">{conv.timestamp}</p>
+                  </div>
+                  {conv.unread && (
+                    <div className="w-2 h-2 bg-red-500 rounded-full ml-2 flex-shrink-0"></div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        {loading && conversations.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">Đang tải...</div>
-        ) : error ? (
-          <div className="p-4 text-center text-red-500">{error}</div>
-        ) : conversations.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">Không có cuộc trò chuyện nào</div>
-        ) : (
-          conversations.map((conv) => (
-            <div
-              key={conv.id}
-              className={`p-4 flex items-center hover:bg-gray-100 cursor-pointer ${selectedConversation === conv.id ? 'bg-gray-100' : ''
-                }`}
-              onClick={() => setSelectedConversation(conv.id)}
-            >
-              <div className="relative">
-                <img
-                  src={conv.image}
-                  className='w-12 h-12 rounded-full mr-3 object-cover'
-                  alt={conv.name}
-                />
-                {/* Hiển thị số lượng tin nhắn chưa đọc */}
-                {unreadCounts[conv.id] && unreadCounts[conv.id] > 0 && (
-                  <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {unreadCounts[conv.id] > 9 ? '9+' : unreadCounts[conv.id]}
-                  </div>
-                )}
+        {/* Chat Window */}
+        {selectedConversationData ? (
+          <div className="w-2/3 flex flex-col overflow-hidden">
+            {/* Chat Header */}
+            <div className="p-4 flex items-center border-b shadow-sm bg-white">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-200 shadow-sm bg-gray-50 flex items-center justify-center">
+                  {selectedConversationData.image ? (
+                    <img
+                      src={selectedConversationData.image}
+                      className="w-full h-full object-cover"
+                      alt={selectedConversationData.name}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = donghoAvatar; // Fallback to default avatar on error
+                      }}
+                    />
+                  ) : (
+                    <div className="bg-purple-100 text-purple-600 w-full h-full flex items-center justify-center text-lg font-semibold">
+                      {selectedConversationData.name?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex-grow">
+              <div className="flex-grow ml-3">
                 {participants[selectedConversationData.participantId] ? (
-                  <h3 className="font-semibold">
+                  <h3 className="font-semibold text-gray-800">
                     {(() => {
                       const participant = participants[selectedConversationData.participantId];
-                      console.log("Rendering participant:", participant);
-
+                      
                       // For sellers, show shop name and personal name
                       if (participant.isSeller && participant.shop) {
                         return `${participant.shop.name} (${participant.firstName} ${participant.lastName})`;
@@ -475,160 +528,127 @@ const Message = () => {
                     })()}
                   </h3>
                 ) : (
-                  <h3 className="font-semibold">{selectedConversationData.name}</h3>
+                  <h3 className="font-semibold text-gray-800">{selectedConversationData.name}</h3>
                 )}
-                <p className="text-gray-500 text-sm">{conv.lastMessage}</p>
-              </div>
-              {conv.unread && (
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Chat Window */}
-      {selectedConversationData ? (
-        <div className="w-3/4 flex flex-col">
-          {/* Chat Header */}
-          <div className="bg-white p-4 flex items-center border-b">
-            <div className="">
-              <img
-                src={selectedConversationData.image}
-                className='w-12 h-12 rounded-full mr-3 object-cover'
-                alt={selectedConversationData.name}
-              />
-            </div>
-            <div>
-              {participants[selectedConversationData.participantId] ? (
-                <h3 className="font-semibold">
-                  {(() => {
-                    const participant = participants[selectedConversationData.participantId];
-                    console.log("Rendering participant:", participant);
-
-                    // For sellers, show shop name and personal name
-                    if (participant.isSeller && participant.shop) {
-                      return `${participant.shop.name} (${participant.firstName} ${participant.lastName})`;
-                    }
-                    // For regular users, show their name
-                    else {
-                      return `${participant.firstName} ${participant.lastName}`;
-                    }
-                  })()}
-                </h3>
-              ) : (
-                <h3 className="font-semibold">{selectedConversationData.name}</h3>
-              )}
-              <p className="text-gray-500 text-sm flex items-center gap-1">
-                {participants[selectedConversationData.participantId] && (
-                  <>
-                    <div className={`w-3 h-3 rounded-full ${onlineStatuses[selectedConversationData.participantId] === 'online'
-                        ? 'bg-green-600'
-                        : onlineStatuses[selectedConversationData.participantId] === 'recently'
-                          ? 'bg-yellow-500'
-                          : 'bg-gray-400'
+                <p className="text-gray-500 text-sm flex items-center gap-1">
+                  {participants[selectedConversationData.participantId] && (
+                    <>
+                      <div className={`w-3 h-3 rounded-full ${
+                        onlineStatuses[selectedConversationData.participantId] === 'online'
+                          ? 'bg-green-600'
+                          : onlineStatuses[selectedConversationData.participantId] === 'recently'
+                            ? 'bg-yellow-500'
+                            : 'bg-gray-400'
                       }`}></div>
-                    <span>
-                      {onlineStatuses[selectedConversationData.participantId] === 'online'
-                        ? 'Đang hoạt động'
-                        : onlineStatuses[selectedConversationData.participantId] === 'recently'
-                          ? 'Vừa hoạt động gần đây'
-                          : 'Không hoạt động'}
-                    </span>
-                  </>
-                )}
-              </p>
+                      <span>
+                        {onlineStatuses[selectedConversationData.participantId] === 'online'
+                          ? 'Đang hoạt động'
+                          : onlineStatuses[selectedConversationData.participantId] === 'recently'
+                            ? 'Vừa hoạt động gần đây'
+                            : 'Không hoạt động'}
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Messages */}
-          <div className="flex-grow overflow-y-auto p-4 space-y-4">
-            {loading && messages.length === 0 ? (
-              <div className="text-center text-gray-500">Đang tải tin nhắn...</div>
-            ) : error ? (
-              <div className="text-center text-red-500">{error}</div>
-            ) : messages.length === 0 ? (
-              <div className="text-center text-gray-500">Hãy bắt đầu cuộc trò chuyện</div>
-            ) : (
-              <>
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'
-                      }`}
-                  >
+            {/* Messages - Fixed scroll issues */}
+            <div className="flex-grow overflow-auto h-[500px] p-4 space-y-3 bg-gray-50 overflow-x-hidden">
+              {loading && messages.length === 0 ? (
+                <div className="text-center text-gray-500">Đang tải tin nhắn...</div>
+              ) : error ? (
+                <div className="text-center text-red-500">{error}</div>
+              ) : messages.length === 0 ? (
+                <div className="text-center text-gray-500">Hãy bắt đầu cuộc trò chuyện</div>
+              ) : (
+                <>
+                  {messages.map((msg) => (
                     <div
-                      className={`
-                        max-w-[70%] p-3 rounded-lg 
-                        ${msg.sender === 'me'
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-gray-200 text-black'
-                        }
-                      `}
+                      key={msg.id}
+                      className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <p>{msg.text}</p>
-                      <p className="text-xs mt-1 opacity-70">{msg.timestamp}</p>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Typing indicator */}
-                {typing[selectedConversation] && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-200 px-4 py-2 rounded-lg">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-75"></div>
-                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-150"></div>
+                      <div
+                        className={`
+                          max-w-[70%] p-3 break-words
+                          ${msg.sender === 'me'
+                            ? 'bg-purple-600 text-white rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl' 
+                            : 'bg-white text-gray-800 rounded-tr-2xl rounded-tl-2xl rounded-br-2xl border border-gray-100'
+                          }
+                        `}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                        <p className={`text-xs mt-1 ${msg.sender === 'me' ? 'text-purple-200' : 'text-gray-400'} text-right`}>
+                          {msg.timestamp.split(' ')[1]}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                )}
+                  ))}
 
-                {/* This empty div helps with scrolling to bottom */}
-                <div ref={messagesEndRef} />
-              </>
-            )}
-          </div>
+                  {/* Typing indicator */}
+                  {typing[selectedConversation] && (
+                    <div className="flex justify-start">
+                      <div className="bg-white px-4 py-2 rounded-tr-2xl rounded-tl-2xl rounded-br-2xl border border-gray-100">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-75"></div>
+                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-150"></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-          {/* Message Input */}
-          <div className="bg-white p-4 flex items-center border-t">
-            <button className="mr-2">
-              <Paperclip size={24} className="text-gray-500" />
-            </button>
-            <button className="mr-2">
-              <Smile size={24} className="text-gray-500" />
-            </button>
-            <input
-              type="text"
-              placeholder="Nhập tin nhắn..."
-              className="flex-grow bg-gray-100 p-2 rounded-full mr-2"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyUp={handleTyping}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            />
-            <button
-              onClick={handleSendMessage}
-              className="bg-purple-600 text-white p-2 rounded-full"
-            >
-              <SendHorizontal size={24} />
-            </button>
+                  {/* This empty div helps with manual scrolling to bottom */}
+                  <div ref={messagesEndRef} className="h-3" />
+                </>
+              )}
+            </div>
+
+            {/* Message Input */}
+            <div className="p-3 flex items-center border-t bg-white">
+              <div className="flex items-center w-full bg-gray-100 rounded-full px-4 py-2">
+                <button className="text-gray-500 hover:text-purple-600 mr-3 transition-colors">
+                  <Paperclip size={20} />
+                </button>
+                <input
+                  type="text"
+                  placeholder="Nhập tin nhắn..."
+                  className="flex-grow bg-transparent p-1 focus:outline-none text-sm"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyUp={handleTyping}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                />
+                <button className="text-gray-500 hover:text-purple-600 mr-2 transition-colors">
+                  <Smile size={20} />
+                </button>
+              </div>
+              <button
+                onClick={handleSendMessage}
+                className="bg-purple-600 text-white p-3 rounded-full ml-3 hover:bg-purple-700 transition-colors focus:outline-none"
+              >
+                <SendHorizontal size={20} />
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="w-3/4 flex flex-col items-center justify-center bg-gray-50 text-gray-500">
-          <div className="text-center">
-            <p className="mb-2">Chọn một cuộc trò chuyện để bắt đầu</p>
-            {conversations.length === 0 && !loading && (
-              <p>
-                Bạn chưa có cuộc trò chuyện nào. Hãy ghé thăm một cửa hàng
-                và bắt đầu trò chuyện!
-              </p>
-            )}
+        ) : (
+          <div className="w-2/3 flex flex-col items-center justify-center bg-gray-50 text-gray-500">
+            <div className="text-center p-8 max-w-md">
+              <div className="mb-6 bg-gray-200 p-6 rounded-full inline-block">
+                <MessageSquare size={40} className="text-purple-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">Chọn một cuộc trò chuyện</h3>
+              <p className="mb-2">Chọn một cuộc trò chuyện từ danh sách bên trái để bắt đầu nhắn tin</p>
+              {conversations.length === 0 && !loading && (
+                <p className="text-sm bg-purple-50 p-3 rounded mt-4 border border-purple-100">
+                  Bạn chưa có cuộc trò chuyện nào. Hãy ghé thăm một cửa hàng
+                  và bắt đầu trò chuyện!
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

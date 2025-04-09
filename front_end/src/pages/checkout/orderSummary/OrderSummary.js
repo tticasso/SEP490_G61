@@ -72,7 +72,7 @@ const OrderSummary = ({
                     ))}
                 </div>
             ) : (
-                <div className="text-center p-4 text-gray-500 mb-4">Cart is empty</div>
+                <div className="text-center p-4 text-gray-500 mb-4">Giỏ hàng của bạn đang trống</div>
             )}
 
             {/* Out of Stock Warning */}
@@ -80,13 +80,13 @@ const OrderSummary = ({
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex items-start">
                     <AlertCircle className="mr-2 h-5 w-5 flex-shrink-0 mt-0.5" />
                     <div>
-                        <p className="font-medium">Items out of stock</p>
+                        <p className="font-medium">Sản phẩm đã hết hàng</p>
                         <ul className="mt-1 list-disc list-inside text-sm">
                             {getOutOfStockNames().map((name, index) => (
                                 <li key={index}>{name}</li>
                             ))}
                         </ul>
-                        <p className="text-sm mt-1">Please remove these items to continue checkout</p>
+                        <p className="text-sm mt-1">Xin hãy xóa những sản phẩm đó để có thể thực hiện thanh toán</p>
                     </div>
                 </div>
             )}
@@ -124,8 +124,8 @@ const OrderSummary = ({
 
             {/* Return to Cart Link */}
             <p className="text-center text-sm text-gray-600 mt-2">
-                Want to use a coupon or change product quantities?{' '}
-                <a href="/cart" className="text-purple-600">Return to cart</a>
+                Bạn muốn thay đổi mã giảm giá hoặc số lượng sản phẩm?{' '}
+                <a href="/cart" className="text-purple-600">Quay trở lại giỏ hàng</a>
             </p>
         </div>
     );

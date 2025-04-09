@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Package, MessageCircle, MapPin, Phone, Mail, Calendar, Award } from 'lucide-react';
+import { Truck, Package, MessageCircle, MapPin, Phone, Mail, Calendar, Award, Star, User, ThumbsUp, ChevronDown, ChevronUp, Store } from 'lucide-react';
 import dienthoai from '../../../assets/dienthoai.jpg';
 import ApiService from '../../../services/ApiService';
+import { BE_API_URL } from '../../../config/config';
 
 const ShopDetailTabs = ({ shopDetails }) => {
   const [activeTab, setActiveTab] = useState('store');
@@ -10,54 +11,77 @@ const ShopDetailTabs = ({ shopDetails }) => {
   const [loading, setLoading] = useState(false);
   const [reviewStats, setReviewStats] = useState({
     totalReviews: 0,
-    averageRating: 0
+    averageRating: 0,
+    distribution: {
+      5: 0,
+      4: 0,
+      3: 0,
+      2: 0,
+      1: 0
+    }
   });
+
+  // Utility function to get image path
+  const getImagePath = (imgPath) => {
+    if (!imgPath) return "";
+    // Kiểm tra nếu imgPath đã là URL đầy đủ
+    if (imgPath.startsWith('http')) return imgPath;
+    // Kiểm tra nếu imgPath là đường dẫn tương đối
+    if (imgPath.startsWith('/uploads')) return `${BE_API_URL}${imgPath}`;
+    
+    // Kiểm tra nếu đường dẫn có chứa "shops" để xử lý ảnh shop
+    if (imgPath.includes('shops')) {
+        const fileName = imgPath.split("\\").pop();
+        return `${BE_API_URL}/uploads/shops/${fileName}`;
+    }
+    
+    // Trường hợp imgPath là đường dẫn từ backend cho sản phẩm
+    const fileName = imgPath.split("\\").pop();
+    return `${BE_API_URL}/uploads/products/${fileName}`;
+  };
 
   useEffect(() => {
     // Fetch shop reviews if available and shop details is provided
     const fetchShopReviews = async () => {
-      if (!shopDetails || !shopDetails._id) return;
+      if (!shopDetails || !shopDetails.user_id) return;
       
       setLoading(true);
       try {
-        const shopId = shopDetails._id;
         const shopUserId = shopDetails.user_id;
         
-        if (shopUserId) {
-          // Gọi API để lấy đánh giá của seller này
-          const reviewsData = await ApiService.get(`/product-review/seller/${shopUserId}`, false);
+        // Use the product-review API endpoint to fetch seller reviews
+        const reviewsData = await ApiService.get(`/product-review/seller/${shopUserId}`, false);
+        
+        if (reviewsData) {
+          // Handle both response formats (object with reviews or direct array)
+          const reviews = reviewsData.reviews || (Array.isArray(reviewsData) ? reviewsData : []);
+          setShopReviews(reviews);
           
-          if (reviewsData && reviewsData.reviews) {
-            setShopReviews(reviewsData.reviews);
-            
-            // Cập nhật thống kê đánh giá
+          // Calculate statistics based on API response
+          if (reviewsData.stats) {
             setReviewStats({
-              totalReviews: reviewsData.stats?.totalReviews || reviewsData.reviews.length,
-              averageRating: reviewsData.stats?.averageRating || 
-                (reviewsData.reviews.reduce((sum, review) => sum + review.rating, 0) / reviewsData.reviews.length)
+              totalReviews: reviewsData.stats.totalReviews || reviews.length,
+              averageRating: reviewsData.stats.averageRating || 0,
+              distribution: calculateDistribution(reviews)
             });
           } else {
-            // Nếu không có thuộc tính reviews thì có thể API trả về mảng trực tiếp
-            setShopReviews(Array.isArray(reviewsData) ? reviewsData : []);
-            
-            // Tính toán thống kê trung bình
-            if (Array.isArray(reviewsData) && reviewsData.length > 0) {
-              const avgRating = reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length;
-              setReviewStats({
-                totalReviews: reviewsData.length,
-                averageRating: avgRating
-              });
-            }
+            // Calculate stats manually if not provided by API
+            const totalReviews = reviews.length;
+            const avgRating = totalReviews > 0 
+              ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews
+              : 0;
+              
+            setReviewStats({
+              totalReviews,
+              averageRating: parseFloat(avgRating.toFixed(1)),
+              distribution: calculateDistribution(reviews)
+            });
           }
         }
       } catch (error) {
         console.error("Error fetching shop reviews:", error);
         // Fall back to sample data
-        setShopReviews(sampleReviews);
-        setReviewStats({
-          totalReviews: sampleReviews.length,
-          averageRating: 4.8
-        });
+        fetchShopReviews();
       } finally {
         setLoading(false);
       }
@@ -66,48 +90,19 @@ const ShopDetailTabs = ({ shopDetails }) => {
     fetchShopReviews();
   }, [shopDetails]);
 
+  // Helper function to calculate rating distribution
+  const calculateDistribution = (reviews) => {
+    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    reviews.forEach(review => {
+      if (review.rating >= 1 && review.rating <= 5) {
+        distribution[Math.floor(review.rating)] = (distribution[Math.floor(review.rating)] || 0) + 1;
+      }
+    });
+    return distribution;
+  };
+
   // Sample reviews data as fallback
-  const sampleReviews = [
-    {
-      id: 1,
-      username: 'Hungreo',
-      avatar: null,
-      rating: 5,
-      date: '5 ngày trước',
-      product: 'Cần bán Xiaomi 14 12/256GB Likenew 99%',
-      price: '9.990.000 đ',
-      productImage: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSepgd_afQeitCQ66Rr4Sg5-R6djjEgrMeSMg&s',
-    },
-    {
-      id: 2,
-      username: 'Phúc Hưng',
-      avatar: null,
-      rating: 5,
-      date: '2 tuần trước',
-      product: 'Điện Thoại Vivo iQOO Z9 Turbo 256GB - New Fullbox',
-      price: '6.790.000 đ',
-      productImage: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5s0SCMcSsfidnhpwznJc1XwKnCsLa188BAQ&s',
-    },
-    {
-      id: 3,
-      username: 'Quốc Chánh',
-      avatar: null,
-      rating: 5,
-      date: '3 tuần trước',
-      product: 'Mtb Xiaomi Mi Pad 6 hàng likenew fullbox 99%',
-      price: '5.390.000 đ',
-      productImage: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTfXBZra7hJcNP7XnOfvKxaEQjhduUZWcUtig&s',
-      tags: ['Đáng tin cậy', 'Giao tiếp lịch sự, thân thiện', 'Mô tả sản phẩm đúng']
-    },
-    {
-      id: 4,
-      username: 'Tùng Đặng',
-      avatar: 'T',
-      rating: 5,
-      date: '1 tháng trước',
-      comment: 'Giao hàng khá nhanh, hàng chất lượng shop mải định :))'
-    }
-  ];
+ 
 
   // Rendering the stars for ratings
   const renderStars = (rating) => {
@@ -431,11 +426,46 @@ const ShopDetailTabs = ({ shopDetails }) => {
                   </button>
                 </div>
               </div>
+              
+              {/* Rating distribution */}
+              <div className="space-y-2 flex-1 mt-4">
+                {[5, 4, 3, 2, 1].map(rating => {
+                  const count = reviewStats.distribution[rating] || 0;
+                  const percentage = reviewStats.totalReviews > 0 
+                    ? Math.round((count / reviewStats.totalReviews) * 100) 
+                    : 0;
+                  
+                  return (
+                    <div key={rating} className="flex items-center">
+                      <div className="w-10 flex items-center">
+                        <span>{rating}</span>
+                        <Star className="h-4 w-4 text-yellow-400 ml-1" fill="#FBBF24" />
+                      </div>
+                      <div className="flex-grow h-2 mx-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-yellow-400 rounded-full" 
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                      <span className="w-10 text-right text-gray-500">{percentage}%</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             
             <div className="space-y-4">
-              {shopReviews.length > 0 ? (
-                // Hiển thị đánh giá từ API
+              {loading ? (
+                <div className="flex justify-center items-center p-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                  <p className="mt-2 text-gray-600">Đang tải dữ liệu...</p>
+                </div>
+              ) : shopReviews.length === 0 ? (
+                <div className="bg-white p-8 rounded-lg shadow text-center">
+                  <p className="text-gray-500">Chưa có đánh giá nào cho shop này</p>
+                </div>
+              ) : (
+                // Display reviews from API
                 shopReviews.map(review => (
                   <div key={review._id || review.id} className="bg-white p-4 rounded-lg shadow">
                     <div className="flex items-start">
@@ -469,28 +499,38 @@ const ShopDetailTabs = ({ shopDetails }) => {
                           {renderStars(review.rating)}
                         </div>
                         
-                        {(review.product_id || review.product) && (
+                        {/* Product information */}
+                        {(review.product_id) && (
                           <div className="mt-3 flex items-start border-t border-gray-100 pt-3">
                             <img 
-                              src={review.productImage || (review.product_id?.thumbnail || dienthoai)} 
-                              alt={review.product || (review.product_id?.name || 'Sản phẩm')} 
+                              src={getImagePath(review.product_id.thumbnail) || review.productImage || dienthoai} 
+                              alt={review.product_id.name || review.product || 'Sản phẩm'} 
                               className="w-16 h-16 object-cover rounded mr-3"
                             />
                             <div>
-                              <p className="text-sm">{review.product || (review.product_id?.name || 'Sản phẩm')}</p>
+                              <p className="text-sm">{review.product_id.name || review.product || 'Sản phẩm'}</p>
                               <p className="text-red-500 font-medium">
                                 {review.price || (review.product_id?.price ? 
-                                  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(review.product_id.price).replace('₫', 'đ') : 
+                                  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+                                    .format(review.product_id.price).replace('₫', 'đ') : 
                                   '')}
                               </p>
+                              <a 
+                                href={`/product-detail?id=${review.product_id._id}`} 
+                                className="text-blue-500 text-xs hover:underline"
+                              >
+                                Xem sản phẩm
+                              </a>
                             </div>
                           </div>
                         )}
                         
+                        {/* Review comment */}
                         {(review.comment || review.content) && (
                           <p className="mt-2 text-sm text-gray-700">{review.comment || review.content}</p>
                         )}
                         
+                        {/* Tags if available */}
                         {review.tags && review.tags.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {review.tags.map((tag, index) => (
@@ -500,15 +540,33 @@ const ShopDetailTabs = ({ shopDetails }) => {
                             ))}
                           </div>
                         )}
+                        
+                        {/* Seller reply if exists */}
+                        {review.reply && review.reply.text && (
+                          <div className="bg-gray-50 p-3 rounded-md mt-3">
+                            <div className="flex items-center mb-2">
+                              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-2">
+                                <Store size={14} className="text-blue-600" />
+                              </div>
+                              <div className="text-sm font-medium">Phản hồi từ người bán</div>
+                              <div className="text-xs text-gray-500 ml-2">
+                                {formatDate(review.reply.created_at)}
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-700">{review.reply.text}</p>
+                          </div>
+                        )}
+                        
+                        {/* Review Actions */}
+                        <div className="mt-3 flex justify-end">
+                          <button className="text-gray-500 text-sm flex items-center">
+                            <ThumbsUp size={14} className="mr-1" /> Hữu ích
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 ))
-              ) : (
-                // Hiển thị thông báo khi không có đánh giá
-                <div className="bg-white p-8 rounded-lg shadow text-center">
-                  <p className="text-gray-500">Chưa có đánh giá nào cho shop này</p>
-                </div>
               )}
             </div>
           </div>

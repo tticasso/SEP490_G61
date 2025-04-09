@@ -28,7 +28,7 @@ const AddressSection = ({
                         onClick={handleRefreshAddresses}
                         className="text-purple-600 text-sm hover:underline"
                     >
-                        ↻ Refresh
+                        ↻ Tải lại
                     </button>
                 )}
             </div>

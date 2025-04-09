@@ -16,10 +16,10 @@ const PaymentMethodSection = ({
 }) => {
     return (
         <>
-            <h2 className="text-xl font-bold mb-4">Payment Method</h2>
+            <h2 className="text-xl font-bold mb-4">Phương thức thanh toán</h2>
             
             {paymentLoading ? (
-                <div className="text-center py-4">Loading payment methods...</div>
+                <div className="text-center py-4">Đang tải phương thức thanh toán...</div>
             ) : paymentError ? (
                 <div className="text-orange-500 mb-2">{paymentError}</div>
             ) : null}
@@ -34,7 +34,7 @@ const PaymentMethodSection = ({
                     />
                 ))
                 : !paymentLoading && (
-                    <div className="text-gray-500 text-center py-2">No payment methods available</div>
+                    <div className="text-gray-500 text-center py-2">Không có phương thức thanh toán có sẵn</div>
                 )
             }
         </>

@@ -16,10 +16,10 @@ const DeliveryMethodSection = ({
 }) => {
     return (
         <>
-            <h2 className="text-xl font-bold mb-4">Delivery Method</h2>
+            <h2 className="text-xl font-bold mb-4">Phương thức giao hàng</h2>
             
             {shippingLoading ? (
-                <div className="text-center py-4">Loading shipping methods...</div>
+                <div className="text-center py-4">Đang tải phương thức giao hàng...</div>
             ) : shippingError ? (
                 <div className="text-orange-500 mb-2">{shippingError}</div>
             ) : null}
@@ -34,7 +34,7 @@ const DeliveryMethodSection = ({
                     />
                 ))
                 : !shippingLoading && (
-                    <div className="text-gray-500 text-center py-2">No delivery methods available</div>
+                    <div className="text-gray-500 text-center py-2">Không có phương thức giao hàng có sẵn nào</div>
                 )
             }
         </>

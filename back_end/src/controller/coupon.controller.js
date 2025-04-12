@@ -2,15 +2,32 @@ const db = require("../models");
 const Coupon = db.coupon;
 const Product = db.product;
 const Category = db.categories;
+const User = db.users || db.user; // Đảm bảo lấy đúng model user tùy thuộc vào cấu trúc dự án
 
 // Lấy tất cả coupon (có phân trang và lọc)
 const getAllCoupons = async (req, res) => {
     try {
-        const { page = 1, limit = 10, active, search } = req.query;
+        const { page = 1, limit = 10, active, search, created_by } = req.query;
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         // Xây dựng bộ lọc
         const filter = { is_delete: false };
+
+        // Lọc theo người tạo (seller ID) - chỉ áp dụng khi không phải admin
+        if (created_by) {
+            // Kiểm tra nếu user hiện tại là admin
+            const user = await User.findById(created_by);
+            
+            // Nếu không phải admin, chỉ xem được coupon của chính họ
+            if (user && user.role !== 'admin') {
+                filter.created_by = created_by;
+            }
+            // Nếu là admin và có chỉ định created_by, vẫn lọc theo created_by đó
+            else if (user && user.role === 'admin' && req.query.filter_by_creator) {
+                filter.created_by = req.query.filter_by_creator;
+            }
+            // Admin không chỉ định lọc theo người tạo sẽ xem tất cả
+        }
 
         // Lọc theo trạng thái kích hoạt
         if (active !== undefined) {
@@ -27,7 +44,7 @@ const getAllCoupons = async (req, res) => {
 
         // Thực hiện truy vấn với bộ lọc
         const coupons = await Coupon.find(filter)
-            .populate('created_by', 'name')
+            .populate('created_by', 'name role')
             .populate('updated_by', 'name')
             .populate('product_id', 'name')
             .populate('category_id', 'name')
@@ -53,7 +70,7 @@ const getAllCoupons = async (req, res) => {
 const getCouponById = async (req, res) => {
     try {
         const coupon = await Coupon.findById(req.params.id)
-            .populate('created_by', 'name')
+            .populate('created_by', 'name role')
             .populate('updated_by', 'name')
             .populate('product_id', 'name')
             .populate('category_id', 'name');
@@ -167,6 +184,19 @@ const createCoupon = async (req, res) => {
     }
 };
 
+// Helper function to check admin role
+const isAdmin = async (userId) => {
+    try {
+        if (!userId) return false;
+        
+        const user = await User.findById(userId);
+        return user && user.role === 'admin';
+    } catch (error) {
+        console.error("Error checking admin role:", error);
+        return false;
+    }
+};
+
 // Cập nhật coupon
 const updateCoupon = async (req, res) => {
     try {
@@ -190,6 +220,12 @@ const updateCoupon = async (req, res) => {
 
         if (!coupon) {
             return res.status(404).json({ message: "Coupon not found" });
+        }
+
+        // Kiểm tra quyền - chỉ admin hoặc người tạo coupon mới có thể cập nhật
+        const admin = await isAdmin(updated_by);
+        if (!admin && updated_by && coupon.created_by && coupon.created_by.toString() !== updated_by.toString()) {
+            return res.status(403).json({ message: "You do not have permission to update this coupon" });
         }
 
         // Kiểm tra product_id nếu có
@@ -242,6 +278,12 @@ const deleteCoupon = async (req, res) => {
 
         if (!coupon) {
             return res.status(404).json({ message: "Coupon not found" });
+        }
+
+        // Kiểm tra quyền - chỉ admin hoặc người tạo coupon mới có thể xóa
+        const admin = await isAdmin(req.body.updated_by);
+        if (!admin && req.body.updated_by && coupon.created_by && coupon.created_by.toString() !== req.body.updated_by.toString()) {
+            return res.status(403).json({ message: "You do not have permission to delete this coupon" });
         }
 
         // Xóa mềm

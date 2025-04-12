@@ -28,6 +28,7 @@ import AuthService from '../services/AuthService';
 
 // EditCouponPopup component (embedded within AllDiscount file)
 const EditCouponPopup = ({ isOpen, onClose, couponId, onCouponUpdated }) => {
+  // Existing EditCouponPopup code remains the same
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [allProducts, setAllProducts] = useState([]);
@@ -144,6 +145,7 @@ const EditCouponPopup = ({ isOpen, onClose, couponId, onCouponUpdated }) => {
     }
   }, [isOpen, couponId]);
 
+  // Rest of the EditCouponPopup component remains the same
   // Khi thay đổi danh mục, lọc lại danh sách sản phẩm
   useEffect(() => {
     if (formData.category_id) {
@@ -515,6 +517,7 @@ const EditCouponPopup = ({ isOpen, onClose, couponId, onCouponUpdated }) => {
               </div>
 
               <form onSubmit={handleSubmit}>
+                {/* Form fields remain the same */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Coupon Code (disabled, but still sent in form) */}
                   <div className="col-span-1">
@@ -831,7 +834,7 @@ const EditCouponPopup = ({ isOpen, onClose, couponId, onCouponUpdated }) => {
   );
 };
 
-// Main AllDiscount component
+// Main AllDiscount component - UPDATED to filter by seller ID
 const AllDiscount = () => {
   const navigate = useNavigate();
 
@@ -911,14 +914,23 @@ const AllDiscount = () => {
     toast.success(`Đã sao chép mã: ${code}`);
   };
 
-  // Load discounts from API
+  // Load discounts from API - UPDATED to filter by seller ID
   const loadDiscounts = async () => {
     setLoading(true);
     try {
-      // Build query params
+      // Get current seller ID from AuthService
+      const currentUser = AuthService.getCurrentUser();
+      if (!currentUser || !currentUser.id) {
+        setError('Bạn cần đăng nhập để xem mã giảm giá');
+        setLoading(false);
+        return;
+      }
+
+      // Build query params with seller ID included
       const params = new URLSearchParams({
         page: currentPage,
-        limit: limit
+        limit: limit,
+        created_by: currentUser.id // Filter by seller ID
       });
 
       // Add search term if available
@@ -967,6 +979,7 @@ const AllDiscount = () => {
         await ApiService.delete(`/coupon/delete/${id}`, { updated_by: currentUser.id });
         // Reload data after deletion
         loadDiscounts();
+        toast.success('Đã xóa mã giảm giá thành công');
       } catch (err) {
         console.error('Error deleting discount:', err);
         toast.error('Không thể xóa mã giảm giá. Vui lòng thử lại sau.');
@@ -1060,7 +1073,7 @@ const AllDiscount = () => {
   }, [currentPage, limit, searchTerm]);
 
   return (
-    <div className="flex  bg-gray-100 ">
+    <div className="flex bg-gray-100">
       {/* Sidebar */}
       <Sidebar onNavigate={(path) => navigate(path)} />
 
@@ -1087,7 +1100,7 @@ const AllDiscount = () => {
                   onClick={handleBulkDelete}
                   className="text-red-500 hover:text-red-700"
                 >
-                  Thêm vào thùng rác ({selectedDiscounts.length})
+                  Xóa đã chọn ({selectedDiscounts.length})
                 </button>
               )}
             </div>
@@ -1304,9 +1317,6 @@ const AllDiscount = () => {
               </div>
             </div>
           )}
-
-          {/* Floating Add Button */}
-
         </div>
       </div>
 

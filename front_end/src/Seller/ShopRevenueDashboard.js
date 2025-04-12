@@ -55,6 +55,30 @@ const ShopRevenueDashboard = () => {
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
+  // Helper function to translate status - same as in AllOrder.js
+  const translateStatus = (statusId) => {
+    const statusMap = {
+      'pending': 'Chờ xác nhận',
+      'processing': 'Đang xử lý',
+      'shipped': 'Đang vận chuyển',
+      'delivered': 'Đã giao hàng',
+      'cancelled': 'Đã hủy'
+    };
+    return statusMap[statusId] || statusId;
+  };
+
+  // Helper function to determine status class for styling - same as in AllOrder.js
+  const getStatusClass = (statusId) => {
+    const statusClassMap = {
+      'pending': 'bg-yellow-500',
+      'processing': 'bg-blue-500',
+      'shipped': 'bg-purple-500',
+      'delivered': 'bg-green-500',
+      'cancelled': 'bg-red-500'
+    };
+    return statusClassMap[statusId] || 'bg-gray-500';
+  };
+
   const fetchRevenueData = async () => {
     try {
       setLoading(true);
@@ -126,21 +150,32 @@ const ShopRevenueDashboard = () => {
         }
       }
 
-      // Process orders to extract revenue information
+  // Process orders to extract revenue information
       const processedOrders = Array.isArray(orders) ? orders.map(order => {
         // Handle different order structures
         const orderData = order.order || order;
         const orderDetails = order.orderDetails || [];
         
+        // Use the same approach as in AllOrder.js to get the effective status
+        const effectiveStatus = orderData.order_status || orderData.status_id;
+        
+        // Calculate total only if the order is delivered
+        const orderTotal = effectiveStatus === 'delivered' ? 
+          Number(orderData.total_price || orderData.totalPrice || orderData.total || 0) : 0;
+        
         return {
           id: orderData.id || orderData._id,
           date: new Date(orderData.created_at || orderData.createdAt || orderData.date),
-          total: Number(orderData.total_price || orderData.totalPrice || orderData.total || 0),
-          status: orderData.order_status || orderData.status || orderData.status_id,
-          commission: Number(orderData.total_price || orderData.totalPrice || orderData.total || 0) * 0.1, // 10% commission
-          shopEarning: Number(orderData.total_price || orderData.totalPrice || orderData.total || 0) * 0.9, // 90% for shop
+          total: Number(orderData.total_price || orderData.totalPrice || orderData.total || 0), // Keep original total for display
+          revenueTotal: orderTotal, // For revenue calculations only count delivered orders
+          status: effectiveStatus,
+          statusText: translateStatus(effectiveStatus),
+          statusClass: getStatusClass(effectiveStatus),
+          commission: orderTotal * 0.1, // 10% commission
+          shopEarning: orderTotal * 0.9, // 90% for shop
           isPaid: orderData.is_paid || false,
-          products: orderDetails.length > 0 ? orderDetails.length : 1
+          products: orderDetails.length > 0 ? orderDetails.length : 1,
+          countInRevenue: effectiveStatus === 'delivered'
         };
       }) : [];
 
@@ -191,6 +226,18 @@ const ShopRevenueDashboard = () => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
+  
+  // Calculate revenue summary - only include delivered orders
+  const calculateRevenueSummary = () => {
+    const revenueOrders = ordersList.filter(order => order.status === 'delivered');
+    
+    return {
+      totalRevenue: revenueOrders.reduce((sum, order) => sum + order.revenueTotal, 0),
+      totalCommission: revenueOrders.reduce((sum, order) => sum + order.commission, 0),
+      totalEarnings: revenueOrders.reduce((sum, order) => sum + order.shopEarning, 0),
+      ordersCount: revenueOrders.length
+    };
+  };
 
   // Format date as dd/MM/yyyy
   const formatShortDate = (date) => {
@@ -209,12 +256,15 @@ const ShopRevenueDashboard = () => {
       return [];
     }
 
+    // Filter only delivered orders for revenue calculations
+    const revenueOrders = ordersList.filter(order => order.status === 'delivered');
+
     // If we're viewing by day or week, use daily data
     if (selectedPeriod === 'day' || selectedPeriod === 'week') {
       // Group orders by day
       const dailyData = {};
       
-      ordersList.forEach(order => {
+      revenueOrders.forEach(order => {
         const dateStr = formatShortDate(order.date);
         if (!dailyData[dateStr]) {
           dailyData[dateStr] = {
@@ -225,7 +275,7 @@ const ShopRevenueDashboard = () => {
           };
         }
         
-        dailyData[dateStr].totalRevenue += order.total;
+        dailyData[dateStr].totalRevenue += order.revenueTotal;
         dailyData[dateStr].platformCommission += order.commission;
         dailyData[dateStr].shopEarnings += order.shopEarning;
       });
@@ -247,7 +297,7 @@ const ShopRevenueDashboard = () => {
       // Group orders by month
       const monthlyData = {};
       
-      ordersList.forEach(order => {
+      revenueOrders.forEach(order => {
         const month = order.date.getMonth() + 1;
         const year = order.date.getFullYear();
         const monthKey = `${month}/${year}`;
@@ -261,7 +311,7 @@ const ShopRevenueDashboard = () => {
           };
         }
         
-        monthlyData[monthKey].totalRevenue += order.total;
+        monthlyData[monthKey].totalRevenue += order.revenueTotal;
         monthlyData[monthKey].platformCommission += order.commission;
         monthlyData[monthKey].shopEarnings += order.shopEarning;
       });
@@ -425,6 +475,7 @@ const ShopRevenueDashboard = () => {
                     <th className="text-right px-2">Hoa hồng</th>
                     <th className="text-right px-2">Thu nhập</th>
                     <th className="text-center px-4">Trạng thái</th>
+                    {/* <th className="text-center px-2">Tính vào doanh thu</th> */}
                   </tr>
                 </thead>
                 <tbody>
@@ -436,21 +487,20 @@ const ShopRevenueDashboard = () => {
                       <td className="px-2 py-2 text-sm text-right">{formatCurrency(order.commission)}</td>
                       <td className="px-2 py-2 text-sm text-right">{formatCurrency(order.shopEarning)}</td>
                       <td className="px-4 py-2 text-sm text-center">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          order.status === 'delivered' ? 'bg-green-100 text-green-800' : 
-                          order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {order.status === 'delivered' ? 'Hoàn thành' : 
-                           order.status === 'pending' ? 'Chờ xử lý' : 
-                           'Đang xử lý'}
+                        <span className={`px-2 py-1 rounded-full text-xs text-white ${order.statusClass}`}>
+                          {order.statusText}
                         </span>
                       </td>
+                      {/* <td className="px-2 py-2 text-sm text-center">
+                        {order.countInRevenue ? 
+                          <span className="text-green-500 font-medium">Có</span> : 
+                          <span className="text-red-500 font-medium">Không</span>}
+                      </td> */}
                     </tr>
                   ))}
                   {ordersList.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="text-center py-4 text-gray-500">
+                      <td colSpan="7" className="text-center py-4 text-gray-500">
                         Không có dữ liệu đơn hàng
                       </td>
                     </tr>

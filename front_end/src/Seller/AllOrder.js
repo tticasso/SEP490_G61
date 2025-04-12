@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, Eye, CheckCircle, X, Loader, AlertTriangle } from 'lucide-react';
+import { Search, ArrowLeft, Eye, CheckCircle, X, Loader, AlertTriangle, Edit } from 'lucide-react';
 import Sidebar from './Sidebar';
 import ApiService from '../services/ApiService';
 import AuthService from '../services/AuthService';
@@ -300,6 +300,134 @@ const RejectOrderModal = ({ onClose, onConfirm }) => {
   );
 };
 
+// Edit Order Status Modal Component
+const EditOrderStatusModal = ({ orderId, currentStatus, onClose, onUpdate, getShopId, translateStatus, ApiService }) => {
+  const [selectedStatus, setSelectedStatus] = useState(currentStatus);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Options for order status - only allow valid transitions
+  const getStatusOptions = (current) => {
+    switch(current) {
+      case 'processing':
+        return [
+          { id: 'processing', name: 'Đang xử lý' },
+          { id: 'shipped', name: 'Đang vận chuyển' }
+        ];
+      case 'shipped':
+        return [
+          { id: 'shipped', name: 'Đang vận chuyển' },
+          { id: 'delivered', name: 'Đã giao hàng' }
+        ];
+      case 'delivered':
+        return [
+          { id: 'delivered', name: 'Đã giao hàng' }
+        ];
+      default:
+        return [
+          { id: current, name: translateStatus(current) }
+        ];
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (selectedStatus === currentStatus) {
+      onClose();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Get shop ID
+      const shopId = await getShopId();
+      
+      // Call the API to update order status
+      const response = await ApiService.put(`/order/status/${orderId}`, {
+        order_status: selectedStatus,
+        shop_id: shopId
+      });
+      
+      console.log("Cập nhật trạng thái đơn hàng thành công:", response);
+      
+      // Show success message
+      alert(`Đã cập nhật trạng thái đơn hàng thành công`);
+      
+      // Close the modal and refresh
+      onUpdate();
+      onClose();
+      
+    } catch (error) {
+      console.error("Lỗi khi cập nhật trạng thái đơn hàng:", error);
+      setError(`Lỗi khi cập nhật trạng thái: ${error.message || "Đã xảy ra lỗi"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-medium">Cập nhật trạng thái đơn hàng</h3>
+          <button
+            className="text-gray-400 hover:text-gray-600"
+            onClick={onClose}
+          >
+            <X size={24} />
+          </button>
+        </div>
+        
+        {error && (
+          <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded mb-4">
+            {error}
+          </div>
+        )}
+        
+        <div className="mb-6">
+          <label className="block text-gray-700 text-sm font-bold mb-2">
+            Trạng thái đơn hàng
+          </label>
+          <select
+            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            disabled={loading}
+          >
+            {getStatusOptions(currentStatus).map(option => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-sm text-gray-500 mt-2">
+            Vui lòng chọn trạng thái mới cho đơn hàng
+          </p>
+        </div>
+        
+        <div className="flex justify-end space-x-3">
+          <button
+            className="px-4 py-2 border rounded-md hover:bg-gray-100"
+            onClick={onClose}
+            disabled={loading}
+          >
+            Hủy
+          </button>
+          <button
+            className="px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 flex items-center"
+            onClick={handleUpdateStatus}
+            disabled={loading || selectedStatus === currentStatus}
+          >
+            {loading && <Loader size={16} className="animate-spin mr-2" />}
+            Cập nhật
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Main Component
 const AllOrders = () => {
   const navigate = useNavigate();
@@ -314,6 +442,7 @@ const AllOrders = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [rejectOrderId, setRejectOrderId] = useState(null);
+  const [editStatusOrder, setEditStatusOrder] = useState(null);
 
   // Get seller shop ID from API
   const getShopId = async () => {
@@ -658,6 +787,14 @@ const AllOrders = () => {
     }
   };
 
+  // Handle edit order status
+  const handleEditOrderStatus = (order) => {
+    setEditStatusOrder({
+      id: order.orderId,
+      status: order.statusId
+    });
+  };
+
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* Sidebar */}
@@ -837,7 +974,7 @@ const AllOrders = () => {
                             <Eye size={18} />
                           </button>
                           
-                          {/* Confirm & Reject buttons - only show if status is pending */}
+                          {/* Conditional action buttons based on status */}
                           {order.statusId === 'pending' && (
                             <>
                               <button 
@@ -856,6 +993,17 @@ const AllOrders = () => {
                                 <AlertTriangle size={18} />
                               </button>
                             </>
+                          )}
+                          
+                          {/* Edit status button - only for confirmed orders that are not cancelled or delivered */}
+                          {(order.statusId === 'processing' || order.statusId === 'shipped') && (
+                            <button 
+                              className="text-blue-600 hover:text-blue-900"
+                              onClick={() => handleEditOrderStatus(order)}
+                              title="Cập nhật trạng thái"
+                            >
+                              <Edit size={18} />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -935,6 +1083,19 @@ const AllOrders = () => {
         <RejectOrderModal
           onClose={() => setRejectOrderId(null)}
           onConfirm={handleConfirmReject}
+        />
+      )}
+      
+      {/* Edit order status modal */}
+      {editStatusOrder && (
+        <EditOrderStatusModal
+          orderId={editStatusOrder.id}
+          currentStatus={editStatusOrder.status}
+          onClose={() => setEditStatusOrder(null)}
+          onUpdate={refreshOrders}
+          getShopId={getShopId}
+          translateStatus={translateStatus}
+          ApiService={ApiService}
         />
       )}
     </div>

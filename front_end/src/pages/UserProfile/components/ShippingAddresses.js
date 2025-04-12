@@ -533,11 +533,11 @@ const ShippingAddresses = () => {
                     </div>
                     <div>
                       <p className="text-gray-700 font-medium">{displayAddress.addressLine1}</p>
-                      {/* <p className="text-gray-600 text-sm">
+                      <p className="text-gray-600 text-sm">
                         {displayAddress.city && displayAddress.city}
                         {displayAddress.country && displayAddress.country !== 'Việt Nam' ?
                           `, ${displayAddress.country}` : ''}
-                      </p> */}
+                      </p>
                     </div>
                   </div>
                 );

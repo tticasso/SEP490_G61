@@ -219,14 +219,7 @@ const ProductDetailsModal = ({ product, onClose }) => {
                     <p>{productDetails.weight} gram</p>
                   </div>
 
-                  <div>
-                    <p className="text-sm text-gray-500">Tình trạng</p>
-                    <p>
-                      {productDetails.condition === 'new' && 'Mới'}
-                      {productDetails.condition === 'Used' && 'Đã qua sử dụng'}
-                      {productDetails.condition === 'refurbished' && 'Tân trang'}
-                    </p>
-                  </div>
+                
                 </div>
 
                 <div>
@@ -404,12 +397,16 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
         setBrands(brandsResponse || []);
 
         if (product) {
+          // Log để debug
+          console.log("Original product data:", product);
+          
           setEditingProduct({
             ...product,
             category_id: product.category_id ?
               (Array.isArray(product.category_id) ?
                 product.category_id.map(cat => cat._id || cat) : [product.category_id]) : [],
             brand_id: product.brand_id?._id || product.brand_id || ''
+            // Đã xóa việc thiết lập trường condition
           });
         }
       } catch (error) {
@@ -428,6 +425,8 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    console.log(`Field changed: ${name} = ${value}`); // Log để debug
+    
     setEditingProduct({
       ...editingProduct,
       [name]: value
@@ -514,58 +513,65 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
 
     try {
       setLoading(true);
-      const formData = new FormData();
+      
+      // Chuẩn bị dữ liệu sản phẩm (đã loại bỏ condition)
+      const productData = {
+        name: editingProduct.name,
+        slug: editingProduct.slug,
+        price: parseFloat(editingProduct.price),
+        weight: parseFloat(editingProduct.weight),
+        brand_id: editingProduct.brand_id,
+        category_id: editingProduct.category_id,
+        description: editingProduct.description || "",
+        detail: editingProduct.detail || "",
+        // Đã xóa trường condition
+        meta_title: editingProduct.meta_title || "",
+        meta_keyword: editingProduct.meta_keyword || "",
+        meta_description: editingProduct.meta_description || "",
+        is_active: editingProduct.is_active || false,
+        is_hot: editingProduct.is_hot || false,
+        is_feature: editingProduct.is_feature || false,
+        is_delete: editingProduct.is_delete || false
+      };
+      
+      console.log("Sending product data:", productData); // Log để debug
 
-      Object.keys(editingProduct).forEach(key => {
-        if (key === 'category_id' && Array.isArray(editingProduct[key])) {
-          editingProduct[key].forEach((catId, index) => {
-            formData.append(`category_id[${index}]`, catId);
-          });
-        } else if (key !== 'thumbnail' || (key === 'thumbnail' && !imageFile)) {
-          if (key === 'price' || key === 'weight') {
-            formData.append(key, parseFloat(editingProduct[key]));
-          } else {
-            formData.append(key, editingProduct[key]);
-          }
-        }
-      });
-
-      if (imageFile) {
-        formData.append('thumbnail', imageFile);
-      } else if (editingProduct.thumbnail && !editingProduct.thumbnail.startsWith('blob:')) {
-        formData.append('thumbnail_url', editingProduct.thumbnail);
+      // Nếu có thumbnail URL và không thay đổi
+      if (editingProduct.thumbnail && !imageFile && !editingProduct.thumbnail.startsWith('blob:')) {
+        productData.thumbnail_url = editingProduct.thumbnail;
       }
 
       let updatedProduct;
-      try {
-        if (imageFile) {
-          updatedProduct = await ApiService.putFormData(
-            `/product/edit/${editingProduct._id || editingProduct.id}`,
-            formData
-          );
-        } else {
-          const productData = {};
-          for (let [key, value] of formData.entries()) {
-            if (key.includes('[') && key.includes(']')) {
-              const mainKey = key.split('[')[0];
-              if (!productData[mainKey]) {
-                productData[mainKey] = [];
-              }
-              productData[mainKey].push(value);
-            } else {
-              productData[key] = value;
-            }
+      
+      if (imageFile) {
+        // Nếu có upload file mới, dùng FormData
+        const formData = new FormData();
+        
+        // Thêm dữ liệu cơ bản vào FormData
+        Object.keys(productData).forEach(key => {
+          if (key === 'category_id') {
+            // Xử lý đặc biệt cho mảng category_id
+            productData[key].forEach((catId, index) => {
+              formData.append(`category_id[${index}]`, catId);
+            });
+          } else {
+            formData.append(key, productData[key]);
           }
-          updatedProduct = await ApiService.put(
-            `/product/edit/${editingProduct._id || editingProduct.id}`,
-            productData
-          );
-        }
-      } catch (err) {
-        updatedProduct = {
-          ...editingProduct,
-          updatedAt: new Date().toISOString()
-        };
+        });
+        
+        // Thêm file hình ảnh
+        formData.append('thumbnail', imageFile);
+        
+        updatedProduct = await ApiService.putFormData(
+          `/product/edit/${editingProduct._id || editingProduct.id}`,
+          formData
+        );
+      } else {
+        // Không có file mới, gửi dữ liệu JSON thông thường
+        updatedProduct = await ApiService.put(
+          `/product/edit/${editingProduct._id || editingProduct.id}`,
+          productData
+        );
       }
 
       if (onUpdate) {
@@ -574,8 +580,9 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
 
       onClose();
     } catch (error) {
+      console.error("Lỗi khi cập nhật sản phẩm:", error);
       setFormErrors({
-        submit: 'Lỗi khi cập nhật sản phẩm'
+        submit: error.response?.data?.message || 'Lỗi khi cập nhật sản phẩm. Vui lòng thử lại.'
       });
     } finally {
       setLoading(false);
@@ -702,22 +709,7 @@ const EditProductModal = ({ product, onClose, onUpdate }) => {
                 )}
               </div>
 
-              {/* Tình trạng */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tình trạng
-                </label>
-                <select
-                  name="condition"
-                  value={editingProduct.condition || 'new'}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="new">Mới</option>
-                  <option value="used">Đã qua sử dụng</option>
-                  <option value="refurbished">Tân trang</option>
-                </select>
-              </div>
+              {/* ĐÃ XÓA: Tình trạng */}
 
               {/* Danh mục - CHANGED to checkboxes */}
               <div className="col-span-2">
@@ -1458,11 +1450,9 @@ const ProductList = () => {
               <table className="w-full table-fixed border-collapse">
                 <thead className="bg-gray-100 border-b">
                   <tr>
-                    <th className="p-4 text-left w-12">
-                      <input type="checkbox" className="rounded" />
-                    </th>
+                    {/* Đã xóa checkbox header */}
                     <th
-                      className="p-4 text-left cursor-pointer w-1/3"
+                      className="p-4 text-left cursor-pointer w-2/5"
                       onClick={() => handleSort('name')}
                     >
                       <div className="flex items-center">
@@ -1496,10 +1486,8 @@ const ProductList = () => {
                 <tbody>
                   {paginatedProducts.map((product) => (
                     <tr key={product.id} className="border-b hover:bg-gray-50">
-                      <td className="p-4 w-12">
-                        <input type="checkbox" className="rounded" />
-                      </td>
-                      <td className="p-4 w-1/3">
+                      {/* Đã xóa checkbox row */}
+                      <td className="p-4 w-2/5">
                         <div className="flex items-center">
                           <div className="w-12 h-12 mr-4 flex-shrink-0 bg-gray-200 rounded overflow-hidden">
                             <img

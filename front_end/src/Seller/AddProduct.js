@@ -44,7 +44,7 @@ const AddProduct = () => {
     meta_keyword: '',
     meta_description: '',
     weight: '',
-    condition: 'new', // Default value
+    condition: 'Mới', // Cambiado de 'new' a 'Mới'
     is_active: true,
     is_hot: false,
     is_feature: false,
@@ -96,6 +96,13 @@ const AddProduct = () => {
           try {
             const product = await ApiService.get(`/product/${editProductId}`);
 
+            // Xử lý giá trị condition nếu nó đang là "new" từ database
+            let conditionValue = product.condition || 'Mới';
+            // Nếu giá trị là "new" từ database, chuyển đổi sang "Mới"
+            if (conditionValue === "new") {
+              conditionValue = "Mới";
+            }
+
             // Populate form with product details
             setNewProduct({
               name: product.name || '',
@@ -110,7 +117,7 @@ const AddProduct = () => {
               meta_keyword: product.meta_keyword || '',
               meta_description: product.meta_description || '',
               thumbnail: product.thumbnail || '',
-              condition: product.condition || 'new',
+              condition: conditionValue, // Usando el valor convertido
               is_active: product.is_active !== undefined ? product.is_active : true,
               is_hot: product.is_hot || false,
               is_feature: product.is_feature || false,
@@ -280,7 +287,7 @@ const AddProduct = () => {
       formData.append('meta_title', newProduct.meta_title);
       formData.append('meta_keyword', newProduct.meta_keyword);
       formData.append('meta_description', newProduct.meta_description);
-      formData.append('condition', newProduct.condition);
+      formData.append('condition', newProduct.condition); // Ahora enviará "Mới" o "Đã qua sử dụng"
 
       // Thêm trường khối lượng nếu có
       if (newProduct.weight) {

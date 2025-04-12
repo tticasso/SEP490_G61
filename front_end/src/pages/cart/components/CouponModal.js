@@ -263,7 +263,7 @@ const CouponModal = ({
                                             <button
                                                 onClick={() => coupon.isValid && applyCoupon(coupon.code)}
                                                 className={`${coupon.isValid ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-400'} 
-                                                           text-white px-4 py-2 rounded-md`}
+                                                           text-white px-4 py-2 rounded-md truncate text-center`}
                                                 disabled={!coupon.isValid}
                                                 aria-label={!coupon.isValid ? `Không thể áp dụng: ${statusDetail}` : "Áp dụng mã giảm giá"}
                                             >

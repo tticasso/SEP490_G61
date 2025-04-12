@@ -576,9 +576,9 @@ const Header = () => {
                     </button>
 
                     <a href="/" className="hover:text-purple-600">Trang chủ</a>
-                    <a href="categories" className="hover:text-purple-600">Danh mục</a>
-                    <a href="#" className="hover:text-purple-600">Bài viết</a>
-                    <a href="#" className="hover:text-purple-600">Hỗ trợ</a>
+                    <a href="categories" className="hover:text-purple-600">Sản phẩm</a>
+                    {/* <a href="#" className="hover:text-purple-600">Bài viết</a>
+                    <a href="#" className="hover:text-purple-600">Hỗ trợ</a> */}
 
                     {/* Hide "Đăng ký bán hàng" link if user is already a seller */}
                     {!userIsSeller && (

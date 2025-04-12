@@ -107,6 +107,7 @@ const CartItem = ({
         }
         return false;
     };
+    
 
     // Lấy thông tin sản phẩm
     const productName = item.product_id && typeof item.product_id === 'object' 
@@ -118,6 +119,9 @@ const CartItem = ({
         : null;
 
     const price = getItemPrice(item);
+
+    // Kiểm tra trạng thái của nút tăng số lượng
+    const isPlusButtonDisabled = isMaxQuantityReached();
 
     return (
         <div className="flex items-center border-b py-4 hover:bg-gray-50">
@@ -144,16 +148,16 @@ const CartItem = ({
                 <div className="flex items-center mt-2">
                     <button
                         onClick={() => onUpdateQuantity(item._id, -1)}
-                        className="p-1 bg-gray-100 rounded"
-                        disabled={item.quantity <= 1}
+                        className={`p-1 bg-gray-100 rounded ${!isPlusButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        disabled={!isPlusButtonDisabled}
                     >
                         <Minus size={16} />
                     </button>
                     <span className="mx-2">{item.quantity}</span>
                     <button
                         onClick={() => onUpdateQuantity(item._id, 1)}
-                        className="p-1 bg-gray-100 rounded"
-                        disabled={isMaxQuantityReached()}
+                        className={`p-1 bg-gray-100 rounded ${isPlusButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        disabled={isPlusButtonDisabled}
                     >
                         <Plus size={16} />
                     </button>

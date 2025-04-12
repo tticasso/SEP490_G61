@@ -1,6 +1,6 @@
 /**
  * Enhanced utility functions for the checkout process
- * Improved to better handle product variants
+ * Improved to better handle product variants and update sold counts
  */
 
 /**
@@ -250,4 +250,84 @@ export const prepareOrderItems = (cartItems) => {
             cart_id: item.cart_id
         };
     });
+};
+
+/**
+ * Cập nhật số lượng đã bán (sold) cho sản phẩm sau khi thanh toán
+ * 
+ * @param {string} productId - ID của sản phẩm cần cập nhật
+ * @param {number} quantity - Số lượng sản phẩm đã bán
+ * @param {Object} apiService - API service để gọi API
+ * @returns {Promise<boolean>} Kết quả cập nhật thành công hay không
+ */
+export const updateProductSoldCount = async (productId, quantity, apiService) => {
+    try {
+        if (!productId || !apiService) {
+            console.error('Thiếu thông tin cần thiết để cập nhật sold');
+            return false;
+        }
+        
+        // Đầu tiên, lấy thông tin sản phẩm hiện tại
+        const product = await apiService.get(`/product/${productId}`);
+        
+        if (!product) {
+            console.error(`Không tìm thấy sản phẩm với ID: ${productId}`);
+            return false;
+        }
+        
+        // Tính toán giá trị mới cho trường sold
+        const currentSold = product.sold || 0;
+        const newSold = currentSold + quantity;
+        
+        // Gọi API để cập nhật giá trị sold
+        await apiService.put(`/product/update/${productId}`, {
+            sold: newSold
+        });
+        
+        console.log(`Đã cập nhật số lượng đã bán cho sản phẩm ${productId}: ${currentSold} → ${newSold}`);
+        return true;
+    } catch (error) {
+        console.error(`Lỗi khi cập nhật số lượng đã bán cho sản phẩm ${productId}:`, error);
+        return false;
+    }
+};
+
+/**
+ * Cập nhật số lượng đã bán cho tất cả sản phẩm trong một đơn hàng
+ * 
+ * @param {string} orderId - ID của đơn hàng
+ * @param {Object} apiService - API service để gọi API
+ * @returns {Promise<boolean>} Kết quả cập nhật thành công hay không
+ */
+export const updateSoldCountsForOrder = async (orderId, apiService) => {
+    try {
+        if (!orderId || !apiService) {
+            console.error('Thiếu thông tin cần thiết để cập nhật số lượng bán');
+            return false;
+        }
+        
+        // Lấy chi tiết đơn hàng từ API
+        const orderDetails = await apiService.get(`/order/${orderId}`);
+        
+        if (!orderDetails || !orderDetails.orderItems || !Array.isArray(orderDetails.orderItems)) {
+            console.error('Không thể lấy thông tin đơn hàng hoặc không có sản phẩm trong đơn hàng');
+            return false;
+        }
+        
+        // Cập nhật sold cho từng sản phẩm trong đơn hàng
+        const updatePromises = orderDetails.orderItems.map(item => {
+            const productId = typeof item.product_id === 'object' ? item.product_id._id : item.product_id;
+            const quantity = item.quantity || 1;
+            
+            return updateProductSoldCount(productId, quantity, apiService);
+        });
+        
+        // Chờ tất cả các cập nhật hoàn tất
+        await Promise.all(updatePromises);
+        
+        return true;
+    } catch (error) {
+        console.error('Lỗi khi cập nhật số lượng bán cho đơn hàng:', error);
+        return false;
+    }
 };

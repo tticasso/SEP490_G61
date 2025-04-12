@@ -13,16 +13,16 @@ const ProductImages = ({ images, selectedImage, setSelectedImage, product }) => 
                     alt={product.name || 'Product image'}
                     className="w-full h-72 md:h-96 object-fit rounded-lg"
                 />
-                <button className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md">
+                {/* <button className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md">
                     <Heart size={18} className="text-gray-600" />
                 </button>
                 <button className="absolute top-14 right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md">
                     <Share2 size={18} className="text-gray-600" />
-                </button>
+                </button> */}
             </div>
 
             {/* Thumbnail images */}
-            <Swiper
+            {/* <Swiper
                 slidesPerView={3.7}
                 spaceBetween={10}
                 className="mySwiper mt-2 px-2"
@@ -42,7 +42,7 @@ const ProductImages = ({ images, selectedImage, setSelectedImage, product }) => 
                         />
                     </SwiperSlide>
                 ))}
-            </Swiper>
+            </Swiper> */}
         </div>
     );
 };

@@ -57,7 +57,7 @@ const ProductCard = ({
             )}
 
             <div className="p-2">
-                <h3 className="text-sm font-medium">{product.name}</h3>
+                <h3 className="text-sm font-medium truncate">{product.name}</h3>
                 <div className="text-xs text-gray-500">{product.condition || "Mới 100%"}</div>
                 <div className="text-red-500 font-bold mt-1">{formatPrice(product.price)}</div>
                 <div className="flex items-center text-xs text-gray-500 mt-1">

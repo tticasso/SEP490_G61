@@ -91,7 +91,7 @@ const ProductCard = ({
                 </div>
 
                 <div className="flex-grow mt-2">
-                    <h3 className="text-sm font-medium">{product.name}</h3>
+                    <h3 className="text-sm font-medium truncate">{product.name}</h3>
                     <span className="text-xs text-gray-500">Đã bán {product.sold || 0}</span>
                     <p className="text-purple-600 font-bold mt-1">
                         {hasVariants ? `Từ ${formatPrice(product.price)}` : formatPrice(product.price)}

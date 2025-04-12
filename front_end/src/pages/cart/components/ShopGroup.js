@@ -117,12 +117,6 @@ const ShopGroup = ({
                 />
             ))}
 
-            <div className="flex p-4 bg-gray-200">
-                <button className="bg-red-500 text-white px-4 py-1 rounded">
-                    Thêm khuyến mãi
-                </button>
-            </div>
-
             {index < shopsLength - 1 && (
                 <div className='w-full h-[1px] bg-gray-600 mt-8'></div>
             )}

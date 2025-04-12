@@ -596,16 +596,17 @@ const ProductDetail = () => {
             <div className="max-w-7xl mx-auto bg-[#F1F5F9] py-8">
                 <div className="bg-white rounded-lg">
                     <div className="flex flex-col gap-6 md:flex-row bg-[#F1F5F9]">
-                        {/* Left side - Product images */}
+                        {/* Left side - Product images */}                 
                         <ProductImages
                             images={images}
                             selectedImage={selectedImage}
                             setSelectedImage={setSelectedImage}
                             product={product}
                         />
+                        
 
                         {/* Right side - Product details */}
-                        <div className="md:w-1/2 px-8 pt-6 pb-2 bg-white rounded-lg">
+                        <div className="w-1/2 px-8 pt-6 pb-2 bg-white rounded-lg">
                             <ProductHeader
                                 product={product}
                                 formatDate={formatDate}

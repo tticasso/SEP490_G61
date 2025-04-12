@@ -233,6 +233,11 @@ const LoginPage = () => {
                                 Đăng kí tài khoản
                             </a>
                         </div>
+                        <div className="mt-1">
+                            <a href="/" className="text-red-500 hover:underline text-sm">
+                                Về trang chủ
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>

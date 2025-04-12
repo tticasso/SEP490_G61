@@ -68,6 +68,36 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         fetchProvinces();
     }, []);
 
+    // Phân tích địa chỉ từ chuỗi city để lấy thông tin tỉnh/quận/phường
+    const parseAddressComponents = (cityString) => {
+        if (!cityString) return { province: '', district: '', ward: '' };
+        
+        // Địa chỉ thường có định dạng: "phường/xã, quận/huyện, tỉnh/thành phố"
+        const parts = cityString.split(', ');
+        
+        if (parts.length >= 3) {
+            return {
+                province: parts[parts.length - 1].trim(),
+                district: parts[parts.length - 2].trim(),
+                ward: parts[parts.length - 3].trim()
+            };
+        } else if (parts.length === 2) {
+            return {
+                province: parts[parts.length - 1].trim(),
+                district: parts[parts.length - 2].trim(),
+                ward: ''
+            };
+        } else if (parts.length === 1) {
+            return {
+                province: parts[0].trim(),
+                district: '',
+                ward: ''
+            };
+        }
+        
+        return { province: '', district: '', ward: '' };
+    };
+
     // Fetch địa chỉ đầu tiên của người dùng
     useEffect(() => {
         const fetchPrimaryAddress = async () => {
@@ -125,12 +155,18 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                                 address_line2: address.address_line2 || ''
                             };
                             
+                            // Phân tích thành phần từ city (tỉnh/quận/phường)
+                            const addressComponents = parseAddressComponents(address.city);
+                            
                             setAddressForm({
                                 ...addressForm,
                                 address: parsedAddress.address,
                                 address_line2: parsedAddress.address_line2,
                                 phone: parsedAddress.phone,
-                                country: parsedAddress.country
+                                country: parsedAddress.country,
+                                provinceName: addressComponents.province,
+                                districtName: addressComponents.district,
+                                wardName: addressComponents.ward
                             });
                             
                             setInitialAddressForm({
@@ -138,31 +174,30 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                                 address: parsedAddress.address,
                                 address_line2: parsedAddress.address_line2,
                                 phone: parsedAddress.phone,
-                                country: parsedAddress.country
+                                country: parsedAddress.country,
+                                provinceName: addressComponents.province,
+                                districtName: addressComponents.district,
+                                wardName: addressComponents.ward
                             });
                             
                             foundAddress = true;
                             
-                            // Nếu có thông tin tỉnh/thành phố, tìm id tương ứng
-                            if (address.city && provinces.length > 0) {
-                                // Thử tìm province từ city
-                                const cityParts = address.city.split(', ');
-                                if (cityParts.length >= 3) {
-                                    const provinceName = cityParts[cityParts.length - 1].trim();
-                                    const foundProvince = provinces.find(p =>
-                                        p.full_name.toLowerCase() === provinceName.toLowerCase()
-                                    );
+                            // Nếu có thông tin tỉnh/thành phố và đã tải danh sách provinces
+                            if (addressComponents.province && provinces.length > 0) {
+                                // Tìm province theo tên
+                                const foundProvince = provinces.find(p =>
+                                    p.full_name.toLowerCase() === addressComponents.province.toLowerCase()
+                                );
+                                
+                                if (foundProvince) {
+                                    setAddressForm(prev => ({
+                                        ...prev,
+                                        provinceId: foundProvince.id,
+                                        provinceName: foundProvince.full_name
+                                    }));
                                     
-                                    if (foundProvince) {
-                                        setAddressForm(prev => ({
-                                            ...prev,
-                                            provinceId: foundProvince.id,
-                                            provinceName: foundProvince.full_name
-                                        }));
-                                        
-                                        // Tải danh sách quận/huyện
-                                        fetchDistricts(foundProvince.id);
-                                    }
+                                    // Tải danh sách quận/huyện
+                                    fetchDistricts(foundProvince.id, addressComponents);
                                 }
                             }
                             
@@ -183,7 +218,9 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             }
         };
         
-        fetchPrimaryAddress();
+        if (provinces.length > 0) {
+            fetchPrimaryAddress();
+        }
     }, [userId, provinces]);
 
     // Xử lý khi nhấn nút Chỉnh sửa
@@ -225,44 +262,90 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
     };
 
     // Lấy dữ liệu quận/huyện khi chọn tỉnh/thành phố
-    const fetchDistricts = async (provinceId) => {
+    const fetchDistricts = async (provinceId, addressComponents = null) => {
         try {
             const response = await fetch(`https://esgoo.net/api-tinhthanh/2/${provinceId}.htm`);
             const data = await response.json();
 
             if (data.error === 0) {
                 setDistricts(data.data);
-                setWards([]); // Reset danh sách phường/xã
-                setAddressForm(prev => ({
-                    ...prev,
-                    districtId: '0',
-                    districtName: '',
-                    wardId: '0',
-                    wardName: ''
-                }));
-                setAddressModified(true); // Đánh dấu địa chỉ đã thay đổi
+                
+                // Nếu có thông tin quận/huyện từ địa chỉ hiện tại
+                if (addressComponents && addressComponents.district) {
+                    // Tìm district theo tên
+                    const foundDistrict = data.data.find(d => 
+                        d.full_name.toLowerCase() === addressComponents.district.toLowerCase()
+                    );
+                    
+                    if (foundDistrict) {
+                        setAddressForm(prev => ({
+                            ...prev,
+                            districtId: foundDistrict.id,
+                            districtName: foundDistrict.full_name
+                        }));
+                        
+                        // Tải danh sách phường/xã
+                        fetchWards(foundDistrict.id, addressComponents);
+                    } else {
+                        setWards([]); // Reset danh sách phường/xã nếu không tìm thấy quận/huyện
+                    }
+                } else {
+                    // Nếu không có thông tin quận/huyện, reset các giá trị liên quan
+                    setWards([]);
+                    setAddressForm(prev => ({
+                        ...prev,
+                        districtId: '0',
+                        districtName: '',
+                        wardId: '0',
+                        wardName: ''
+                    }));
+                }
             } else {
                 console.error('Lỗi khi lấy dữ liệu quận/huyện');
+                setWards([]);
             }
         } catch (error) {
             console.error('Lỗi khi gọi API quận/huyện:', error);
+            setWards([]);
         }
     };
 
     // Lấy dữ liệu phường/xã khi chọn quận/huyện
-    const fetchWards = async (districtId) => {
+    const fetchWards = async (districtId, addressComponents = null) => {
         try {
             const response = await fetch(`https://esgoo.net/api-tinhthanh/3/${districtId}.htm`);
             const data = await response.json();
 
             if (data.error === 0) {
                 setWards(data.data);
-                setAddressForm(prev => ({
-                    ...prev,
-                    wardId: '0',
-                    wardName: ''
-                }));
-                setAddressModified(true); // Đánh dấu địa chỉ đã thay đổi
+                
+                // Nếu có thông tin phường/xã từ địa chỉ hiện tại
+                if (addressComponents && addressComponents.ward) {
+                    // Tìm ward theo tên
+                    const foundWard = data.data.find(w => 
+                        w.full_name.toLowerCase() === addressComponents.ward.toLowerCase()
+                    );
+                    
+                    if (foundWard) {
+                        setAddressForm(prev => ({
+                            ...prev,
+                            wardId: foundWard.id,
+                            wardName: foundWard.full_name
+                        }));
+                    } else {
+                        setAddressForm(prev => ({
+                            ...prev,
+                            wardId: '0',
+                            wardName: ''
+                        }));
+                    }
+                } else {
+                    setAddressForm(prev => ({
+                        ...prev,
+                        wardId: '0',
+                        wardName: ''
+                    }));
+                }
             } else {
                 console.error('Lỗi khi lấy dữ liệu phường/xã');
             }
@@ -609,7 +692,9 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                                             >
                                                 <option value="0">Chọn Tỉnh/Thành phố</option>
                                                 {provinces.map((province) => (
-                                                    <option key={province.id} value={province.id}>{province.full_name}</option>
+                                                    <option key={province.id} value={province.id}>
+                                                        {province.full_name}
+                                                    </option>
                                                 ))}
                                             </select>
                                         </div>
@@ -627,7 +712,9 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                                             >
                                                 <option value="0">Chọn Quận/Huyện</option>
                                                 {districts.map((district) => (
-                                                    <option key={district.id} value={district.id}>{district.full_name}</option>
+                                                    <option key={district.id} value={district.id}>
+                                                        {district.full_name}
+                                                    </option>
                                                 ))}
                                             </select>
                                         </div>
@@ -645,7 +732,9 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                                             >
                                                 <option value="0">Chọn Phường/Xã</option>
                                                 {wards.map((ward) => (
-                                                    <option key={ward.id} value={ward.id}>{ward.full_name}</option>
+                                                    <option key={ward.id} value={ward.id}>
+                                                        {ward.full_name}
+                                                    </option>
                                                 ))}
                                             </select>
                                         </div>

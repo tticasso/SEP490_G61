@@ -112,14 +112,14 @@ const OrderSummary = ({
                 onClick={handlePlaceOrder}
             >
                 {!selectedAddress
-                    ? 'Please select a delivery address'
+                    ? 'Hãy chọn địa chỉ nhận hàng'
                     : !paymentMethod
-                        ? 'Please select a payment method'
+                        ? 'Hãy chọn phương thức thanh toán'
                         : cartItems.length === 0
-                            ? 'Cart is empty'
+                            ? 'Giỏ hàng đang trống'
                             : hasOutOfStockItems
-                                ? 'Remove out of stock items'
-                                : 'Checkout'}
+                                ? 'Hãy xóa những sản phẩm đã hết hàng'
+                                : 'Thanh toán'}
             </button>
 
             {/* Return to Cart Link */}

@@ -160,6 +160,11 @@ const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
     const displayPrice = getDisplayPrice();
     const displayOriginalPrice = productInfo.original_price || null;
     
+    // Kiểm tra xem nút tăng số lượng có bị vô hiệu hóa không
+    const isPlusButtonDisabled = variantDetail && 
+        variantDetail.stock !== undefined && 
+        item.quantity >= variantDetail.stock;
+    
     return (
         <div className="flex items-center mb-4 pb-4 border-b last:border-b-0">
             <img 
@@ -201,8 +206,8 @@ const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
                     <span className="mx-2">{item.quantity}</span>
                     <button 
                         onClick={() => onUpdateQuantity(item._id, item.quantity + 1)}
-                        className="p-1 border rounded"
-                        disabled={variantDetail && variantDetail.stock !== undefined && item.quantity >= variantDetail.stock}
+                        className={`p-1 border rounded ${isPlusButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        disabled={isPlusButtonDisabled}
                     >
                         <Plus size={16} />
                     </button>

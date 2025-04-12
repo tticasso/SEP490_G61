@@ -139,7 +139,7 @@ const ProductVariantSelector = ({
                 </div>
               </div>
               <div className="text-green-600 text-sm font-medium">
-                Còn {selectedVariant.stock} sp
+                Còn {selectedVariant.stock} sản phẩm
               </div>
             </div>
           )}

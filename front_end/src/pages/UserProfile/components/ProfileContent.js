@@ -36,6 +36,9 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         country: 'Việt Nam'
     });
 
+    // Thêm state để kiểm tra xem địa chỉ có thay đổi hay không
+    const [addressModified, setAddressModified] = useState(false);
+
     // Lưu trữ giá trị ban đầu để có thể hủy thay đổi
     const [initialProfile, setInitialProfile] = useState(null);
     const [initialAddress, setInitialAddress] = useState(null);
@@ -189,9 +192,10 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         setInitialAddress(primaryAddress ? { ...primaryAddress } : null);
         setInitialAddressForm({ ...addressForm });
         setIsEditing(true);
-        // Reset thông báo
+        // Reset thông báo và trạng thái đã sửa đổi địa chỉ
         setError('');
         setSuccess('');
+        setAddressModified(false);
     };
 
     // Xử lý khi nhấn nút Hủy
@@ -214,9 +218,10 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         setAddressForm(initialAddressForm || addressForm);
         
         setIsEditing(false);
-        // Reset thông báo
+        // Reset thông báo và trạng thái đã sửa đổi địa chỉ
         setError('');
         setSuccess('');
+        setAddressModified(false);
     };
 
     // Lấy dữ liệu quận/huyện khi chọn tỉnh/thành phố
@@ -235,6 +240,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                     wardId: '0',
                     wardName: ''
                 }));
+                setAddressModified(true); // Đánh dấu địa chỉ đã thay đổi
             } else {
                 console.error('Lỗi khi lấy dữ liệu quận/huyện');
             }
@@ -256,6 +262,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                     wardId: '0',
                     wardName: ''
                 }));
+                setAddressModified(true); // Đánh dấu địa chỉ đã thay đổi
             } else {
                 console.error('Lỗi khi lấy dữ liệu phường/xã');
             }
@@ -274,6 +281,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             provinceId,
             provinceName: selectedProvince ? selectedProvince.full_name : ''
         });
+        setAddressModified(true); // Đánh dấu địa chỉ đã thay đổi
 
         if (provinceId !== '0') {
             fetchDistricts(provinceId);
@@ -292,6 +300,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             districtId,
             districtName: selectedDistrict ? selectedDistrict.full_name : ''
         });
+        setAddressModified(true); // Đánh dấu địa chỉ đã thay đổi
 
         if (districtId !== '0') {
             fetchWards(districtId);
@@ -309,6 +318,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             wardId,
             wardName: selectedWard ? selectedWard.full_name : ''
         });
+        setAddressModified(true); // Đánh dấu địa chỉ đã thay đổi
     };
 
     // Hàm xử lý thay đổi thông tin địa chỉ
@@ -318,6 +328,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             ...addressForm,
             [name]: value
         });
+        setAddressModified(true); // Đánh dấu địa chỉ đã thay đổi
     };
 
     const validateProfileData = () => {
@@ -346,8 +357,8 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
 
     // Validate địa chỉ trước khi lưu
     const validateAddress = () => {
-        // Nếu không chỉnh sửa địa chỉ hoặc không có địa chỉ, bỏ qua validation
-        if (!primaryAddress || !isEditing) return { isValid: true, errors: {} };
+        // Nếu không chỉnh sửa địa chỉ hoặc không có địa chỉ hoặc không thay đổi địa chỉ, bỏ qua validation
+        if (!primaryAddress || !isEditing || !addressModified) return { isValid: true, errors: {} };
         
         let errors = {};
         
@@ -376,7 +387,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             return;
         }
         
-        // Validate địa chỉ
+        // Validate địa chỉ nếu có thay đổi
         const addressValidation = validateAddress();
         if (!addressValidation.isValid) {
             const errorMessage = Object.values(addressValidation.errors).join(', ');
@@ -392,8 +403,8 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             // Gọi hàm updateProfile để cập nhật thông tin người dùng
             const result = await updateProfile(profile);
 
-            // Nếu có địa chỉ và đã chỉnh sửa địa chỉ
-            if (primaryAddress && primaryAddress._id && isEditing) {
+            // Chỉ cập nhật địa chỉ nếu có địa chỉ, đang trong chế độ chỉnh sửa và địa chỉ đã được thay đổi
+            if (primaryAddress && primaryAddress._id && isEditing && addressModified) {
                 try {
                     // Tạo chuỗi địa chỉ đầy đủ từ các thành phần đã chọn
                     const city = `${addressForm.wardName}, ${addressForm.districtName}, ${addressForm.provinceName}`;
@@ -438,6 +449,8 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             if (result && result.success) {
                 setSuccess('Cập nhật thông tin thành công!');
                 setIsEditing(false);
+                // Reset trạng thái đã sửa đổi địa chỉ
+                setAddressModified(false);
             } else {
                 setError(result?.error || 'Đã xảy ra lỗi khi cập nhật thông tin.');
             }
@@ -496,6 +509,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                     <div className="mb-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded">
                         <p className="text-sm">
                             <strong>Lưu ý:</strong> Bạn có thể cập nhật họ, tên, số điện thoại và địa chỉ. Email không thể thay đổi.
+                            Nếu không muốn thay đổi địa chỉ, bạn có thể để nguyên thông tin địa chỉ hiện tại.
                         </p>
                     </div>
                 )}
@@ -591,7 +605,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                                                 value={addressForm.provinceId}
                                                 onChange={handleProvinceChange}
                                                 className="border p-2 rounded-md w-full"
-                                                required
+                                                required={addressModified}
                                             >
                                                 <option value="0">Chọn Tỉnh/Thành phố</option>
                                                 {provinces.map((province) => (
@@ -608,7 +622,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                                                 value={addressForm.districtId}
                                                 onChange={handleDistrictChange}
                                                 className="border p-2 rounded-md w-full"
-                                                required
+                                                required={addressModified}
                                                 disabled={addressForm.provinceId === '0'}
                                             >
                                                 <option value="0">Chọn Quận/Huyện</option>
@@ -626,7 +640,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                                                 value={addressForm.wardId}
                                                 onChange={handleWardChange}
                                                 className="border p-2 rounded-md w-full"
-                                                required
+                                                required={addressModified}
                                                 disabled={addressForm.districtId === '0'}
                                             >
                                                 <option value="0">Chọn Phường/Xã</option>
@@ -647,7 +661,7 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                                             value={addressForm.address}
                                             onChange={handleAddressFormChange}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                            required
+                                            required={addressModified}
                                         />
                                     </div>
 

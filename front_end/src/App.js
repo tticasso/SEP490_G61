@@ -34,6 +34,7 @@ import MyShop from './Seller/MyShop';
 import OrderConfirmation from './pages/orderConfirm/OrderConfirmation';
 import PaymentCallback from './pages/checkout/payment/PaymentCallback';
 import MessageBubble from './pages/UserProfile/components/messageBubble';
+import RoleRedirect from './route/RoleRedirect'; // Import the new component
 
 import SellerSettings from './Seller/SellerChangePassword';
 import ProductReviews from './Seller/ProductReview';
@@ -46,18 +47,61 @@ function App() {
   const noHeaderPaths = ['/register', '/login', '/admin', '/forgot-password', '/reset-password'];
   const noHeaderPage = noHeaderPaths.includes(location.pathname) || location.pathname.startsWith('/admin/');
 
+  // Define paths that should not have role-based redirection
+  const noRedirectPaths = ['/login', '/register', '/admin', '/seller-dashboard', '/forgot-password', '/reset-password'];
+  const shouldRedirect = !noRedirectPaths.includes(location.pathname) && 
+                        !location.pathname.startsWith('/admin/') && 
+                        !location.pathname.startsWith('/seller-dashboard/');
+
   return (
     <div className="font-bold">
       <AuthProvider>
         {!noHeaderPage && <Header />}
         <Routes>
-          {/* Public routes - accessible to everyone */}
-          <Route path="/" element={<Homepage />} />
+          {/* Public routes with role redirection */}
+          <Route path="/" element={
+            shouldRedirect ? (
+              <RoleRedirect>
+                <Homepage />
+              </RoleRedirect>
+            ) : (
+              <Homepage />
+            )
+          } />
+          
+          <Route path="/product-detail" element={
+            shouldRedirect ? (
+              <RoleRedirect>
+                <ProductDetail />
+              </RoleRedirect>
+            ) : (
+              <ProductDetail />
+            )
+          } />
+          
+          <Route path="/shop-detail" element={
+            shouldRedirect ? (
+              <RoleRedirect>
+                <ShopDetail />
+              </RoleRedirect>
+            ) : (
+              <ShopDetail />
+            )
+          } />
+          
+          <Route path="/categories" element={
+            shouldRedirect ? (
+              <RoleRedirect>
+                <Categories />
+              </RoleRedirect>
+            ) : (
+              <Categories />
+            )
+          } />
+
+          {/* Public routes without role redirection */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/product-detail" element={<ProductDetail />} />
-          <Route path="/shop-detail" element={<ShopDetail />} />
-          <Route path="/categories" element={<Categories />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/shop-registration" element={<ShopRegistration />} />
@@ -66,22 +110,49 @@ function App() {
           {/* Protected routes - require authentication */}
           <Route path="/user-profile/*" element={
             <ProtectedRoute>
-              <UserProfile />
+              {shouldRedirect ? (
+                <RoleRedirect>
+                  <UserProfile />
+                </RoleRedirect>
+              ) : (
+                <UserProfile />
+              )}
             </ProtectedRoute>
           } />
+          
           <Route path="/order-confirmation" element={
             <ProtectedRoute>
-              <OrderConfirmation />
+              {shouldRedirect ? (
+                <RoleRedirect>
+                  <OrderConfirmation />
+                </RoleRedirect>
+              ) : (
+                <OrderConfirmation />
+              )}
             </ProtectedRoute>
           } />
+          
           <Route path="/cart" element={
             <ProtectedRoute>
-              <Cart />
+              {shouldRedirect ? (
+                <RoleRedirect>
+                  <Cart />
+                </RoleRedirect>
+              ) : (
+                <Cart />
+              )}
             </ProtectedRoute>
           } />
+          
           <Route path="/checkout" element={
             <ProtectedRoute>
-              <CheckoutPage />
+              {shouldRedirect ? (
+                <RoleRedirect>
+                  <CheckoutPage />
+                </RoleRedirect>
+              ) : (
+                <CheckoutPage />
+              )}
             </ProtectedRoute>
           } />
 
@@ -175,7 +246,15 @@ function App() {
           } />
 
           {/* Catch-all route for 404 pages */}
-          <Route path="*" element={<div className="text-center p-20">Page not found</div>} />
+          <Route path="*" element={
+            shouldRedirect ? (
+              <RoleRedirect>
+                <div className="text-center p-20">Page not found</div>
+              </RoleRedirect>
+            ) : (
+              <div className="text-center p-20">Page not found</div>
+            )
+          } />
         </Routes>
         {!noHeaderPage && <Footer />}
         <ChatBot />

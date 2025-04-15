@@ -6,11 +6,25 @@ const Role = db.role
 const bcrypt = require("bcrypt")
 require('dotenv').config()
 
+// Updated to handle international phone numbers
 function formatPhoneNumber(phone) {
-    if (!phone.startsWith('84') && phone.startsWith('0')) {
-        return '84' + phone.substring(1); // Thay 0 bằng 84
+    if (!phone) return phone;
+    
+    // Remove any non-digit characters (like +, spaces, or dashes)
+    let cleanPhone = phone.replace(/\D/g, '');
+    
+    // Handle Vietnamese numbers specifically (local format starting with 0)
+    if (cleanPhone.startsWith('0') && cleanPhone.length >= 10 && cleanPhone.length <= 11) {
+        return '84' + cleanPhone.substring(1);
     }
-    return phone;
+    
+    // For all other numbers, ensure they start with a country code
+    // If phone doesn't start with a valid country code digit (1-9), default to Vietnam country code
+    if (!/^[1-9]/.test(cleanPhone)) {
+        return '84' + cleanPhone;
+    }
+    
+    return cleanPhone;
 }
 
 async function create(req, res, next) {
@@ -97,7 +111,7 @@ async function update(req, res, next) {
         // Chỉ cập nhật các trường được cung cấp trong request
         ...(req.body.firstName !== undefined && { firstName: req.body.firstName }),
         ...(req.body.lastName !== undefined && { lastName: req.body.lastName }),
-        ...(req.body.phone !== undefined && { phone: req.body.phone }),
+        ...(req.body.phone !== undefined && { phone: formatPhoneNumber(req.body.phone) }),
         ...(req.body.email !== undefined && { email: req.body.email }),
         ...(req.body.password !== undefined && { password: req.body.password }),
         ...(req.body.type !== undefined && { type: req.body.type }),

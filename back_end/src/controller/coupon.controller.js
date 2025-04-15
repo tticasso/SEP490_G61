@@ -17,7 +17,7 @@ const getAllCoupons = async (req, res) => {
         if (created_by) {
             // Kiểm tra nếu user hiện tại là admin
             const user = await User.findById(created_by);
-            
+
             // Nếu không phải admin, chỉ xem được coupon của chính họ
             if (user && user.role !== 'admin') {
                 filter.created_by = created_by;
@@ -188,7 +188,7 @@ const createCoupon = async (req, res) => {
 const isAdmin = async (userId) => {
     try {
         if (!userId) return false;
-        
+
         const user = await User.findById(userId);
         return user && user.role === 'admin';
     } catch (error) {
@@ -306,9 +306,9 @@ async function validateCoupon(req, res) {
         const { code, userId, cartTotal, productIds, categoryIds, shopIds, variantIds } = req.body;
 
         if (!code) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 valid: false,
-                message: "Mã giảm giá là bắt buộc" 
+                message: "Mã giảm giá là bắt buộc"
             });
         }
 
@@ -330,9 +330,9 @@ async function validateCoupon(req, res) {
         });
 
         if (!coupon) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 valid: false,
-                message: "Mã giảm giá không tồn tại hoặc đã hết hạn" 
+                message: "Mã giảm giá không tồn tại hoặc đã hết hạn"
             });
         }
 
@@ -356,8 +356,37 @@ async function validateCoupon(req, res) {
         }
 
         // Kiểm tra giới hạn sử dụng mỗi người dùng
+        // Kiểm tra giới hạn sử dụng mỗi người dùng
         if (userId && coupon.max_uses_per_user > 0) {
-            const userUsage = coupon.history?.get(userId.toString()) || 0;
+            let userUsage = 0;
+
+            // Kiểm tra cấu trúc history và lấy đúng số lần sử dụng
+            if (coupon.history instanceof Map) {
+                // Nếu history là Map (được định nghĩa trong model)
+                userUsage = coupon.history.get(userId.toString()) || 0;
+            } else if (coupon.history && typeof coupon.history === 'object') {
+                // Kiểm tra nếu history được lưu dưới dạng object
+                if (coupon.history[userId.toString()] !== undefined) {
+                    userUsage = coupon.history[userId.toString()];
+                } else if (coupon.history[userId] !== undefined) {
+                    userUsage = coupon.history[userId];
+                } else {
+                    // Kiểm tra các trường hợp khác có thể xảy ra
+                    const keys = Object.keys(coupon.history);
+                    const matchKey = keys.find(k =>
+                        k === userId.toString() ||
+                        k === String(userId)
+                    );
+
+                    if (matchKey) {
+                        userUsage = coupon.history[matchKey];
+                    }
+                }
+            }
+
+            // Ghi log để debug
+            console.log(`[COUPON] User ${userId} has used coupon ${coupon.code} ${userUsage}/${coupon.max_uses_per_user} times`);
+
             if (userUsage >= coupon.max_uses_per_user) {
                 return res.status(400).json({
                     valid: false,
@@ -366,35 +395,79 @@ async function validateCoupon(req, res) {
             }
         }
 
-        // Kiểm tra áp dụng cho sản phẩm cụ thể
-        if (coupon.product_id) {
-            const matchProduct = productIds.includes(coupon.product_id.toString());
-            if (!matchProduct) {
+        // Kiểm tra xem có giới hạn sản phẩm hoặc danh mục không
+        const isProductSpecific = coupon.product_id !== null && coupon.product_id !== undefined;
+        const isCategorySpecific = coupon.category_id !== null && coupon.category_id !== undefined;
+        const isShopSpecific = coupon.shop_id !== null && coupon.shop_id !== undefined;
+
+        // Nếu mã giảm giá áp dụng cho sản phẩm cụ thể
+        if (isProductSpecific) {
+            // Kiểm tra từng sản phẩm trong giỏ hàng
+            const eligibleProducts = productIds.filter(pid =>
+                pid === coupon.product_id.toString()
+            );
+
+            // Nếu không có sản phẩm nào phù hợp
+            if (eligibleProducts.length === 0) {
                 return res.status(400).json({
                     valid: false,
                     message: "Mã giảm giá chỉ áp dụng cho sản phẩm cụ thể"
                 });
             }
+
+            // Nếu không phải tất cả sản phẩm đều phù hợp
+            if (eligibleProducts.length !== productIds.length) {
+                return res.status(400).json({
+                    valid: false,
+                    message: "Mã giảm giá không áp dụng cho tất cả sản phẩm đã chọn"
+                });
+            }
         }
 
-        // Kiểm tra áp dụng cho danh mục cụ thể
-        if (coupon.category_id && categoryIds) {
-            const matchCategory = categoryIds.includes(coupon.category_id.toString());
-            if (!matchCategory) {
+        // Nếu mã giảm giá áp dụng cho danh mục cụ thể
+        if (isCategorySpecific && categoryIds && categoryIds.length > 0) {
+            // Cần tất cả sản phẩm đều thuộc danh mục được áp dụng
+            const productsInCategory = categoryIds.filter(cid =>
+                cid === coupon.category_id.toString()
+            );
+
+            // Nếu không có sản phẩm nào thuộc danh mục
+            if (productsInCategory.length === 0) {
                 return res.status(400).json({
                     valid: false,
                     message: "Mã giảm giá chỉ áp dụng cho danh mục sản phẩm cụ thể"
                 });
             }
+
+            // Nếu không phải tất cả sản phẩm đều thuộc danh mục
+            if (productsInCategory.length !== categoryIds.length) {
+                return res.status(400).json({
+                    valid: false,
+                    message: "Mã giảm giá không áp dụng cho tất cả sản phẩm đã chọn"
+                });
+            }
         }
 
-        // Kiểm tra áp dụng cho shop cụ thể (nếu có)
-        if (coupon.shop_id && shopIds) {
-            const matchShop = shopIds.includes(coupon.shop_id.toString());
-            if (!matchShop) {
+        // Nếu mã giảm giá áp dụng cho shop cụ thể
+        if (isShopSpecific && shopIds && shopIds.length > 0) {
+            // Cần tất cả sản phẩm đều thuộc shop được áp dụng
+            const productsInShop = shopIds.filter(sid =>
+                sid === coupon.shop_id.toString()
+            );
+
+            // Nếu không có sản phẩm nào thuộc shop
+            if (productsInShop.length === 0) {
                 return res.status(400).json({
                     valid: false,
                     message: "Mã giảm giá chỉ áp dụng cho cửa hàng cụ thể"
+                });
+            }
+
+            // Nếu không phải tất cả sản phẩm đều thuộc shop
+            if (productsInShop.length !== shopIds.length) {
+                return res.status(400).json({
+                    valid: false,
+                    message: "Mã giảm giá không áp dụng cho tất cả sản phẩm đã chọn"
                 });
             }
         }
@@ -425,9 +498,9 @@ async function validateCoupon(req, res) {
             message: "Mã giảm giá hợp lệ"
         });
     } catch (error) {
-        res.status(500).json({ 
+        res.status(500).json({
             valid: false,
-            message: error.message 
+            message: error.message
         });
     }
 }

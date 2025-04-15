@@ -7,7 +7,7 @@ const BASE_URL = process.env.API_BASE_URL || 'https://trooc.kaine.fun';
 
 // Thông tin đăng nhập admin
 const ADMIN_USERNAME = 'lahieuts@gmail.com'; // Thay bằng username thực tế của admin
-const ADMIN_PASSWORD = '123456yy'; // Thay bằng password thực tế của admin
+const ADMIN_PASSWORD = '123456qq'; // Thay bằng password thực tế của admin
 
 /**
  * Lấy token admin bằng cách đăng nhập

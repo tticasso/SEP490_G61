@@ -1,111 +1,163 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, Package, Truck, Home, AlertCircle, XCircle } from 'lucide-react';
+import { CheckCircle, Package, Truck, Home, AlertCircle, XCircle, ChevronLeft, ChevronRight, Store } from 'lucide-react';
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import defaultProductImage from '../../assets/dongho.png';
 
 const OrderConfirmation = () => {
-  const [order, setOrder] = useState(null);
-  const [orderDetails, setOrderDetails] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [currentOrderIndex, setCurrentOrderIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [variantDetails, setVariantDetails] = useState({});
   const [loadingVariants, setLoadingVariants] = useState(false);
-  const [calculatedSubtotal, setCalculatedSubtotal] = useState(0);
-  const [calculatedTotal, setCalculatedTotal] = useState(0); // New state for calculated total
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
+  const [totalAmount, setTotalAmount] = useState(0);
 
   // Get user information
   const currentUser = AuthService.getCurrentUser();
   const userId = currentUser?._id || currentUser?.id || "";
 
   useEffect(() => {
-    const fetchOrderData = async () => {
+    const fetchOrdersData = async () => {
       try {
         setLoading(true);
 
-        // Get orderId from URL
+        // Get orderId or orderIds from URL
         const urlParams = new URLSearchParams(window.location.search);
         const orderId = urlParams.get('orderId');
-
+        const orderIds = urlParams.get('orderIds');
         const paymentErrorParam = urlParams.get('paymentError');
 
-        if (!orderId) {
+        // Check if we have orderIds parameter (comma-separated list)
+        if (orderIds) {
+          const idsArray = orderIds.split(',').filter(id => id.trim());
+          if (idsArray.length === 0) {
+            throw new Error("No valid order IDs found");
+          }
+
+          // Fetch all orders in parallel
+          const orderPromises = idsArray.map(id => ApiService.get(`/order/find/${id}`));
+          const ordersResults = await Promise.all(orderPromises);
+          
+          // Filter out any failed requests
+          const validOrders = ordersResults
+            .filter(result => result && result.order)
+            .map(result => ({
+              order: result.order,
+              orderDetails: result.orderDetails || []
+            }));
+          
+          if (validOrders.length === 0) {
+            throw new Error("Failed to load order information");
+          }
+
+          setOrders(validOrders);
+          
+          // Calculate total amount for all orders
+          const total = validOrders.reduce((sum, orderData) => {
+            const orderTotal = calculateOrderTotal(orderData);
+            return sum + orderTotal;
+          }, 0);
+          
+          setTotalAmount(total);
+          
+          // Check payment status if applicable
+          if (validOrders.some(orderData => isOnlinePayment(orderData.order))) {
+            // Check for transaction code in localStorage
+            const transactionCode = localStorage.getItem('paymentTransactionCode');
+            if (transactionCode) {
+              await checkPaymentStatus(idsArray[0], transactionCode);
+            }
+          }
+
+          // Load variant details if needed
+          for (const orderData of validOrders) {
+            const needsVariantLoad = (orderData.orderDetails || []).some(detail =>
+              detail.variant_id &&
+              (typeof detail.variant_id !== 'object' ||
+                !detail.variant_id.attributes && !detail.variant_id.name)
+            );
+
+            if (needsVariantLoad) {
+              await loadVariantDetails(orderData.orderDetails, orderData.order);
+            }
+          }
+        } 
+        // Handle single orderId parameter (backward compatibility)
+        else if (orderId) {
+          const orderData = await ApiService.get(`/order/find/${orderId}`);
+
+          if (!orderData || !orderData.order) {
+            throw new Error("Unable to load order information");
+          }
+
+          setOrders([{
+            order: orderData.order,
+            orderDetails: orderData.orderDetails || []
+          }]);
+          
+          setTotalAmount(calculateOrderTotal({
+            order: orderData.order, 
+            orderDetails: orderData.orderDetails || []
+          }));
+
+          // Check payment status if applicable
+          if (isOnlinePayment(orderData.order)) {
+            const transactionCode = localStorage.getItem('paymentTransactionCode');
+            if (transactionCode) {
+              await checkPaymentStatus(orderId, transactionCode);
+            }
+          }
+
+          // Load variant details if needed
+          const needsVariantLoad = (orderData.orderDetails || []).some(detail =>
+            detail.variant_id &&
+            (typeof detail.variant_id !== 'object' ||
+              !detail.variant_id.attributes && !detail.variant_id.name)
+          );
+
+          if (needsVariantLoad) {
+            await loadVariantDetails(orderData.orderDetails, orderData.order);
+          }
+        } 
+        // Check localStorage as fallback
+        else {
           const storedOrderId = localStorage.getItem('currentOrderId');
-          if (storedOrderId) {
+          const storedOrderIds = localStorage.getItem('currentOrderIds');
+          
+          if (storedOrderIds) {
+            try {
+              const idsArray = JSON.parse(storedOrderIds);
+              localStorage.removeItem('currentOrderIds');
+              window.location.href = `/order-confirmation?orderIds=${idsArray.join(',')}`;
+              return;
+            } catch (e) {
+              console.error("Error parsing stored order IDs:", e);
+            }
+          } else if (storedOrderId) {
             localStorage.removeItem('currentOrderId');
             window.location.href = `/order-confirmation?orderId=${storedOrderId}`;
             return;
+          } else {
+            throw new Error("Order ID not found");
           }
-          throw new Error("Order ID not found");
-        }
-
-        // Call API to get order information
-        const orderData = await ApiService.get(`/order/find/${orderId}`);
-
-        if (!orderData || !orderData.order) {
-          throw new Error("Unable to load order information");
-        }
-
-        console.log("Order data received:", orderData);
-
-        setOrder(orderData.order);
-        setOrderDetails(orderData.orderDetails || []);
-
-        // Calculate subtotal with received data
-        if (orderData.orderDetails && orderData.orderDetails.length > 0) {
-          const subtotal = calculateOrderSubtotal(orderData.orderDetails);
-          setCalculatedSubtotal(subtotal);
-
-          // Calculate total including shipping cost
-          const shippingCost = orderData.order.shipping_id?.price || 0;
-          const totalDiscount = (orderData.order.discount_amount || 0) + (orderData.order.coupon_amount || 0);
-          const total = Math.max(0, subtotal - totalDiscount) + shippingCost;
-          setCalculatedTotal(total);
-
-          console.log(`Calculated subtotal: ${subtotal}, Shipping cost: ${shippingCost}, Discounts: ${totalDiscount}, Total: ${total}`);
-        }
-
-        // Code kiểm tra nếu đơn hàng sử dụng PayOS
-        const paymentMethod = orderData.order.payment_id;
-        const isPayOsOrder = paymentMethod &&
-          (typeof paymentMethod === 'object'
-            ? (paymentMethod.name && (paymentMethod.name.toLowerCase().includes('vnpay') || paymentMethod.name.toLowerCase().includes('payos')))
-            : false);
-
-        // Kiểm tra xem có transaction code trong localStorage không
-        const transactionCode = localStorage.getItem('paymentTransactionCode');
-
-        if (isPayOsOrder || transactionCode) {
-          // Kiểm tra trạng thái thanh toán từ PayOS
-          await checkPaymentStatus(orderId, transactionCode || orderData.order.order_payment_id);
         }
 
         setLoading(false);
-
-        // Only load variant details for items that don't have variant info populated
-        const needsVariantLoad = (orderData.orderDetails || []).some(detail =>
-          detail.variant_id &&
-          (typeof detail.variant_id !== 'object' ||
-            !detail.variant_id.attributes && !detail.variant_id.name)
-        );
-
-        if (needsVariantLoad) {
-          await loadVariantDetails(orderData.orderDetails, orderData.order);
-        }
       } catch (err) {
-        console.error("Error fetching order:", err);
+        console.error("Error fetching orders:", err);
         setError(err.message || "An error occurred loading order information");
         setLoading(false);
       }
     };
 
-    fetchOrderData();
+    fetchOrdersData();
   }, []);
 
-  // Kiểm tra xem đơn hàng có phải thanh toán qua VNPay/PayOS không
+  // Check if the order uses online payment
   const isOnlinePayment = (order) => {
     if (!order) return false;
 
@@ -155,7 +207,7 @@ const OrderConfirmation = () => {
       console.log(`Checking if variant details needed for ${details.length} items`);
 
       // Create a copy of the current variant details
-      const detailsMap = {};
+      const detailsMap = { ...variantDetails };
 
       // Process each order detail item
       for (const detail of details) {
@@ -225,21 +277,6 @@ const OrderConfirmation = () => {
 
       console.log("Final variant details:", detailsMap);
       setVariantDetails(detailsMap);
-
-      // Recalculate subtotal and total with newly fetched variant info if needed
-      if (Object.keys(detailsMap).length > 0) {
-        const subtotal = calculateOrderSubtotal(details, detailsMap);
-        setCalculatedSubtotal(subtotal);
-
-        // Recalculate total with updated subtotal
-        const shippingCost = orderObj.shipping_id?.price || 0;
-        const totalDiscount = (orderObj.discount_amount || 0) + (orderObj.coupon_amount || 0);
-        const total = Math.max(0, subtotal - totalDiscount) + shippingCost;
-        setCalculatedTotal(total);
-
-        console.log(`Updated calculated subtotal: ${subtotal}, Total: ${total}`);
-      }
-
     } catch (error) {
       console.error('Error in loadVariantDetails:', error);
     } finally {
@@ -273,7 +310,10 @@ const OrderConfirmation = () => {
   };
 
   // Calculate correct subtotal for order
-  const calculateOrderSubtotal = (details, variants = {}) => {
+  const calculateOrderSubtotal = (orderData) => {
+    const details = orderData.orderDetails || [];
+    const order = orderData.order;
+    
     if (!details || details.length === 0) return 0;
 
     // If order.original_price is available from server and seems reasonable, use it
@@ -305,6 +345,21 @@ const OrderConfirmation = () => {
 
     console.log(`Calculated subtotal from order details: ${total}`);
     return total;
+  };
+
+  // Calculate full order total including shipping and discount
+  const calculateOrderTotal = (orderData) => {
+    const order = orderData.order;
+    
+    // Calculate subtotal
+    const subtotal = calculateOrderSubtotal(orderData);
+    
+    // Get discount and shipping cost
+    const totalDiscount = (order.discount_amount || 0) + (order.coupon_amount || 0);
+    const shippingCost = order.shipping_id?.price || 0;
+    
+    // Calculate total
+    return Math.max(0, subtotal - totalDiscount) + shippingCost;
   };
 
   // Format price
@@ -438,6 +493,35 @@ const OrderConfirmation = () => {
     return defaultProductImage;
   };
 
+  // Get shop information from order
+  const getShopInfo = (order) => {
+    if (!order) return { name: 'Cửa hàng', id: 'unknown' };
+    
+    if (order.shop_id) {
+      if (typeof order.shop_id === 'object') {
+        return {
+          name: order.shop_id.name || 'Cửa hàng',
+          id: order.shop_id._id || 'unknown'
+        };
+      }
+      return { name: 'Cửa hàng', id: order.shop_id };
+    }
+    
+    return { name: 'Cửa hàng', id: 'unknown' };
+  };
+
+  const goToNextOrder = () => {
+    if (currentOrderIndex < orders.length - 1) {
+      setCurrentOrderIndex(currentOrderIndex + 1);
+    }
+  };
+
+  const goToPreviousOrder = () => {
+    if (currentOrderIndex > 0) {
+      setCurrentOrderIndex(currentOrderIndex - 1);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto p-6 mt-10 text-center">
@@ -463,7 +547,7 @@ const OrderConfirmation = () => {
     );
   }
 
-  if (!order) {
+  if (!orders || orders.length === 0) {
     return (
       <div className="max-w-4xl mx-auto p-6 mt-10 bg-white rounded-lg shadow-md">
         <div className="text-center mb-4">Không tìm thấy thông tin đơn hàng</div>
@@ -479,16 +563,22 @@ const OrderConfirmation = () => {
     );
   }
 
+  // Get current order data
+  const currentOrderData = orders[currentOrderIndex];
+  const order = currentOrderData.order;
+  const orderDetails = currentOrderData.orderDetails || [];
+  
   // Always use calculated subtotal to ensure accuracy
-  const subtotal = calculatedSubtotal || 0;
+  const subtotal = calculateOrderSubtotal(currentOrderData);
   // Calculate total discount
   const totalDiscount = (order.discount_amount || 0) + (order.coupon_amount || 0);
   // Calculate shipping cost
   const shippingCost = order.shipping_id?.price || 0;
-
-  // ALWAYS use our calculatedTotal if available, otherwise calculate it manually
-  // This ensures shipping is ALWAYS included in the total
-  const displayTotal = calculatedTotal || Math.max(0, subtotal - totalDiscount) + shippingCost;
+  // Calculate total for current order
+  const displayTotal = Math.max(0, subtotal - totalDiscount) + shippingCost;
+  
+  // Get shop info
+  const shopInfo = getShopInfo(order);
 
   return (
     <div className="max-w-4xl mx-auto p-6 mt-10">
@@ -496,11 +586,18 @@ const OrderConfirmation = () => {
       <div className="bg-white p-6 rounded-lg shadow-md mb-6 text-center">
         <CheckCircle size={56} className="text-green-500 mx-auto mb-4" />
         <h1 className="text-2xl font-bold mb-2">Đặt hàng thành công!</h1>
-        <p className="text-gray-600">
-          Cảm ơn bạn đã đặt hàng. Mã đơn hàng của bạn là <span className="font-semibold">{order._id}</span>
-        </p>
+        
+        {orders.length > 1 ? (
+          <p className="text-gray-600">
+            Cảm ơn bạn đã đặt hàng. Chúng tôi đã tạo {orders.length} đơn hàng cho bạn.
+          </p>
+        ) : (
+          <p className="text-gray-600">
+            Cảm ơn bạn đã đặt hàng. Mã đơn hàng của bạn là <span className="font-semibold">{order._id}</span>
+          </p>
+        )}
 
-        {/* Thêm ghi chú nếu là đơn hàng VNPay chưa thanh toán */}
+        {/* Thêm ghi chú nếu là đơn hàng thanh toán online chưa thanh toán */}
         {isOnlinePayment(order) && order.status_id === 'pending' && (
           <p className="text-yellow-600 mt-2 bg-yellow-50 p-2 rounded">
             <AlertCircle size={16} className="inline mr-1" />
@@ -516,10 +613,49 @@ const OrderConfirmation = () => {
           </p>
         )}
       </div>
+      
+      {/* Order Navigation - Show only if multiple orders */}
+      {orders.length > 1 && (
+        <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+          <div className="flex justify-between items-center">
+            <button 
+              onClick={goToPreviousOrder}
+              disabled={currentOrderIndex === 0}
+              className={`flex items-center ${currentOrderIndex === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-purple-600 hover:text-purple-800'}`}
+            >
+              <ChevronLeft size={20} className="mr-1" />
+              Đơn hàng trước
+            </button>
+            
+            <div className="text-center">
+              <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+                Đơn hàng {currentOrderIndex + 1} / {orders.length}
+              </span>
+            </div>
+            
+            <button 
+              onClick={goToNextOrder}
+              disabled={currentOrderIndex === orders.length - 1}
+              className={`flex items-center ${currentOrderIndex === orders.length - 1 ? 'text-gray-400 cursor-not-allowed' : 'text-purple-600 hover:text-purple-800'}`}
+            >
+              Đơn hàng tiếp
+              <ChevronRight size={20} className="ml-1" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Order Summary */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h2 className="text-xl font-bold mb-4">Thông tin đơn hàng</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Thông tin đơn hàng</h2>
+          
+          {/* Shop information */}
+          <div className="flex items-center text-sm">
+            <Store size={16} className="mr-1 text-purple-600" />
+            <span className="font-medium">{shopInfo.name}</span>
+          </div>
+        </div>
 
         <div className="flex flex-col md:flex-row md:justify-between mb-6">
           <div className="mb-4 md:mb-0">
@@ -655,6 +791,17 @@ const OrderConfirmation = () => {
           </div>
         </div>
       </div>
+      
+      {/* Total for all orders - Show only if multiple orders */}
+      {orders.length > 1 && (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+          <h2 className="text-xl font-bold mb-4">Tổng thanh toán cho tất cả đơn hàng</h2>
+          <div className="flex justify-between font-bold text-lg text-purple-700">
+            <span>Tổng cộng ({orders.length} đơn hàng):</span>
+            <span>{formatPrice(totalAmount)}</span>
+          </div>
+        </div>
+      )}
 
       {/* CTA Buttons */}
       <div className="flex flex-col md:flex-row gap-4 mb-10">

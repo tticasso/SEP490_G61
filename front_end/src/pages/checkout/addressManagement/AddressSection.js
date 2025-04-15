@@ -34,20 +34,20 @@ const AddressSection = ({
             </div>
 
             {loading ? (
-                <div className="text-center py-4">Loading addresses...</div>
+                <div className="text-center py-4">Đang tải địa chỉ giao hàng...</div>
             ) : error && addresses.length === 0 ? (
                 <div className="text-red-500 text-center py-4">
                     {error}
                 </div>
             ) : addresses.length === 0 ? (
                 <div className="text-center py-4 text-gray-500">
-                    You don't have any addresses yet. Please add a new address to continue checkout.
+                    Bạn chưa có địa chỉ nào. Vui lòng thêm địa chỉ mới để tiếp tục thanh toán.
                     <div className="mt-2">
                         <button
                             onClick={handleAddAddress}
                             className="text-purple-600 hover:underline"
                         >
-                            Add Address Now
+                            Thêm địa chỉ mới
                         </button>
                     </div>
                 </div>
@@ -72,7 +72,7 @@ const AddressSection = ({
                     className="w-full border p-4 rounded text-purple-600 font-medium mt-2"
                     onClick={handleAddAddress}
                 >
-                    + Add Address
+                    + Thêm địa chỉ mới
                 </button>
             )}
         </>

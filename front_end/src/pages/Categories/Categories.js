@@ -76,24 +76,64 @@ const Categories = () => {
                     product.is_active === true || product.is_active === 'true' || product.is_active === 1
                 );
 
+                // Kiểm tra hàng tồn kho của tất cả biến thể
+                let productsInStock = [];
+                
+                // Dùng Promise.all để kiểm tra song song tất cả sản phẩm
+                const productStockChecks = await Promise.all(
+                    activeProducts.map(async (product) => {
+                        try {
+                            const variants = await ApiService.get(`/product-variant/product/${product._id}`, false);
+                            
+                            // Lọc ra các biến thể đang active
+                            const activeVariants = variants.filter(variant => 
+                                variant.is_active === true || variant.is_active === 'true' || variant.is_active === 1
+                            );
+                            
+                            // Kiểm tra xem có ít nhất một biến thể còn hàng không
+                            const hasStock = activeVariants.length === 0 || 
+                                             activeVariants.some(variant => 
+                                                variant.stock === undefined || variant.stock > 0
+                                             );
+                                             
+                            return {
+                                product,
+                                hasStock
+                            };
+                        } catch (error) {
+                            console.error(`Error checking variants for product ${product._id}:`, error);
+                            // Nếu có lỗi khi kiểm tra, coi như sản phẩm còn hàng
+                            return {
+                                product,
+                                hasStock: true
+                            };
+                        }
+                    })
+                );
+                
+                // Lọc ra các sản phẩm còn hàng
+                productsInStock = productStockChecks
+                    .filter(item => item.hasStock)
+                    .map(item => item.product);
+
                 // Parse URL parameters
                 const urlParams = new URLSearchParams(location.search);
                 const search = urlParams.get('search');
                 const categoryId = urlParams.get('category');
 
-                // Save search query in state if present
+                // Xử lý tìm kiếm và lọc từ sản phẩm còn hàng
                 if (search) {
                     setSearchQuery(search);
 
                     // Filter products based on search query
                     const searchLower = search.toLowerCase();
-                    const filteredProducts = activeProducts.filter(product =>
+                    const filteredProducts = productsInStock.filter(product =>
                         product.name.toLowerCase().includes(searchLower) ||
                         (product.description && product.description.toLowerCase().includes(searchLower))
                     );
                     setProducts(filteredProducts);
                 } else {
-                    setProducts(activeProducts);
+                    setProducts(productsInStock);
                     // Clear search query when no search is present
                     setSearchQuery('');
                 }
@@ -180,6 +220,29 @@ const Categories = () => {
                 }, 3000);
                 return;
             }
+            
+            // Kiểm tra xem sản phẩm còn hàng không
+            const variants = await ApiService.get(`/product-variant/product/${updatedProduct._id}`, false);
+            
+            // Lọc ra các biến thể đang active
+            const activeVariants = variants.filter(variant => 
+                variant.is_active === true || variant.is_active === 'true' || variant.is_active === 1
+            );
+            
+            // Kiểm tra xem có ít nhất một biến thể còn hàng không
+            const hasStock = activeVariants.length === 0 || 
+                             activeVariants.some(variant => 
+                                variant.stock === undefined || variant.stock > 0
+                             );
+            
+            if (!hasStock) {
+                setAddCartMessage("Sản phẩm này hiện đã hết hàng.");
+                setShowMessage(true);
+                setTimeout(() => {
+                    setShowMessage(false);
+                }, 3000);
+                return;
+            }
         } catch (error) {
             console.error("Error checking product status:", error);
         }
@@ -218,6 +281,16 @@ const Categories = () => {
                 // Kiểm tra trạng thái active của biến thể
                 if (!(selectedVariant.is_active === true || selectedVariant.is_active === 'true' || selectedVariant.is_active === 1)) {
                     setAddCartMessage("Biến thể sản phẩm này hiện không có sẵn.");
+                    setShowMessage(true);
+                    setTimeout(() => {
+                        setShowMessage(false);
+                    }, 3000);
+                    return;
+                }
+                
+                // Kiểm tra stock của biến thể đã chọn
+                if (selectedVariant.stock !== undefined && selectedVariant.stock <= 0) {
+                    setAddCartMessage("Biến thể sản phẩm này hiện đã hết hàng.");
                     setShowMessage(true);
                     setTimeout(() => {
                         setShowMessage(false);
@@ -388,10 +461,32 @@ const Categories = () => {
             // Kiểm tra lại trạng thái active của sản phẩm trước khi mở modal
             const updatedProduct = await ApiService.get(`/product/${product._id}`, false);
             if (updatedProduct.is_active === true || updatedProduct.is_active === 'true' || updatedProduct.is_active === 1) {
-                setSelectedProduct(updatedProduct);
-                setShowProductModal(true);
-                setQuantity(1);
-                setSelectedVariant(null);
+                // Kiểm tra xem sản phẩm còn hàng không
+                const variants = await ApiService.get(`/product-variant/product/${updatedProduct._id}`, false);
+                
+                // Lọc ra các biến thể đang active
+                const activeVariants = variants.filter(variant => 
+                    variant.is_active === true || variant.is_active === 'true' || variant.is_active === 1
+                );
+                
+                // Kiểm tra xem có ít nhất một biến thể còn hàng không
+                const hasStock = activeVariants.length === 0 || 
+                                activeVariants.some(variant => 
+                                    variant.stock === undefined || variant.stock > 0
+                                );
+                
+                if (hasStock) {
+                    setSelectedProduct(updatedProduct);
+                    setShowProductModal(true);
+                    setQuantity(1);
+                    setSelectedVariant(null);
+                } else {
+                    setAddCartMessage("Sản phẩm này hiện đã hết hàng.");
+                    setShowMessage(true);
+                    setTimeout(() => {
+                        setShowMessage(false);
+                    }, 3000);
+                }
             } else {
                 setAddCartMessage("Sản phẩm này hiện không có sẵn.");
                 setShowMessage(true);

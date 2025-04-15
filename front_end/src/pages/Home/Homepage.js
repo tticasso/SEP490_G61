@@ -82,22 +82,62 @@ const TroocEcommerce = () => {
                     thumbnail: getImagePath(product.thumbnail),
                 }));
 
-                setProducts(productsWithImages);
+                // Lấy tất cả biến thể của sản phẩm để kiểm tra hàng tồn kho
+                let productsInStock = [];
+                
+                // Dùng Promise.all để giảm thời gian chờ
+                const productStockChecks = await Promise.all(
+                    productsWithImages.map(async (product) => {
+                        try {
+                            const variants = await ApiService.get(`/product-variant/product/${product._id}`, false);
+                            
+                            // Lọc ra các biến thể đang active
+                            const activeVariants = variants.filter(variant => 
+                                variant.is_active === true || variant.is_active === 'true' || variant.is_active === 1
+                            );
+                            
+                            // Kiểm tra xem có ít nhất một biến thể còn hàng không
+                            const hasStock = activeVariants.length === 0 || 
+                                             activeVariants.some(variant => 
+                                                variant.stock === undefined || variant.stock > 0
+                                             );
+                                             
+                            return {
+                                product,
+                                hasStock
+                            };
+                        } catch (error) {
+                            console.error(`Error checking variants for product ${product._id}:`, error);
+                            // Nếu có lỗi khi kiểm tra, coi như sản phẩm còn hàng
+                            return {
+                                product,
+                                hasStock: true
+                            };
+                        }
+                    })
+                );
+                
+                // Lọc ra các sản phẩm còn hàng
+                productsInStock = productStockChecks
+                    .filter(item => item.hasStock)
+                    .map(item => item.product);
+
+                setProducts(productsInStock);
 
                 // Lấy danh sách danh mục
                 const categoriesData = await ApiService.get('/categories', false);
                 setCategories(categoriesData);
 
-                // Lọc sản phẩm mới - chỉ lấy từ sản phẩm đang active
-                const sortedByDate = [...productsWithImages].sort((a, b) =>
+                // Lọc sản phẩm mới - chỉ lấy từ sản phẩm đang active và còn hàng
+                const sortedByDate = [...productsInStock].sort((a, b) =>
                     new Date(b.created_at) - new Date(a.created_at)
                 );
                 setNewProducts(sortedByDate.slice(0, 5));
 
-                // Lọc sản phẩm đề xuất - chỉ từ sản phẩm đang active
-                const featuredProducts = productsWithImages.filter(product => product.is_feature);
-                const hotProducts = productsWithImages.filter(product => product.is_hot);
-                const sortedBySold = [...productsWithImages].sort((a, b) => b.sold - a.sold);
+                // Lọc sản phẩm đề xuất - chỉ từ sản phẩm đang active và còn hàng
+                const featuredProducts = productsInStock.filter(product => product.is_feature);
+                const hotProducts = productsInStock.filter(product => product.is_hot);
+                const sortedBySold = [...productsInStock].sort((a, b) => b.sold - a.sold);
 
                 // Kết hợp các sản phẩm đặc biệt, loại bỏ trùng lặp
                 const combined = [...featuredProducts, ...hotProducts, ...sortedBySold];
@@ -249,10 +289,32 @@ const TroocEcommerce = () => {
         try {
             const updatedProduct = await ApiService.get(`/product/${product._id}`, false);
             if (updatedProduct.is_active === true || updatedProduct.is_active === 'true' || updatedProduct.is_active === 1) {
-                setSelectedProduct(updatedProduct);
-                setShowProductModal(true);
-                setProductQuantity(1); // Reset quantity when opening modal
-                setSelectedVariant(null); // Reset selected variant
+                // Kiểm tra xem sản phẩm còn hàng không
+                const variants = await ApiService.get(`/product-variant/product/${updatedProduct._id}`, false);
+                
+                // Lọc ra các biến thể đang active
+                const activeVariants = variants.filter(variant => 
+                    variant.is_active === true || variant.is_active === 'true' || variant.is_active === 1
+                );
+                
+                // Kiểm tra xem có ít nhất một biến thể còn hàng không
+                const hasStock = activeVariants.length === 0 || 
+                                 activeVariants.some(variant => 
+                                    variant.stock === undefined || variant.stock > 0
+                                 );
+                
+                if (hasStock) {
+                    setSelectedProduct(updatedProduct);
+                    setShowProductModal(true);
+                    setProductQuantity(1); // Reset quantity when opening modal
+                    setSelectedVariant(null); // Reset selected variant
+                } else {
+                    setAddCartMessage("Sản phẩm này hiện đã hết hàng.");
+                    setShowMessage(true);
+                    setTimeout(() => {
+                        setShowMessage(false);
+                    }, 3000);
+                }
             } else {
                 setAddCartMessage("Sản phẩm này hiện không có sẵn.");
                 setShowMessage(true);
@@ -262,6 +324,7 @@ const TroocEcommerce = () => {
             }
         } catch (error) {
             console.error("Error fetching product details:", error);
+            // Nếu không thể kiểm tra, vẫn mở modal
             setSelectedProduct(product);
             setShowProductModal(true);
             setProductQuantity(1);

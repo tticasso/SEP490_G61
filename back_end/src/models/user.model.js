@@ -15,7 +15,11 @@ const userSchema = new Schema({
         type: String,
         validate: {
             validator: function (v) {
-                return /^(84|0[3-9])[0-9]{8,9}$/.test(v); // Hỗ trợ cả số 9 và 10 chữ số
+                // Updated regex for international phone numbers
+                // Allows formats: 
+                // - Country codes without + (e.g., 84xxxxxxxxx, 1xxxxxxxxxx)
+                // - International numbers with various lengths (7-15 digits after country code)
+                return /^[1-9][0-9]{0,3}[0-9]{7,15}$/.test(v);
             },
             message: props => `${props.value} is not a valid phone number`
         },

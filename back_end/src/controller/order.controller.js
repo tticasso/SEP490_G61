@@ -316,7 +316,35 @@ const createOrder = async (req, res) => {
 
                         // Kiểm tra giới hạn sử dụng của người dùng
                         if (coupon.max_uses_per_user > 0) {
-                            const userUsage = coupon.history.get(customer_id.toString()) || 0;
+                            let userUsage = 0;
+
+                            // Kiểm tra cấu trúc history và lấy đúng số lần sử dụng
+                            if (coupon.history instanceof Map) {
+                                // Nếu history là Map (được định nghĩa trong model)
+                                userUsage = coupon.history.get(customer_id.toString()) || 0;
+                            } else if (coupon.history && typeof coupon.history === 'object') {
+                                // Kiểm tra nếu history được lưu dưới dạng object
+                                if (coupon.history[customer_id.toString()] !== undefined) {
+                                    userUsage = coupon.history[customer_id.toString()];
+                                } else if (coupon.history[customer_id] !== undefined) {
+                                    userUsage = coupon.history[customer_id];
+                                } else {
+                                    // Kiểm tra các trường hợp khác có thể xảy ra
+                                    const keys = Object.keys(coupon.history);
+                                    const matchKey = keys.find(k =>
+                                        k === customer_id.toString() ||
+                                        k === String(customer_id)
+                                    );
+
+                                    if (matchKey) {
+                                        userUsage = coupon.history[matchKey];
+                                    }
+                                }
+                            }
+
+                            // Ghi log để debug
+                            console.log(`[ORDER] User ${customer_id} has used coupon ${coupon.code} ${userUsage}/${coupon.max_uses_per_user} times`);
+
                             if (userUsage >= coupon.max_uses_per_user) {
                                 return res.status(400).json({
                                     message: "You have reached the maximum usage limit for this coupon"
@@ -324,9 +352,30 @@ const createOrder = async (req, res) => {
                             }
                         }
 
-                        // Cập nhật lịch sử sử dụng coupon
-                        const usageHistory = coupon.history || new Map();
-                        usageHistory.set(customer_id.toString(), (usageHistory.get(customer_id.toString()) || 0) + 1);
+                        // Cập nhật lịch sử sử dụng coupon - chỉnh sửa đoạn này trong createOrder
+                        let usageHistory = new Map();
+
+                        // Chuyển đổi từ object sang Map nếu cần
+                        if (coupon.history) {
+                            if (coupon.history instanceof Map) {
+                                usageHistory = coupon.history;
+                            } else if (typeof coupon.history === 'object') {
+                                // Khởi tạo Map từ Object
+                                usageHistory = new Map();
+                                Object.keys(coupon.history).forEach(key => {
+                                    usageHistory.set(key, coupon.history[key]);
+                                });
+                            }
+                        }
+
+                        // Cập nhật số lần sử dụng
+                        const currentUsage = usageHistory.get(customer_id.toString()) || 0;
+                        usageHistory.set(customer_id.toString(), currentUsage + 1);
+
+                        // Ghi log cho debug
+                        console.log(`[ORDER] Updated coupon usage for user ${customer_id}: ${currentUsage} -> ${currentUsage + 1}`);
+
+                        // Lưu trở lại vào coupon
                         coupon.history = usageHistory;
                         await coupon.save();
                     } else {

@@ -4,6 +4,19 @@ import ApiService from '../../../services/ApiService';
 import AuthService from '../../../services/AuthService';
 import { MapPin } from 'lucide-react';
 
+// Country options for address
+const countryOptions = [
+  { name: 'Việt Nam', code: '+84' },
+  { name: 'Hoa Kỳ', code: '+1' },
+  { name: 'Anh', code: '+44' },
+  { name: 'Úc', code: '+61' },
+  { name: 'Singapore', code: '+65' },
+  { name: 'Nhật Bản', code: '+81' },
+  { name: 'Hàn Quốc', code: '+82' },
+  { name: 'Trung Quốc', code: '+86' },
+  { name: 'Thái Lan', code: '+66' },
+];
+
 // Profile Content Component
 const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, updateProfile }) => {
     // Thêm state để theo dõi trạng thái chỉnh sửa
@@ -32,7 +45,8 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         wardName: '',
         address: '',
         address_line2: '',
-        phone: '',
+        phoneNumber: '',
+        countryCode: '+84',
         country: 'Việt Nam'
     });
 
@@ -47,6 +61,48 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
     // Lấy userId từ thông tin người dùng đã đăng nhập
     const currentUser = AuthService.getCurrentUser();
     const userId = currentUser?._id || currentUser?.id || currentUser?.userId || "";
+
+    // Helper function to parse phone number
+    const parsePhoneNumber = (phone) => {
+        if (!phone) return { countryCode: '+84', phoneNumber: '' };
+        
+        // Convert to string and clean up
+        let phoneStr = String(phone).trim();
+        
+        // Check against known country codes
+        for (const country of countryOptions) {
+            const codeDigits = country.code.replace('+', '');
+            if (phoneStr.startsWith(codeDigits)) {
+                return {
+                    countryCode: country.code,
+                    phoneNumber: phoneStr.substring(codeDigits.length),
+                    country: country.name
+                };
+            }
+        }
+        
+        // If no country code matched but starts with 0, assume Vietnam
+        if (phoneStr.startsWith('0')) {
+            return {
+                countryCode: '+84',
+                phoneNumber: phoneStr.substring(1),
+                country: 'Việt Nam'
+            };
+        }
+        
+        // Default case - assume Vietnam phone without country code
+        return {
+            countryCode: '+84',
+            phoneNumber: phoneStr,
+            country: 'Việt Nam'
+        };
+    };
+    
+    // Helper function to format phone with country code
+    const formatPhoneWithCountryCode = (countryCode, phoneNumber) => {
+        if (!phoneNumber) return '';
+        return countryCode.replace('+', '') + phoneNumber;
+    };
 
     // Fetch danh sách tỉnh/thành phố
     useEffect(() => {
@@ -146,38 +202,54 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                             setPrimaryAddress(address);
                             setInitialAddress(address);
                             
-                            // Khởi tạo giá trị ban đầu cho form địa chỉ
                             // Phân tích địa chỉ để lấy các thành phần
                             const parsedAddress = {
-                                phone: address.phone || '',
-                                country: address.country || 'Việt Nam',
                                 address: address.address_line1 || '',
-                                address_line2: address.address_line2 || ''
+                                address_line2: address.address_line2 || '',
+                                country: address.country || 'Việt Nam'
                             };
+                            
+                            // Phân tích số điện thoại
+                            const phoneInfo = parsePhoneNumber(address.phone);
                             
                             // Phân tích thành phần từ city (tỉnh/quận/phường)
                             const addressComponents = parseAddressComponents(address.city);
                             
+                            // Cập nhật form address với dữ liệu đã phân tích
                             setAddressForm({
-                                ...addressForm,
                                 address: parsedAddress.address,
                                 address_line2: parsedAddress.address_line2,
-                                phone: parsedAddress.phone,
                                 country: parsedAddress.country,
                                 provinceName: addressComponents.province,
                                 districtName: addressComponents.district,
-                                wardName: addressComponents.ward
+                                wardName: addressComponents.ward,
+                                provinceId: '0',
+                                districtId: '0',
+                                wardId: '0',
+                                countryCode: phoneInfo.countryCode,
+                                phoneNumber: phoneInfo.phoneNumber
                             });
                             
+                            // Lưu lại form ban đầu
                             setInitialAddressForm({
-                                ...addressForm,
                                 address: parsedAddress.address,
                                 address_line2: parsedAddress.address_line2,
-                                phone: parsedAddress.phone,
                                 country: parsedAddress.country,
                                 provinceName: addressComponents.province,
                                 districtName: addressComponents.district,
-                                wardName: addressComponents.ward
+                                wardName: addressComponents.ward,
+                                provinceId: '0',
+                                districtId: '0',
+                                wardId: '0',
+                                countryCode: phoneInfo.countryCode,
+                                phoneNumber: phoneInfo.phoneNumber
+                            });
+                            
+                            // Log để debug
+                            console.log('Parsed phone data:', {
+                                original: address.phone,
+                                countryCode: phoneInfo.countryCode,
+                                phoneNumber: phoneInfo.phoneNumber
                             });
                             
                             foundAddress = true;
@@ -225,6 +297,16 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
 
     // Xử lý khi nhấn nút Chỉnh sửa
     const handleEdit = () => {
+        // Ensure we have the updated phone information
+        if (profile.phone) {
+            const phoneInfo = parsePhoneNumber(profile.phone);
+            setAddressForm(prev => ({
+                ...prev,
+                countryCode: phoneInfo.countryCode,
+                phoneNumber: phoneInfo.phoneNumber
+            }));
+        }
+        
         setInitialProfile({ ...profile }); // Lưu giá trị hiện tại trước khi chỉnh sửa
         setInitialAddress(primaryAddress ? { ...primaryAddress } : null);
         setInitialAddressForm({ ...addressForm });
@@ -404,6 +486,54 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         setAddressModified(true); // Đánh dấu địa chỉ đã thay đổi
     };
 
+    // Handle country change
+    const handleCountryChange = (e) => {
+        const selectedCountry = e.target.value;
+        // Find the corresponding country code
+        const country = countryOptions.find(c => c.name === selectedCountry);
+        const countryCode = country ? country.code : '+84'; // Default to Vietnam
+
+        setAddressForm(prev => ({
+            ...prev,
+            country: selectedCountry,
+            countryCode: countryCode
+        }));
+        setAddressModified(true);
+    };
+
+    // Handle phone number change
+    const handlePhoneNumberChange = (e) => {
+        // Only allow digits
+        const value = e.target.value.replace(/\D/g, '');
+        
+        // Check max length based on country
+        const maxLength = getMaxPhoneLength();
+        if (value.length <= maxLength) {
+            setAddressForm(prev => ({
+                ...prev,
+                phoneNumber: value
+            }));
+            
+            // Update the profile phone with the formatted number
+            const formattedPhone = formatPhoneWithCountryCode(addressForm.countryCode, value);
+            handleInputChange('phone', formattedPhone);
+        }
+        setAddressModified(true);
+    };
+
+    // Get maximum phone length based on country
+    const getMaxPhoneLength = () => {
+        switch (addressForm.country) {
+            case 'Việt Nam': return 9; // 9 digits after +84
+            case 'Hoa Kỳ': return 10;
+            case 'Nhật Bản': return 10;
+            case 'Hàn Quốc': return 10;
+            case 'Trung Quốc': return 11;
+            case 'Singapore': return 8;
+            default: return 12; // Default for other countries
+        }
+    };
+
     // Hàm xử lý thay đổi thông tin địa chỉ
     const handleAddressFormChange = (e) => {
         const { name, value } = e.target;
@@ -427,11 +557,16 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
             errors.lastName = 'Họ không được để trống';
         }
 
-        // Kiểm tra số điện thoại chỉ chứa số và đủ 10 chữ số
+        // Validate phone number
         if (profile.phone) {
-            const phoneRegex = /^(0|\+84)[0-9]{9}$/;
-            if (!phoneRegex.test(profile.phone)) {
-                errors.phone = 'Số điện thoại không hợp lệ (bắt đầu bằng 0 hoặc +84 và có 10 chữ số)';
+            // Parse the phone to check format
+            const phoneInfo = parsePhoneNumber(profile.phone);
+            const phoneNumber = phoneInfo.phoneNumber;
+            
+            // Check minimum length based on country
+            const minLength = phoneInfo.country === 'Singapore' ? 8 : 9;
+            if (phoneNumber.length < minLength) {
+                errors.phone = `Số điện thoại phải có ít nhất ${minLength} chữ số`;
             }
         }
 
@@ -453,6 +588,16 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         // Kiểm tra đã chọn đầy đủ địa chỉ chưa
         if (addressForm.provinceId === '0' || addressForm.districtId === '0' || addressForm.wardId === '0') {
             errors.location = 'Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã';
+        }
+        
+        // Check phone number
+        if (!addressForm.phoneNumber) {
+            errors.phone = 'Vui lòng nhập số điện thoại';
+        } else {
+            const minLength = addressForm.country === 'Singapore' ? 8 : 9;
+            if (addressForm.phoneNumber.length < minLength) {
+                errors.phone = `Số điện thoại phải có ít nhất ${minLength} chữ số`;
+            }
         }
         
         return { isValid: Object.keys(errors).length === 0, errors };
@@ -483,6 +628,11 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
         setSuccess('');
 
         try {
+            // Ensure profile.phone is properly formatted
+            if (addressForm.phoneNumber) {
+                profile.phone = formatPhoneWithCountryCode(addressForm.countryCode, addressForm.phoneNumber);
+            }
+            
             // Gọi hàm updateProfile để cập nhật thông tin người dùng
             const result = await updateProfile(profile);
 
@@ -497,9 +647,12 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                         address_line2: addressForm.address_line2 || "",
                         city: city,
                         country: addressForm.country,
-                        phone: profile.phone, // Sử dụng số điện thoại từ profile
+                        phone: profile.phone, // Use the formatted phone number
                         status: true
                     };
+                    
+                    // Log the address data being sent
+                    console.log("Sending address data:", updatedAddressData);
                     
                     // Thử cập nhật địa chỉ
                     try {
@@ -632,13 +785,36 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
-                    <input
-                        type="tel"
-                        value={profile.phone || ""}
-                        onChange={(e) => handleInputChange('phone', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        disabled={!isEditing}
-                    />
+                    {isEditing ? (
+                        <div>
+                            <div className="flex">
+                                <div className="border p-2 rounded-l-md bg-gray-100 flex items-center justify-center min-w-[60px]">
+                                    {addressForm.countryCode}
+                                </div>
+                                <input
+                                    id="phoneNumber"
+                                    type="tel"
+                                    name="phoneNumber"
+                                    placeholder="Số điện thoại"
+                                    value={addressForm.phoneNumber}
+                                    onChange={handlePhoneNumberChange}
+                                    maxLength={getMaxPhoneLength()}
+                                    className="border p-2 rounded-r-md w-full"
+                                    required
+                                />
+                            </div>
+                            {addressForm.country === 'Việt Nam' && (
+                                <p className="text-xs text-gray-500 mt-1">Ví dụ: Đối với số 0987654321, chỉ cần nhập 987654321</p>
+                            )}
+                        </div>
+                    ) : (
+                        <input
+                            type="tel"
+                            value={profile.phone || ""}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            disabled
+                        />
+                    )}
                 </div>
 
                 {/* Thêm phần địa chỉ */}
@@ -655,27 +831,16 @@ const ProfileContent = ({ profile, handleInputChange, handleBirthDateChange, upd
                             {isEditing ? (
                                 <>
                                     <div>
-                                        <label className="block text-sm text-gray-600 mb-1">Số điện thoại</label>
-                                        <input
-                                            type="tel"
-                                            name="phone" 
-                                            placeholder="Số điện thoại"
-                                            value={profile.phone || ""}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                            disabled
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Số điện thoại của địa chỉ sẽ tự động đồng bộ với số điện thoại cá nhân của bạn.</p>
-                                    </div>
-
-                                    <div>
                                         <label className="block text-sm text-gray-600 mb-1">Quốc gia</label>
                                         <select
                                             name="country"
                                             value={addressForm.country}
-                                            onChange={handleAddressFormChange}
+                                            onChange={handleCountryChange}
                                             className="border p-2 rounded-md w-full"
                                         >
-                                            <option value="Việt Nam">Việt Nam</option>
+                                            {countryOptions.map(country => (
+                                                <option key={country.code} value={country.name}>{country.name}</option>
+                                            ))}
                                         </select>
                                     </div>
 

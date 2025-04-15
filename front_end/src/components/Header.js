@@ -61,17 +61,53 @@ const flashingAnimation = `
   }
 }
 
-@keyframes scrollHorizontal {
+@keyframes trainEffect {
   0% {
-    transform: translateX(20%);
+    transform: translateX(-100%);
+    opacity: 0;
   }
-  100% {
-    transform: translateX(-20%);  
+  10% {
+    transform: translateX(-70%);
+    opacity: 1;
+  }
+  25% {
+    transform: translateX(0%);
+    opacity: 1;
+  }
+  /* Pause in the middle to give time for reading */
+  45% {
+    transform: translateX(0%);
+    opacity: 1;
+  }
+  /* Then continue movement */
+  65% {
+    transform: translateX(70%);
+    opacity: 1;
+  }
+  75% {
+    transform: translateX(70%);
+    opacity: 0;
+  }
+  90% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+    100% { 
+    transform: translateX(100%);
+    opacity: 0;
   }
 }
 
+/* Container to properly contain the animation */
+.promotion-container {
+  position: relative;
+  overflow: hidden;
+  width: 340px;
+  margin-left: auto;
+}
+
 .flashing-text {
-  animation: flash 2s infinite, bounce 1.5s infinite, scrollHorizontal 5s linear infinite alternate;
+  animation: flash 2s infinite, bounce 1.5s infinite, trainEffect 10s linear infinite;
   font-weight: bold;
   background-size: 200% 200%;
   color: white;
@@ -81,7 +117,9 @@ const flashingAnimation = `
   gap: 8px;
   transition: all 0.3s ease;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+  min-width: 340px; /* Ensure enough width for all text */
 }
 
 .flashing-text:hover {
@@ -92,6 +130,7 @@ const flashingAnimation = `
 
 .piggy-bank-icon {
   animation: bounce 1.5s infinite;
+  display: inline-block; /* Ensure icon is always visible */
 }
 `;
 
@@ -586,10 +625,12 @@ const Header = () => {
                     )}
 
                     {/* Updated flashing promotion text */}
-                    <div className="ml-auto flashing-text cursor-pointer"
-                        onClick={() => navigate('/categories')}>
-                        <PiggyBank size={24} className="piggy-bank-icon" />
-                        <span>Khuyến mại 20% cho đơn hàng đầu tiên</span>
+                    <div className="promotion-container">
+                        <div className="flashing-text cursor-pointer"
+                            onClick={() => navigate('/categories')}>
+                            <PiggyBank size={24} className="piggy-bank-icon" />
+                            <span>Khuyến mại 20% cho đơn hàng đầu tiên</span>
+                        </div>
                     </div>
                 </div>
             </nav>

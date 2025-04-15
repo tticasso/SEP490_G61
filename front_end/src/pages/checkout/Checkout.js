@@ -465,7 +465,7 @@ const CheckoutPage = () => {
                 address_line2: newAddressData.address_line2 || "",
                 city: newAddressData.province,
                 country: newAddressData.country,
-                phone: newAddressData.phone,
+                phone: newAddressData.phone, // Phone is already properly formatted with country code
                 status: true
             };
 
@@ -528,7 +528,7 @@ const CheckoutPage = () => {
                 address_line2: updatedAddressData.address_line2 || "",
                 city: updatedAddressData.province,
                 country: updatedAddressData.country,
-                phone: updatedAddressData.phone,
+                phone: updatedAddressData.phone, // Phone is already properly formatted with country code
                 status: true
             };
 
@@ -669,6 +669,7 @@ const CheckoutPage = () => {
     // In CheckoutPage.js, modify the handlePlaceOrder function to include shipping_cost
 
     // Enhanced Place Order with improved variant handling and PayOS integration
+    // Enhanced Place Order with multi-shop order creation
     const handlePlaceOrder = async () => {
         // Kiểm tra xem có sản phẩm nào hết hàng không
         const outOfStockItems = cartItems.filter(item => {
@@ -682,149 +683,235 @@ const CheckoutPage = () => {
             }
             return false;
         });
-    
+
         // Nếu có sản phẩm hết hàng, hiển thị thông báo và không cho phép đặt hàng
         if (outOfStockItems.length > 0) {
             const productNames = outOfStockItems.map(item => {
                 const product = item.product_id || {};
                 const productName = product.name || "Product";
-                
+
                 // Lấy tên variant nếu có
                 const variant = item.variant_id && typeof item.variant_id === 'object' ? item.variant_id : null;
                 const variantName = variant && variant.name ? ` (${variant.name})` : '';
-                
+
                 return `${productName}${variantName}`;
             }).join(', ');
-    
+
             alert(`Cannot place order. The following items are out of stock: ${productNames}`);
             return;
         }
-    
+
         if (!selectedAddress || !paymentMethod || cartItems.length === 0) {
             alert("Please select address, payment method and have products in cart");
             return;
         }
-    
+
         try {
             // Show loading
             setLoading(true);
-    
+
             // Get selected shipping method and its cost
             const selectedShippingMethod = deliveryMethods.find(method => method.id === deliveryMethod);
             const shippingCost = selectedShippingMethod ? selectedShippingMethod.price : 0;
-    
-            // Prepare order data with proper variant handling
-            const orderItems = cartItems.map(item => {
-                const productId = typeof item.product_id === 'object' ? item.product_id._id : item.product_id;
-                
-                // Handle variant ID
-                let variantId = null;
-                if (item.variant_id) {
-                    variantId = typeof item.variant_id === 'object' ? item.variant_id._id : item.variant_id;
+
+            // Group cart items by shop
+            const itemsByShop = {};
+
+            cartItems.forEach(item => {
+                // Determine shop_id
+                let shopId = "unknown";
+
+                if (item.product_id && typeof item.product_id === 'object' && item.product_id.shop_id) {
+                    shopId = typeof item.product_id.shop_id === 'object'
+                        ? item.product_id.shop_id._id
+                        : item.product_id.shop_id;
+                } else if (item.shop_id) {
+                    shopId = typeof item.shop_id === 'object'
+                        ? item.shop_id._id
+                        : item.shop_id;
                 }
-                
-                // Determine the correct price to send
+
+                // Create group if it doesn't exist
+                if (!itemsByShop[shopId]) {
+                    itemsByShop[shopId] = [];
+                }
+
+                // Add item to group
+                itemsByShop[shopId].push(item);
+            });
+
+            // Store created order IDs
+            const createdOrderIds = [];
+
+            // Calculate subtotal for discount distribution
+            const cartSubtotal = cartItems.reduce((total, item) => {
                 let itemPrice;
                 if (item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price) {
-                    // Use variant price if available
                     itemPrice = item.variant_id.price;
                 } else if (typeof item.product_id === 'object') {
-                    // Otherwise use product price
                     itemPrice = item.product_id.discounted_price || item.product_id.price || 0;
                 } else {
-                    // Fallback
                     itemPrice = 0;
                 }
-                
-                return {
-                    product_id: productId,
-                    variant_id: variantId,
-                    quantity: item.quantity,
-                    price: itemPrice, // Send the determined price
-                    cart_id: item.cart_id
-                };
-            });
-            
-            // Create payload for API with proper coupon handling
-            const orderPayload = {
-                customer_id: userId,
-                shipping_id: deliveryMethod,
-                payment_id: paymentMethod,
-                user_address_id: selectedAddress,
-                orderItems: orderItems,
-                order_payment_id: `PAY-${Date.now()}`,
-                // For the coupon, we need proper ID handling
-                coupon_id: appliedCoupon ? (appliedCoupon._id || appliedCoupon.id || null) : null,
-                discount_amount: discountAmount || 0,
-                // Add explicit shipping cost field
-                shipping_cost: shippingCost,
-                // Add total to help with validation (subtotal + shipping - discount)
-                total_price: calculateTotal(),
-            };
-    
-            console.log("Sending order payload:", orderPayload);
-    
-            // Call API to create order
-            const response = await ApiService.post('/order/create', orderPayload);
-    
-            // Handle successful order placement
-            if (response && response.order) {
-                // Clear saved data in localStorage
-                localStorage.removeItem('selectedCartItems');
-                localStorage.removeItem('appliedCoupon');
-    
-                // Clear cart after successful order
-                if (cartItems.length > 0 && cartItems[0].cart_id) {
-                    await ApiService.delete(`/cart/clear/${cartItems[0].cart_id}`);
-                }
+                return total + (itemPrice * item.quantity);
+            }, 0);
 
-                // Kiểm tra phương thức thanh toán VNPay
-                const selectedPaymentMethod = paymentMethods.find(method => method.id === paymentMethod);
-                const isVNPayMethod = selectedPaymentMethod && (
-                    selectedPaymentMethod.name.toLowerCase().includes("qr") || 
-                    selectedPaymentMethod.name.toLowerCase().includes("mã qr")
+            // Process each shop's orders
+            for (const [shopId, shopItems] of Object.entries(itemsByShop)) {
+                // Prepare order items with proper variant handling
+                const orderItems = shopItems.map(item => {
+                    const productId = typeof item.product_id === 'object' ? item.product_id._id : item.product_id;
+
+                    // Handle variant ID
+                    let variantId = null;
+                    if (item.variant_id) {
+                        variantId = typeof item.variant_id === 'object' ? item.variant_id._id : item.variant_id;
+                    }
+
+                    // Determine the correct price to send
+                    let itemPrice;
+                    if (item.variant_id && typeof item.variant_id === 'object' && item.variant_id.price) {
+                        // Use variant price if available
+                        itemPrice = item.variant_id.price;
+                    } else if (typeof item.product_id === 'object') {
+                        // Otherwise use product price
+                        itemPrice = item.product_id.discounted_price || item.product_id.price || 0;
+                    } else {
+                        // Fallback
+                        itemPrice = 0;
+                    }
+
+                    return {
+                        product_id: productId,
+                        variant_id: variantId,
+                        quantity: item.quantity,
+                        price: itemPrice,
+                        cart_id: item.cart_id
+                    };
+                });
+
+                // Calculate shop subtotal
+                const shopSubtotal = orderItems.reduce(
+                    (total, item) => total + (item.price * item.quantity),
+                    0
                 );
 
-                if (isVNPayMethod) {
-                    try {
-                        // Gọi API PayOS để tạo thanh toán
-                        console.log("Creating PayOS payment for order:", response.order._id);
-                        
+                // Distribute discount proportionally if coupon is applied
+                let shopDiscountAmount = 0;
+                if (appliedCoupon && discountAmount > 0) {
+                    // Calculate discount proportion based on shop subtotal vs cart subtotal
+                    const discountProportion = shopSubtotal / cartSubtotal;
+                    shopDiscountAmount = Math.round(discountAmount * discountProportion);
+
+                    // Log discount distribution
+                    console.log(`Shop ${shopId} gets ${shopDiscountAmount} discount (${discountProportion.toFixed(2)}% of total ${discountAmount})`);
+                }
+
+                // Create payload for API with proper coupon handling
+                const orderPayload = {
+                    customer_id: userId,
+                    shipping_id: deliveryMethod,
+                    payment_id: paymentMethod,
+                    user_address_id: selectedAddress,
+                    orderItems: orderItems,
+                    order_payment_id: `PAY-${Date.now()}-${shopId}`,
+                    // For the coupon, we need proper ID handling
+                    coupon_id: appliedCoupon ? (appliedCoupon._id || appliedCoupon.id || null) : null,
+                    discount_amount: shopDiscountAmount,
+                    // Add explicit shipping cost field
+                    shipping_cost: shippingCost,
+                    // Add shop ID
+                    shop_id: shopId,
+                    // Calculate total for this shop's order (subtotal + shipping - discount)
+                    total_price: shopSubtotal + shippingCost - shopDiscountAmount,
+                };
+
+                console.log(`Creating order for shop ${shopId} with ${orderItems.length} items:`, orderPayload);
+
+                // Call API to create order for this shop
+                const response = await ApiService.post('/order/create', orderPayload);
+
+                // Store created order ID
+                if (response && response.order) {
+                    createdOrderIds.push(response.order._id);
+                    console.log(`Created order ${response.order._id} for shop ${shopId}`);
+                }
+            }
+
+            // Clear saved data in localStorage after all orders are created
+            localStorage.removeItem('selectedCartItems');
+            localStorage.removeItem('appliedCoupon');
+
+            // Clear cart after successful orders
+            if (cartItems.length > 0 && cartItems[0].cart_id) {
+                await ApiService.delete(`/cart/clear/${cartItems[0].cart_id}`);
+            }
+
+            console.log(`Created ${createdOrderIds.length} orders for ${Object.keys(itemsByShop).length} shops`);
+
+            // Handle payment - VNPay needs special handling for multiple orders
+            const selectedPaymentMethod = paymentMethods.find(method => method.id === paymentMethod);
+            const isVNPayMethod = selectedPaymentMethod && (
+                selectedPaymentMethod.name.toLowerCase().includes("qr") ||
+                selectedPaymentMethod.name.toLowerCase().includes("mã qr")
+            );
+
+            if (isVNPayMethod && createdOrderIds.length > 0) {
+                try {
+                    // If payment integration supports multiple orders, pass them all
+                    if (createdOrderIds.length === 1) {
+                        // For single order, proceed normally
+                        console.log("Creating PayOS payment for single order:", createdOrderIds[0]);
+
                         const paymentResponse = await ApiService.post('/payos/create-payment', {
-                            orderId: response.order._id
+                            orderId: createdOrderIds[0]
                         });
 
-                        console.log("PayOS payment response:", paymentResponse);
-
                         if (paymentResponse && paymentResponse.success && paymentResponse.data && paymentResponse.data.paymentUrl) {
-                            // Lưu thông tin thanh toán vào localStorage để sử dụng sau
-                            localStorage.setItem('currentOrderId', response.order._id);
+                            // Save payment info to localStorage
+                            localStorage.setItem('currentOrderId', createdOrderIds[0]);
                             localStorage.setItem('paymentTransactionCode', paymentResponse.data.transactionCode);
-                            
-                            // Chuyển hướng người dùng đến trang thanh toán của PayOS
+
+                            // Redirect to payment page
                             window.location.href = paymentResponse.data.paymentUrl;
                             return;
-                        } else {
-                            console.error("Invalid PayOS payment response:", paymentResponse);
-                            throw new Error("Không thể tạo liên kết thanh toán. Vui lòng thử lại sau.");
                         }
-                    } catch (paymentError) {
-                        console.error("PayOS payment error:", paymentError);
-                        alert(`Lỗi khởi tạo thanh toán: ${paymentError.message || 'Không xác định'}`);
-                        
-                        // Chuyển hướng đến trang xác nhận đơn hàng mặc dù có lỗi thanh toán
-                        window.location.href = `/order-confirmation?orderId=${response.order._id}&paymentError=true`;
-                        return;
+                    } else {
+                        // For multiple orders, try batch payment if supported
+                        console.log("Creating PayOS payment for multiple orders:", createdOrderIds);
+
+                        // This API endpoint would need to be implemented to handle multiple orders
+                        const paymentResponse = await ApiService.post('/payos/create-batch-payment', {
+                            orderIds: createdOrderIds
+                        });
+
+                        if (paymentResponse && paymentResponse.success && paymentResponse.data && paymentResponse.data.paymentUrl) {
+                            // Save all order IDs for later reference
+                            localStorage.setItem('currentOrderIds', JSON.stringify(createdOrderIds));
+                            localStorage.setItem('paymentTransactionCode', paymentResponse.data.transactionCode);
+
+                            // Redirect to payment page
+                            window.location.href = paymentResponse.data.paymentUrl;
+                            return;
+                        }
                     }
+                } catch (paymentError) {
+                    console.error("PayOS payment error:", paymentError);
+                    alert(`Lỗi khởi tạo thanh toán: ${paymentError.message || 'Không xác định'}`);
                 }
-    
-                // Nếu không phải thanh toán VNPay hoặc quá trình tạo thanh toán bị lỗi
-                // Chuyển hướng đến trang xác nhận đơn hàng bình thường
-                window.location.href = `/order-confirmation?orderId=${response.order._id}`;
+            }
+
+            // Redirect to order confirmation page with all order IDs
+            if (createdOrderIds.length === 1) {
+                // For single order, use the existing URL format
+                window.location.href = `/order-confirmation?orderId=${createdOrderIds[0]}`;
+            } else {
+                // For multiple orders, pass all IDs
+                window.location.href = `/order-confirmation?orderIds=${createdOrderIds.join(',')}`;
             }
         } catch (error) {
-            console.error("Error creating order:", error);
-            alert(`Error placing order: ${error.message || 'Unknown error'}`);
+            console.error("Error creating orders:", error);
+            alert(`Error placing orders: ${error.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }

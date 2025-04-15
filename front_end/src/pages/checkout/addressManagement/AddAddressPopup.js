@@ -36,7 +36,7 @@ const AddAddressPopup = ({ onClose, onSave }) => {
                         onClick={onClose}
                         className="border border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50"
                     >
-                        Cancel
+                        Hủy
                     </button>
                 </div>
             </div>

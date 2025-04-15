@@ -1,15 +1,59 @@
 import React, { useState, useEffect } from 'react';
 
+// Country options with country codes
+const countryOptions = [
+  { name: 'Việt Nam', code: '+84' },
+  { name: 'Hoa Kỳ', code: '+1' },
+  { name: 'Anh', code: '+44' },
+  { name: 'Úc', code: '+61' },
+  { name: 'Singapore', code: '+65' },
+  { name: 'Nhật Bản', code: '+81' },
+  { name: 'Hàn Quốc', code: '+82' },
+  { name: 'Trung Quốc', code: '+86' },
+  { name: 'Thái Lan', code: '+66' },
+];
+
 /**
  * AddressForm Component
  * 
  * A reusable form for adding or editing addresses
  * Handles location data fetching and form state management
+ * Supports international phone numbers
  */
 const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
+    // Parse phone number from initialData
+    const parsePhoneNumber = (phoneStr) => {
+        if (!phoneStr) return { countryCode: '+84', phoneNumber: '' };
+        
+        let cleanPhone = String(phoneStr).trim();
+        
+        // Check against known country codes
+        for (const country of countryOptions) {
+            const codeDigits = country.code.replace('+', '');
+            if (cleanPhone.startsWith(codeDigits)) {
+                return {
+                    countryCode: country.code,
+                    phoneNumber: cleanPhone.substring(codeDigits.length),
+                    country: country.name
+                };
+            }
+        }
+        
+        // Default to Vietnam if no match found
+        return {
+            countryCode: '+84',
+            phoneNumber: cleanPhone,
+            country: 'Việt Nam'
+        };
+    };
+    
+    // Extract phone data from initialData
+    const phoneData = parsePhoneNumber(initialData.phone);
+
     const [formData, setFormData] = useState({
-        phone: initialData.phone || '',
-        country: initialData.country || 'Việt Nam',
+        phoneNumber: phoneData.phoneNumber || '',
+        countryCode: phoneData.countryCode || '+84',
+        country: initialData.country || phoneData.country || 'Việt Nam',
         provinceId: initialData.provinceId || '0',
         provinceName: initialData.provinceName || '',
         districtId: initialData.districtId || '0',
@@ -150,9 +194,52 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
         }
     };
 
+    // Handle text input changes
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
+    };
+    
+    // Handle country change - update country code
+    const handleCountryChange = (e) => {
+        const selectedCountry = e.target.value;
+        // Find corresponding country code
+        const country = countryOptions.find(c => c.name === selectedCountry);
+        const countryCode = country ? country.code : '+84'; // Default to Vietnam
+        
+        setFormData({
+            ...formData,
+            country: selectedCountry,
+            countryCode: countryCode
+        });
+    };
+    
+    // Handle phone number input - only allow digits
+    const handlePhoneNumberChange = (e) => {
+        // Only allow digits
+        const value = e.target.value.replace(/\D/g, '');
+        
+        // Check max length based on country
+        const maxLength = getMaxPhoneLength();
+        if (value.length <= maxLength) {
+            setFormData(prev => ({
+                ...prev,
+                phoneNumber: value
+            }));
+        }
+    };
+    
+    // Get maximum phone length based on country
+    const getMaxPhoneLength = () => {
+        switch (formData.country) {
+            case 'Việt Nam': return 9; // 9 digits after +84
+            case 'Hoa Kỳ': return 10;
+            case 'Nhật Bản': return 10;
+            case 'Hàn Quốc': return 10;
+            case 'Trung Quốc': return 11;
+            case 'Singapore': return 8;
+            default: return 12; // Default for other countries
+        }
     };
     
     const handleProvinceChange = (e) => {
@@ -210,17 +297,32 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         
+        // Validate phone number
+        if (!formData.phoneNumber) {
+            alert('Please enter a phone number');
+            return;
+        }
+        
+        const minLength = formData.country === 'Singapore' ? 8 : 9;
+        if (formData.phoneNumber.length < minLength) {
+            alert(`Phone number must have at least ${minLength} digits`);
+            return;
+        }
+        
         // Check if address details are complete
         if (formData.provinceId === '0' || formData.districtId === '0' || formData.wardId === '0') {
             alert('Please select Province/City, District, and Ward completely');
             return;
         }
         
+        // Format phone number with country code
+        const formattedPhone = formData.countryCode.replace('+', '') + formData.phoneNumber;
+        
         // Create full address string
         const fullAddress = `${formData.address}, ${formData.wardName}, ${formData.districtName}, ${formData.provinceName}`;
         
         onSubmit({
-            phone: formData.phone,
+            phone: formattedPhone,
             address: fullAddress,
             address_line2: formData.address_line2,
             province: formData.provinceName,
@@ -229,43 +331,54 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="">
             {loading && (
                 <div className="py-2 px-3 bg-blue-50 text-blue-700 rounded mb-4">
-                    Loading data...
+                    Đang tải dữ liệu...
                 </div>
             )}
 
             <div>
-                <label htmlFor="phone" className="block text-sm text-gray-600 mb-1">Phone Number</label>
-                <input
-                    id="phone"
-                    type="text"
-                    name="phone"
-                    placeholder="Phone number"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="border p-2 rounded-md w-full"
-                    required
-                />
-            </div>
-            
-            <div>
-                <label htmlFor="country" className="block text-sm text-gray-600 mb-1">Country</label>
+                <label htmlFor="country" className="block text-sm text-gray-600 mb-1">Quốc gia</label>
                 <select
                     id="country"
                     name="country"
                     value={formData.country}
-                    onChange={handleChange}
+                    onChange={handleCountryChange}
                     className="border p-2 rounded-md w-full"
                 >
-                    <option value="Việt Nam">Việt Nam</option>
+                    {countryOptions.map(country => (
+                        <option key={country.code} value={country.name}>{country.name}</option>
+                    ))}
                 </select>
+            </div>
+
+            <div>
+                <label htmlFor="phoneNumber" className="block text-sm text-gray-600 mb-1">Số điện thoại</label>
+                <div className="flex">
+                    <div className="border p-2 rounded-l-md bg-gray-100 flex items-center justify-center min-w-[60px]">
+                        {formData.countryCode}
+                    </div>
+                    <input
+                        id="phoneNumber"
+                        type="tel"
+                        name="phoneNumber"
+                        placeholder="Số điện thoại..."
+                        value={formData.phoneNumber}
+                        onChange={handlePhoneNumberChange}
+                        maxLength={getMaxPhoneLength()}
+                        className="border p-2 rounded-r-md w-full"
+                        required
+                    />
+                </div>
+                {formData.country === 'Việt Nam' && (
+                    <p className="text-xs text-gray-500 mt-1">Ví dị: Nếu số điện thoại là 0987654321, hãy nhập 987654321</p>
+                )}
             </div>
             
             <div className="grid grid-cols-1 gap-4">
                 <div>
-                    <label htmlFor="provinceId" className="block text-sm text-gray-600 mb-1">Province / City</label>
+                    <label htmlFor="provinceId" className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố</label>
                     <select
                         id="provinceId"
                         name="provinceId"
@@ -274,7 +387,7 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
                         className="border p-2 rounded-md w-full"
                         required
                     >
-                        <option value="0">Select Province/City</option>
+                        <option value="0">Chọn Tỉnh/Thành phố</option>
                         {provinces.map((province) => (
                             <option key={province.id} value={province.id}>{province.full_name}</option>
                         ))}
@@ -282,7 +395,7 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
                 </div>
                 
                 <div>
-                    <label htmlFor="districtId" className="block text-sm text-gray-600 mb-1">District</label>
+                    <label htmlFor="districtId" className="block text-sm text-gray-600 mb-1">Quận / Huyện</label>
                     <select
                         id="districtId"
                         name="districtId"
@@ -292,7 +405,7 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
                         required
                         disabled={formData.provinceId === '0'}
                     >
-                        <option value="0">Select District</option>
+                        <option value="0">Chọn Quận/Huyện</option>
                         {districts.map((district) => (
                             <option key={district.id} value={district.id}>{district.full_name}</option>
                         ))}
@@ -300,7 +413,7 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
                 </div>
                 
                 <div>
-                    <label htmlFor="wardId" className="block text-sm text-gray-600 mb-1">Ward</label>
+                    <label htmlFor="wardId" className="block text-sm text-gray-600 mb-1">Phường / Xã</label>
                     <select
                         id="wardId"
                         name="wardId"
@@ -310,7 +423,7 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
                         required
                         disabled={formData.districtId === '0'}
                     >
-                        <option value="0">Select Ward</option>
+                        <option value="0">Chọn Phường/Xã</option>
                         {wards.map((ward) => (
                             <option key={ward.id} value={ward.id}>{ward.full_name}</option>
                         ))}
@@ -319,12 +432,12 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
             </div>
             
             <div>
-                <label htmlFor="address" className="block text-sm text-gray-600 mb-1">Specific Address</label>
+                <label htmlFor="address" className="block text-sm text-gray-600 mb-1">Địa chỉ cụ thể</label>
                 <input
                     id="address"
                     type="text"
                     name="address"
-                    placeholder="House number, street name"
+                    placeholder="Số nhà, tên đường..."
                     value={formData.address}
                     onChange={handleChange}
                     className="border p-2 rounded-md w-full"
@@ -333,12 +446,12 @@ const AddressForm = ({ initialData = {}, onSubmit, submitLabel = "Save" }) => {
             </div>
             
             <div>
-                <label htmlFor="address_line2" className="block text-sm text-gray-600 mb-1">Additional Address (optional)</label>
+                <label htmlFor="address_line2" className="block text-sm text-gray-600 mb-1">Địa chỉ bổ sung (Không bắt buộc)</label>
                 <input
                     id="address_line2"
                     type="text"
                     name="address_line2"
-                    placeholder="Building, floor, room number, etc."
+                    placeholder="Tòa nhà, số tầng, số phòng,..."
                     value={formData.address_line2}
                     onChange={handleChange}
                     className="border p-2 rounded-md w-full"

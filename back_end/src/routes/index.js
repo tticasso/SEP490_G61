@@ -20,7 +20,7 @@ const UserStatusRouter = require('./user-status.routes')
 const ProductVariantRouter = require('./product-variant.routes');
 const ProductAttributeRouter = require('./product-attribute.routes');
 const GeminiRouter = require('./gemini.routes');
-
+const BankAccountRouter = require('./bank-account.routes')
 const PayOsRouter = require('./payos.routes')
 const ShopRevenueRouter = require('./shop-revenue.routes');
 module.exports = {
@@ -47,5 +47,6 @@ module.exports = {
     ProductAttributeRouter,
     GeminiRouter,
     PayOsRouter ,
-    ShopRevenueRouter
+    ShopRevenueRouter,
+    BankAccountRouter
 }

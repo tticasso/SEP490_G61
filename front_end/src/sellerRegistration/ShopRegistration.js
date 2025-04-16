@@ -30,18 +30,21 @@ const ShopRegistration = () => {
     description: '',
     logo: null,
     image_cover: null,
-    identityCardImage: null, // Không có trong model nhưng cần cho quá trình xác minh
+    identityCardFront: null, // Ảnh mặt trước CCCD
+    identityCardBack: null,  // Ảnh mặt sau CCCD
     businessLicense: null    // Không có trong model nhưng cần cho quá trình xác minh
   });
 
   // Thêm state cho file và preview
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
-  const [identityFile, setIdentityFile] = useState(null);
+  const [identityFrontFile, setIdentityFrontFile] = useState(null);
+  const [identityBackFile, setIdentityBackFile] = useState(null);
   const [licenseFile, setLicenseFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
-  const [identityPreview, setIdentityPreview] = useState(null);
+  const [identityFrontPreview, setIdentityFrontPreview] = useState(null);
+  const [identityBackPreview, setIdentityBackPreview] = useState(null);
   const [licensePreview, setLicensePreview] = useState(null);
 
   // State quản lý các bước đăng ký
@@ -53,6 +56,30 @@ const ShopRegistration = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [user, setUser] = useState(null);
+  
+  // Thêm state để theo dõi tiến trình
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressStatus, setProgressStatus] = useState('');
+
+  // Component ProgressBar để hiển thị tiến trình
+  const ProgressBar = ({ percent, status }) => {
+    if (percent === 0) return null;
+    
+    return (
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-1">
+          <div className="text-sm text-gray-600">{status}</div>
+          <div className="text-sm font-medium text-gray-900">{percent}%</div>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div
+            className="bg-purple-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
+            style={{ width: `${percent}%` }}
+          ></div>
+        </div>
+      </div>
+    );
+  };
 
   // Fetch user và categories khi component mount
   useEffect(() => {
@@ -158,9 +185,13 @@ const ShopRegistration = () => {
         setCoverFile(file);
         setCoverPreview(previewUrl);
         break;
-      case 'identityCardImage':
-        setIdentityFile(file);
-        setIdentityPreview(previewUrl);
+      case 'identityCardFront':
+        setIdentityFrontFile(file);
+        setIdentityFrontPreview(previewUrl);
+        break;
+      case 'identityCardBack':
+        setIdentityBackFile(file);
+        setIdentityBackPreview(previewUrl);
         break;
       case 'businessLicense':
         setLicenseFile(file);
@@ -188,9 +219,13 @@ const ShopRegistration = () => {
         setCoverFile(null);
         setCoverPreview(null);
         break;
-      case 'identityCardImage':
-        setIdentityFile(null);
-        setIdentityPreview(null);
+      case 'identityCardFront':
+        setIdentityFrontFile(null);
+        setIdentityFrontPreview(null);
+        break;
+      case 'identityCardBack':
+        setIdentityBackFile(null);
+        setIdentityBackPreview(null);
         break;
       case 'businessLicense':
         setLicenseFile(null);
@@ -207,25 +242,40 @@ const ShopRegistration = () => {
     }));
   };
 
-  // Function upload ảnh shop
-  const uploadShopImage = async (file, imageType) => {
-    if (!file) return null;
+  // Function upload ảnh shop - cập nhật để hỗ trợ thêm ảnh CCCD
+  const uploadShopImage = async (file, field, shopId) => {
+    if (!file || !shopId) return null;
     
     try {
       const formData = new FormData();
       formData.append('image', file);
-      formData.append('type', imageType); // Thêm tham số để phân biệt loại ảnh
+      formData.append('field', field); // field: 'logo', 'image_cover', 'identity_card_image_front', 'identity_card_image_back', 'business_license'
       
-      const uploadedImage = await ApiService.uploadFile('/upload/shop-image', formData);
+      const response = await ApiService.uploadFile(`/shops/upload/${shopId}`, formData);
       
-      if (uploadedImage && uploadedImage.url) {
-        return uploadedImage.url;
+      if (response) {
+        // Trả về URL tương ứng với loại ảnh
+        if (field === 'logo' && response.logo) {
+          return response.logo;
+        } else if (field === 'image_cover' && response.image_cover) {
+          return response.image_cover;
+        } else if (field === 'identity_card_image_front' && response.identity_card_image_front) {
+          return response.identity_card_image_front;
+        } else if (field === 'identity_card_image_back' && response.identity_card_image_back) {
+          return response.identity_card_image_back;
+        } else if (field === 'business_license' && response.business_license) {
+          return response.business_license;
+        } else {
+          console.log('Response from upload:', response);
+          return null;
+        }
       } else {
         throw new Error('URL hình ảnh không hợp lệ');
       }
     } catch (error) {
-      console.error(`Lỗi upload ảnh ${imageType}:`, error);
-      throw new Error(`Không thể tải lên hình ảnh: ${error.message || 'Lỗi không xác định'}`);
+      console.error(`Lỗi upload ảnh ${field}:`, error);
+      // Không throw error, chỉ log và trả về null
+      return null;
     }
   };
   
@@ -280,9 +330,23 @@ const ShopRegistration = () => {
       }
     }
 
-    if (currentStep === 3 && !terms) {
-      setError('Vui lòng đồng ý với điều khoản dịch vụ');
-      return;
+    if (currentStep === 3) {
+      // Kiểm tra xem đã tải lên ảnh CCCD chưa (cả mặt trước và mặt sau)
+      if (!identityFrontFile) {
+        setError('Vui lòng tải lên ảnh mặt trước CMND/CCCD');
+        return;
+      }
+      
+      if (!identityBackFile) {
+        setError('Vui lòng tải lên ảnh mặt sau CMND/CCCD');
+        return;
+      }
+      
+      // Kiểm tra điều khoản
+      if (!terms) {
+        setError('Vui lòng đồng ý với điều khoản dịch vụ');
+        return;
+      }
     }
 
     if (currentStep < 3) {
@@ -299,7 +363,7 @@ const ShopRegistration = () => {
     }
   };
 
-  // Xử lý submit form - Cập nhật để tích hợp uploadImage và xử lý lỗi tốt hơn
+  // Xử lý submit form - Đã cập nhật để upload song song
   const handleSubmit = async () => {
     console.log("handleSubmit called");
     
@@ -309,184 +373,158 @@ const ShopRegistration = () => {
       return;
     }
 
+    // Kiểm tra xem có đủ ảnh CCCD chưa (cả mặt trước và mặt sau)
+    if (!identityFrontFile) {
+      setError('Vui lòng tải lên ảnh mặt trước CMND/CCCD');
+      return;
+    }
+    
+    if (!identityBackFile) {
+      setError('Vui lòng tải lên ảnh mặt sau CMND/CCCD');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-
-      // Debug trước khi bắt đầu
-      console.log("Form data before submission:", JSON.stringify(formData, null, 2));
       
+      // Hiển thị tiến trình
+      setProgressStatus('Đang khởi tạo cửa hàng...');
+      setProgressPercent(10);
+
       // Kiểm tra lại username
-      if (!formData.username && formData.email) {
-        const generatedUsername = formData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-        console.log("Re-generating username at submission time:", generatedUsername);
-        setFormData(prev => ({
-          ...prev,
-          username: generatedUsername
-        }));
-      }
-
-      // Debug user object
-      const user = AuthService.getCurrentUser();
-      console.log("Current user object:", user);
-
-      // Debug token
-      const token = AuthService.getToken();
-      console.log("Token from AuthService:", token);
-
-      if (!token) {
-        throw new Error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
-      }
-
-      // 1. Upload logo nếu có
-      let logoUrl = null;
-      if (logoFile) {
-        try {
-          logoUrl = await uploadShopImage(logoFile, 'logo');
-        } catch (err) {
-          console.error("Lỗi upload logo:", err);
-          throw new Error("Không thể tải lên logo: " + (err.message || 'Lỗi không xác định'));
-        }
-      }
-      
-      // 2. Upload ảnh bìa nếu có
-      let coverUrl = null;
-      if (coverFile) {
-        try {
-          coverUrl = await uploadShopImage(coverFile, 'cover');
-        } catch (err) {
-          console.error("Lỗi upload ảnh bìa:", err);
-          throw new Error("Không thể tải lên ảnh bìa: " + (err.message || 'Lỗi không xác định'));
-        }
-      }
-      
-      // 3. Upload CMND/CCCD nếu có
-      let identityUrl = null;
-      if (identityFile) {
-        try {
-          identityUrl = await uploadShopImage(identityFile, 'identity');
-        } catch (err) {
-          console.error("Lỗi upload CMND/CCCD:", err);
-          throw new Error("Không thể tải lên CMND/CCCD: " + (err.message || 'Lỗi không xác định'));
-        }
-      }
-      
-      // 4. Upload giấy phép kinh doanh nếu có
-      let licenseUrl = null;
-      if (licenseFile) {
-        try {
-          licenseUrl = await uploadShopImage(licenseFile, 'license');
-        } catch (err) {
-          console.error("Lỗi upload giấy phép:", err);
-          throw new Error("Không thể tải lên giấy phép kinh doanh: " + (err.message || 'Lỗi không xác định'));
-        }
-      }
-
-      // 5. Tạo shop mới với URL hình ảnh
-      // Tạo username từ email TRƯỚC KHI tạo shopData
       let usernameValue = formData.username || '';
       if (!usernameValue && formData.email) {
         usernameValue = formData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-        console.log("Generated username:", usernameValue);
+        console.log("Re-generating username at submission time:", usernameValue);
       }
-      
+
+      // Chuẩn bị dữ liệu shop (không bao gồm ảnh, sẽ upload sau)
       const shopData = {
         name: formData.name,
-        username: usernameValue, // Đảm bảo username luôn có giá trị
+        username: usernameValue,
         phone: formData.phone,
         email: formData.email,
         CCCD: formData.CCCD,
         address: formData.address,
         description: formData.description || '',
-        logo: logoUrl,
-        image_cover: coverUrl,
-        identity_card_image: identityUrl,
-        business_license: licenseUrl
       };
       
       // Log để debug
       console.log("Sending request to create shop with data:", JSON.stringify(shopData, null, 2));
 
-      // Kiểm tra xem dữ liệu có đầy đủ các trường bắt buộc không
-      const requiredFields = ['name', 'username', 'phone', 'email', 'CCCD', 'address'];
-      const missingFields = requiredFields.filter(field => !shopData[field]);
+      // 1. Tạo shop mới
+      setProgressStatus('Đang tạo cửa hàng...');
+      setProgressPercent(20);
+      const response = await ApiService.post('/shops/create', shopData);
+      console.log("Shop creation successful:", response);
       
-      if (missingFields.length > 0) {
-        throw new Error(`Thiếu thông tin bắt buộc: ${missingFields.join(', ')}`);
-      }
-
-      // Gọi API tạo shop
-      let shopId;
-      try {
-        // Đảm bảo có username trước khi gửi API
-        if (!shopData.username && shopData.email) {
-          shopData.username = shopData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-        }
-        
-        // Log dữ liệu chi tiết để kiểm tra
-        console.log("Final data being sent to API:", JSON.stringify(shopData, null, 2));
-        
-        // Kiểm tra lại một lần nữa xem có username không
-        if (!shopData.username) {
-          throw new Error('Thiếu trường username bắt buộc');
-        }
-        
-        const response = await ApiService.post('/shops/create', shopData);
-        console.log("Shop creation successful:", response);
-        
-        // Kiểm tra xem response có hợp lệ không
-        if (!response || !response.shop || !response.shop._id) {
-          throw new Error('Phản hồi từ server không hợp lệ hoặc thiếu thông tin shop');
-        }
-        
-        shopId = response.shop._id;
-      } catch (apiError) {
-        console.error("API Error details:", apiError);
-        
-        // Log chi tiết về lỗi
-        if (apiError.response) {
-          console.error("Response status:", apiError.response.status);
-          console.error("Response data:", apiError.response.data);
-        }
-        
-        // Kiểm tra các trường hợp lỗi cụ thể
-        if (apiError.response && apiError.response.status === 400) {
-          // Lỗi dữ liệu không hợp lệ
-          if (apiError.response.data && apiError.response.data.message) {
-            throw new Error(`Lỗi từ server: ${apiError.response.data.message}`);
-          } else {
-            throw new Error('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.');
-          }
-        } else if (apiError.response && apiError.response.status === 409) {
-          // Lỗi xung đột (username hoặc email đã tồn tại)
-          throw new Error('Tên đăng nhập hoặc email đã được sử dụng cho cửa hàng khác.');
-        } else if (apiError.response && apiError.response.status === 401) {
-          // Lỗi xác thực
-          throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-        } else {
-          // Các lỗi khác
-          if (apiError.message) {
-            throw new Error(`Lỗi khi tạo cửa hàng: ${apiError.message}`);
-          } else {
-            throw new Error('Không thể tạo cửa hàng. Vui lòng kiểm tra lại thông tin và thử lại sau.');
-          }
-        }
+      if (!response || !response.shop || !response.shop._id) {
+        throw new Error('Phản hồi từ server không hợp lệ hoặc thiếu thông tin shop');
       }
       
-      // 6. Lưu danh mục cửa hàng (chỉ thực hiện nếu có shopId)
-      if (shopId) {
+      const shopId = response.shop._id;
+      let hasUploadError = false;
+      
+      // 2. Setup tất cả các upload trong một mảng Promise
+      setProgressStatus('Đang tải lên ảnh...');
+      setProgressPercent(40);
+      
+      const uploadPromises = [];
+      const uploadResults = {
+        logoUrl: null,
+        coverUrl: null,
+        identityFrontUrl: null,
+        identityBackUrl: null,
+        licenseUrl: null
+      };
+      
+      // Thêm các file vào danh sách upload
+      if (logoFile) {
+        uploadPromises.push(
+          uploadShopImage(logoFile, 'logo', shopId)
+            .then(url => { uploadResults.logoUrl = url; })
+            .catch(err => { 
+              console.error("Lỗi upload logo:", err);
+              hasUploadError = true;
+            })
+        );
+      }
+      
+      if (coverFile) {
+        uploadPromises.push(
+          uploadShopImage(coverFile, 'image_cover', shopId)
+            .then(url => { uploadResults.coverUrl = url; })
+            .catch(err => { 
+              console.error("Lỗi upload ảnh bìa:", err);
+              hasUploadError = true;
+            })
+        );
+      }
+      
+      // CCCD mặt trước (bắt buộc)
+      if (identityFrontFile) {
+        uploadPromises.push(
+          uploadShopImage(identityFrontFile, 'identity_card_image_front', shopId)
+            .then(url => { 
+              uploadResults.identityFrontUrl = url;
+              if (!url) hasUploadError = true;
+            })
+            .catch(err => { 
+              console.error("Lỗi upload ảnh mặt trước CMND/CCCD:", err);
+              hasUploadError = true;
+            })
+        );
+      }
+      
+      // CCCD mặt sau (bắt buộc)
+      if (identityBackFile) {
+        uploadPromises.push(
+          uploadShopImage(identityBackFile, 'identity_card_image_back', shopId)
+            .then(url => { 
+              uploadResults.identityBackUrl = url;
+              if (!url) hasUploadError = true;
+            })
+            .catch(err => { 
+              console.error("Lỗi upload ảnh mặt sau CMND/CCCD:", err);
+              hasUploadError = true;
+            })
+        );
+      }
+      
+      // Giấy phép kinh doanh (không bắt buộc)
+      if (licenseFile) {
+        uploadPromises.push(
+          uploadShopImage(licenseFile, 'business_license', shopId)
+            .then(url => { uploadResults.licenseUrl = url; })
+            .catch(err => { 
+              console.error("Lỗi upload giấy phép kinh doanh:", err);
+              // Không bắt buộc nên không set hasUploadError = true
+            })
+        );
+      }
+      
+      // Thực hiện tất cả các upload song song
+      await Promise.all(uploadPromises);
+      console.log("Upload kết quả:", uploadResults);
+      
+      // 3. Lưu danh mục cửa hàng
+      setProgressStatus('Đang lưu danh mục...');
+      setProgressPercent(80);
+      
+      if (shopId && selectedCategories.length > 0) {
         try {
           await ApiService.post(`/shop-categories/${shopId}`, { categoryIds: selectedCategories });
           console.log("Shop categories saved successfully");
         } catch (err) {
           console.error("Error saving shop categories:", err);
-          // Không throw lỗi, vì shop đã được tạo thành công
         }
-      } else {
-        console.error("Cannot save shop categories: shopId is undefined");
       }
 
-      // 7. Cập nhật thông tin người dùng
+      // 4. Cập nhật thông tin người dùng
+      setProgressStatus('Đang hoàn tất...');
+      setProgressPercent(90);
+      
       try {
         console.log("Refreshing user info to get updated roles...");
         await AuthService.refreshUserInfo();
@@ -495,9 +533,16 @@ const ShopRegistration = () => {
         console.error("Failed to refresh user info:", refreshError);
       }
 
+      setProgressPercent(100);
+      setProgressStatus('Hoàn tất đăng ký!');
       setSuccess(true);
+      
+      // Hiển thị cảnh báo nếu có lỗi upload ảnh
+      if (hasUploadError) {
+        setError('Cửa hàng đã được tạo nhưng có lỗi khi tải lên một số hình ảnh. Bạn có thể cập nhật sau trong trang "Cửa hàng của tôi".');
+      }
 
-      // 8. Chuyển hướng sau khi đăng ký thành công
+      // 5. Chuyển hướng sau khi đăng ký thành công
       setTimeout(() => {
         navigate('/');
       }, 3000);
@@ -783,59 +828,115 @@ const ShopRegistration = () => {
     );
   };
 
-  // Render step 3: Giấy tờ và xác nhận (Cập nhật phần upload giấy tờ)
+  // Render step 3: Giấy tờ và xác nhận (Cập nhật phần upload giấy tờ với 2 ảnh CCCD)
   const renderDocuments = () => {
     return (
       <div className="mt-8">
         <h2 className="text-xl font-bold mb-4">Tải lên giấy tờ xác thực</h2>
         <p className="text-gray-600 mb-6">Để đảm bảo tính xác thực, vui lòng tải lên các giấy tờ sau</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Identity Card Upload */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ảnh CMND/CCCD (mặt trước và sau) *</label>
-            <div 
-              className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer"
-              onClick={() => document.getElementById('identity-upload').click()}
-            >
-              {identityPreview ? (
-                <div className="relative">
-                  <img 
-                    src={identityPreview} 
-                    alt="Identity preview" 
-                    className="max-h-48 mx-auto mb-2"
-                  />
-                  <button 
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveImage('identityCardImage');
-                    }}
-                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
-                  >
-                    <X size={16} />
-                  </button>
-                  <p className="text-sm text-gray-500">Nhấp để thay đổi</p>
-                </div>
-              ) : (
-                <>
-                  <Upload className="mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-500">Kéo thả file hoặc click để tải lên</p>
-                </>
-              )}
-              <input
-                id="identity-upload"
-                type="file"
-                name="identityCardImage"
-                onChange={handleFileChange}
-                className="hidden"
-                accept="image/*"
-                required
-              />
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-3">CMND/CCCD (bắt buộc)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Identity Card Front Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mặt trước CMND/CCCD <span className="text-red-500">*</span>
+              </label>
+              <div 
+                className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer"
+                onClick={() => document.getElementById('identity-front-upload').click()}
+              >
+                {identityFrontPreview ? (
+                  <div className="relative">
+                    <img 
+                      src={identityFrontPreview} 
+                      alt="Identity front preview" 
+                      className="max-h-48 mx-auto mb-2"
+                    />
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveImage('identityCardFront');
+                      }}
+                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                    >
+                      <X size={16} />
+                    </button>
+                    <p className="text-sm text-gray-500">Nhấp để thay đổi</p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500">Tải lên ảnh mặt trước CMND/CCCD</p>
+                    <p className="text-xs text-red-500 mt-1">Bắt buộc</p>
+                  </>
+                )}
+                <input
+                  id="identity-front-upload"
+                  type="file"
+                  name="identityCardFront"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="image/*"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Identity Card Back Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mặt sau CMND/CCCD <span className="text-red-500">*</span>
+              </label>
+              <div 
+                className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer"
+                onClick={() => document.getElementById('identity-back-upload').click()}
+              >
+                {identityBackPreview ? (
+                  <div className="relative">
+                    <img 
+                      src={identityBackPreview} 
+                      alt="Identity back preview" 
+                      className="max-h-48 mx-auto mb-2"
+                    />
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveImage('identityCardBack');
+                      }}
+                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                    >
+                      <X size={16} />
+                    </button>
+                    <p className="text-sm text-gray-500">Nhấp để thay đổi</p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500">Tải lên ảnh mặt sau CMND/CCCD</p>
+                    <p className="text-xs text-red-500 mt-1">Bắt buộc</p>
+                  </>
+                )}
+                <input
+                  id="identity-back-upload"
+                  type="file"
+                  name="identityCardBack"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="image/*"
+                  required
+                />
+              </div>
             </div>
           </div>
+        </div>
 
-          {/* Business License Upload */}
+        {/* Business License Upload */}
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-3">Giấy phép kinh doanh (không bắt buộc)</h3>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Giấy phép kinh doanh (nếu có)</label>
             <div 
@@ -886,6 +987,7 @@ const ShopRegistration = () => {
               <h4 className="font-medium text-yellow-800">Lưu ý quan trọng</h4>
               <ul className="list-disc pl-5 mt-2 text-sm text-yellow-700 space-y-1">
                 <li>Các thông tin và giấy tờ của bạn sẽ được bảo mật tuyệt đối</li>
+                <li>Ảnh CMND/CCCD phải rõ nét, đủ thông tin cả mặt trước và mặt sau</li>
                 <li>Quá trình xét duyệt có thể mất từ 1-3 ngày làm việc</li>
                 <li>Nếu thông tin không chính xác, đơn đăng ký của bạn có thể bị từ chối</li>
                 <li>Sau khi được phê duyệt, bạn có thể bắt đầu đăng bán sản phẩm</li>
@@ -907,6 +1009,13 @@ const ShopRegistration = () => {
             </span>
           </label>
         </div>
+        
+        {/* Hiển thị thanh tiến trình */}
+        {progressPercent > 0 && (
+          <div className="mt-4">
+            <ProgressBar percent={progressPercent} status={progressStatus} />
+          </div>
+        )}
       </div>
     );
   };

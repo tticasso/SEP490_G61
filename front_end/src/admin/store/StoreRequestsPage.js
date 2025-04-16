@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  CheckCircle, 
-  XCircle, 
-  Eye, 
-  RefreshCcw, 
+import {
+  CheckCircle,
+  XCircle,
+  Eye,
+  RefreshCcw,
   AlertTriangle,
   User,
   Mail,
@@ -40,11 +40,11 @@ const StoreRequestsPage = () => {
     try {
       // Fetch all shops with status="pending"
       const response = await ApiService.get('/shops/list');
-      
+
       // Filter to get pending stores
       const pendingStores = response.filter(shop => shop.status === 'pending');
       setStoreRequests(pendingStores);
-      
+
       // Update stats
       setStats({
         total: response.length,
@@ -88,7 +88,7 @@ const StoreRequestsPage = () => {
     if (!store.user_id || !storeOwners[store.user_id]) {
       return 'Chưa có thông tin';
     }
-    
+
     const owner = storeOwners[store.user_id];
     return `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || 'Chưa có thông tin';
   };
@@ -98,7 +98,7 @@ const StoreRequestsPage = () => {
     setProcessingId(storeId);
     try {
       await ApiService.put(`/shops/approve/${storeId}`);
-      
+
       // Update local state after successful approval
       setStoreRequests(storeRequests.filter(store => store._id !== storeId));
       setStats(prev => ({
@@ -106,7 +106,7 @@ const StoreRequestsPage = () => {
         pending: prev.pending - 1,
         approved: prev.approved + 1
       }));
-      
+
       // Close detail view if the approved store was being viewed
       if (selectedStore && selectedStore._id === storeId) {
         setSelectedStore(null);
@@ -130,9 +130,9 @@ const StoreRequestsPage = () => {
   const handleRejectStore = async () => {
     try {
       if (!processingId) return;
-      
+
       await ApiService.put(`/shops/reject/${processingId}`, { reason: rejectReason });
-      
+
       // Update local state after successful rejection
       setStoreRequests(storeRequests.filter(store => store._id !== processingId));
       setStats(prev => ({
@@ -140,12 +140,12 @@ const StoreRequestsPage = () => {
         pending: prev.pending - 1,
         rejected: prev.rejected + 1
       }));
-      
+
       // Close detail view if the rejected store was being viewed
       if (selectedStore && selectedStore._id === processingId) {
         setSelectedStore(null);
       }
-      
+
       setShowRejectModal(false);
     } catch (err) {
       console.error('Error rejecting store:', err);
@@ -186,7 +186,7 @@ const StoreRequestsPage = () => {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-500">
         <div className="flex justify-between items-center">
           <div>
@@ -198,7 +198,7 @@ const StoreRequestsPage = () => {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
         <div className="flex justify-between items-center">
           <div>
@@ -210,7 +210,7 @@ const StoreRequestsPage = () => {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
         <div className="flex justify-between items-center">
           <div>
@@ -230,7 +230,7 @@ const StoreRequestsPage = () => {
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="p-4 border-b flex justify-between items-center">
         <h2 className="text-lg font-semibold">Danh sách yêu cầu đăng ký cửa hàng</h2>
-        <button 
+        <button
           onClick={fetchStoreRequests}
           className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md flex items-center"
         >
@@ -238,7 +238,7 @@ const StoreRequestsPage = () => {
           Làm mới
         </button>
       </div>
-      
+
       {loading ? (
         <div className="p-8 text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-600 mb-2"></div>
@@ -248,7 +248,7 @@ const StoreRequestsPage = () => {
         <div className="p-8 text-center text-red-600 flex flex-col items-center">
           <AlertTriangle size={40} className="mb-2" />
           <p>{error}</p>
-          <button 
+          <button
             onClick={fetchStoreRequests}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md"
           >
@@ -344,13 +344,13 @@ const StoreRequestsPage = () => {
     </div>
   );
 
-  // Render store details
+  // Render store details - ĐÃ CẬP NHẬT để hiển thị 2 ảnh CCCD
   const renderStoreDetails = () => {
     if (!selectedStore) return null;
-    
+
     // Lấy thông tin chủ sở hữu từ state đã lưu
     const ownerData = selectedStore.user_id ? storeOwners[selectedStore.user_id] : null;
-    
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -363,7 +363,7 @@ const StoreRequestsPage = () => {
               <XCircle size={20} />
             </button>
           </div>
-          
+
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
@@ -377,7 +377,7 @@ const StoreRequestsPage = () => {
                         <p className="font-medium">{selectedStore.name}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-start">
                       <Mail className="text-gray-500 mr-2 mt-1" size={18} />
                       <div>
@@ -385,7 +385,7 @@ const StoreRequestsPage = () => {
                         <p className="font-medium">{selectedStore.email}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-start">
                       <Phone className="text-gray-500 mr-2 mt-1" size={18} />
                       <div>
@@ -393,7 +393,7 @@ const StoreRequestsPage = () => {
                         <p className="font-medium">{selectedStore.phone}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-start">
                       <MapPin className="text-gray-500 mr-2 mt-1" size={18} />
                       <div>
@@ -401,7 +401,7 @@ const StoreRequestsPage = () => {
                         <p className="font-medium">{selectedStore.address}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-start">
                       <Calendar className="text-gray-500 mr-2 mt-1" size={18} />
                       <div>
@@ -411,7 +411,7 @@ const StoreRequestsPage = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Mô tả cửa hàng</h3>
                   <div className="bg-gray-50 p-4 rounded-lg">
@@ -421,7 +421,7 @@ const StoreRequestsPage = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Thông tin chủ sở hữu</h3>
@@ -435,7 +435,7 @@ const StoreRequestsPage = () => {
                             <p className="font-medium">{`${ownerData.firstName || ''} ${ownerData.lastName || ''}`.trim() || 'N/A'}</p>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-start">
                           <Mail className="text-gray-500 mr-2 mt-1" size={18} />
                           <div>
@@ -443,7 +443,7 @@ const StoreRequestsPage = () => {
                             <p className="font-medium">{ownerData.email || 'N/A'}</p>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-start">
                           <Phone className="text-gray-500 mr-2 mt-1" size={18} />
                           <div>
@@ -457,7 +457,7 @@ const StoreRequestsPage = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Hình ảnh cửa hàng</h3>
                   <div className="grid grid-cols-2 gap-4">
@@ -475,7 +475,7 @@ const StoreRequestsPage = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Ảnh bìa</p>
                       {selectedStore.image_cover ? (
@@ -492,33 +492,113 @@ const StoreRequestsPage = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Giấy tờ xác thực</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FileText className="text-gray-500 mr-2" size={18} />
-                        <span>CMND/CCCD ({selectedStore.CCCD})</span>
+
+                  {/* CMND/CCCD - Mặt trước và mặt sau */}
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          <FileText className="text-gray-500 mr-2" size={18} />
+                          <span>CMND/CCCD ({selectedStore.CCCD})</span>
+                        </div>
                       </div>
-                      {selectedStore.identityCardImage && (
-                        <button className="text-blue-600 flex items-center">
-                          <Download size={16} className="mr-1" />
-                          <span>Xem</span>
-                        </button>
-                      )}
+
+                      <div className="grid grid-cols-2 gap-4 mt-2">
+                        {/* Mặt trước CCCD */}
+                        <div>
+                          <p className="text-sm text-gray-500 mb-1">Mặt trước:</p>
+                          {selectedStore.identity_card_image_front ? (
+                            <div>
+                              <img
+                                src={selectedStore.identity_card_image_front}
+                                alt="CMND/CCCD mặt trước"
+                                className="w-full h-auto object-contain border rounded-lg"
+                              />
+                              <div className="text-center mt-2">
+                                <a
+                                  href={selectedStore.identity_card_image_front}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 flex items-center justify-center"
+                                >
+                                  <Download size={16} className="mr-1" />
+                                  <span>Xem ảnh gốc</span>
+                                </a>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-center p-4 bg-gray-100 rounded-lg text-gray-500">
+                              Không có ảnh mặt trước
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Mặt sau CCCD */}
+                        <div>
+                          <p className="text-sm text-gray-500 mb-1">Mặt sau:</p>
+                          {selectedStore.identity_card_image_back ? (
+                            <div>
+                              <img
+                                src={selectedStore.identity_card_image_back}
+                                alt="CMND/CCCD mặt sau"
+                                className="w-full h-auto object-contain border rounded-lg"
+                              />
+                              <div className="text-center mt-2">
+                                <a
+                                  href={selectedStore.identity_card_image_back}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 flex items-center justify-center"
+                                >
+                                  <Download size={16} className="mr-1" />
+                                  <span>Xem ảnh gốc</span>
+                                </a>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-center p-4 bg-gray-100 rounded-lg text-gray-500">
+                              Không có ảnh mặt sau
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FileText className="text-gray-500 mr-2" size={18} />
-                        <span>Giấy phép kinh doanh</span>
+
+                    {/* Giấy phép kinh doanh */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          <FileText className="text-gray-500 mr-2" size={18} />
+                          <span>Giấy phép kinh doanh</span>
+                        </div>
                       </div>
-                      {selectedStore.businessLicense && (
-                        <button className="text-blue-600 flex items-center">
-                          <Download size={16} className="mr-1" />
-                          <span>Xem</span>
-                        </button>
+
+                      {selectedStore.business_license ? (
+                        <div>
+                          <img
+                            src={selectedStore.business_license}
+                            alt="Giấy phép kinh doanh"
+                            className="w-full h-auto max-h-48 object-contain border rounded-lg"
+                          />
+                          <div className="text-center mt-2">
+                            <a
+                              href={selectedStore.business_license}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 flex items-center justify-center"
+                            >
+                              <Download size={16} className="mr-1" />
+                              <span>Xem ảnh gốc</span>
+                            </a>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center p-4 bg-gray-100 rounded-lg text-gray-500">
+                          Không có giấy phép kinh doanh
+                        </div>
                       )}
                     </div>
                   </div>
@@ -526,7 +606,7 @@ const StoreRequestsPage = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="p-6 border-t bg-gray-50 flex justify-end space-x-4">
             <button
               onClick={() => setSelectedStore(null)}
@@ -559,14 +639,14 @@ const StoreRequestsPage = () => {
   // Render reject modal
   const renderRejectModal = () => {
     if (!showRejectModal) return null;
-    
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
           <div className="p-6 border-b">
             <h2 className="text-xl font-bold">Từ chối đăng ký cửa hàng</h2>
           </div>
-          
+
           <div className="p-6">
             <label className="block mb-2 text-sm font-medium text-gray-700">
               Lý do từ chối <span className="text-red-500">*</span>
@@ -580,7 +660,7 @@ const StoreRequestsPage = () => {
               required
             />
           </div>
-          
+
           <div className="p-6 border-t bg-gray-50 flex justify-end space-x-4">
             <button
               onClick={() => {
@@ -594,9 +674,8 @@ const StoreRequestsPage = () => {
             <button
               onClick={handleRejectStore}
               disabled={!rejectReason.trim()}
-              className={`px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 ${
-                !rejectReason.trim() ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className={`px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 ${!rejectReason.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
             >
               Xác nhận từ chối
             </button>
@@ -612,7 +691,7 @@ const StoreRequestsPage = () => {
         <h1 className="text-2xl font-bold text-gray-800">Yêu cầu đăng ký cửa hàng</h1>
         <p className="text-gray-600">Quản lý và phê duyệt các yêu cầu đăng ký cửa hàng mới từ người dùng.</p>
       </p>
-      
+
       {renderStats()}
       {renderStoreTable()}
       {renderStoreDetails()}

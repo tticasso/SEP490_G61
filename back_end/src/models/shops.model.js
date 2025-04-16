@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
- const Schema = mongoose.Schema;
+const Schema = mongoose.Schema;
  
- const shopSchema = new Schema({
+const shopSchema = new Schema({
      name: {
          type: String,
          required: true
@@ -82,6 +82,20 @@ const mongoose = require('mongoose');
          type: String,
          default: null
        },
+       // Thay đổi để lưu 2 ảnh CCCD riêng biệt
+       identity_card_image_front: {
+         type: String,
+         default: null
+       },
+       identity_card_image_back: {
+         type: String,
+         default: null
+       },
+       // Thêm trường mới để lưu ảnh giấy phép kinh doanh
+       business_license: {
+         type: String,
+         default: null
+       },
        created_at: {
          type: Date,
          default: Date.now
@@ -92,5 +106,5 @@ const mongoose = require('mongoose');
        }
      });
  
- const Shop = mongoose.model('Shop',shopSchema);
- module.exports = Shop;
+const Shop = mongoose.model('Shop', shopSchema);
+module.exports = Shop;

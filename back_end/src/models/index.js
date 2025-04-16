@@ -24,7 +24,7 @@ const ProductVariant = require('./product-variant.model');
 const ProductAttribute = require('./product-attribute.model');
 const ShopRevenue = require('./shop-revenue.model');
 const PaymentBatch = require('./payment-batch.model');
-
+const BankAccount = require('./bank-account.model');
 // Cau hinh mongoose dang global
 mongoose.Promise = global.Promise
 // Dinh nghia doi tuong DB
@@ -58,7 +58,7 @@ db.productVariant = ProductVariant
 db.productAttribute = ProductAttribute
 db.shopRevenue = ShopRevenue
 db.paymentBatch = PaymentBatch
-
+db.bankAccount = BankAccount
 // Thuoc tinh tham chieu toi action ket noi CSDL
 db.connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, {

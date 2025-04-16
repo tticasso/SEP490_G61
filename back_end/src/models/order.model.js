@@ -33,6 +33,11 @@ const orderSchema = new Schema({
         enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
         default: 'pending'
     },
+    // Trường để đánh dấu cần hoàn tiền
+    need_pay_back: {
+        type: Boolean,
+        default: false
+    },
     // Giá gốc trước khi áp dụng giảm giá
     original_price: {
         type: Number,

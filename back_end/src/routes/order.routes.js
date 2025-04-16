@@ -35,4 +35,9 @@ orderRouter.get("/statistics", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], order
 
 orderRouter.get("/shop/:shopId", [VerifyJwt.verifyToken, VerifyJwt.isSeller], orderController.getOrdersByShopId)
 
+orderRouter.get("/refunds", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], orderController.getOrdersNeedingRefund)
+
+// Đánh dấu đã hoàn tiền cho đơn hàng
+orderRouter.put("/refund/:id", [VerifyJwt.verifyToken, VerifyJwt.isAdmin], orderController.markAsRefunded)
+
 module.exports = orderRouter

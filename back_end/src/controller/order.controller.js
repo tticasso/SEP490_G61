@@ -562,6 +562,7 @@ const updateOrderStatus = async (req, res) => {
 };
 
 // Hủy đơn hàng
+// Hủy đơn hàng
 const cancelOrder = async (req, res) => {
     try {
         const { id } = req.params;
@@ -580,6 +581,13 @@ const cancelOrder = async (req, res) => {
 
         // Cập nhật trạng thái đơn hàng
         order.order_status = 'cancelled';
+
+        // Nếu đơn hàng đã được thanh toán (status_id là 'paid'), đánh dấu cần hoàn tiền
+        if (order.status_id === 'paid') {
+            order.need_pay_back = true;
+            console.log(`Đơn hàng ${order.id} đã được đánh dấu cần hoàn tiền`);
+        }
+
         await order.save();
 
         // Hoàn trả tồn kho
@@ -780,6 +788,7 @@ const getOrdersByShopId = async (req, res) => {
     }
 };
 // Từ chối đơn hàng bởi người bán (seller)
+// Từ chối đơn hàng bởi người bán (seller)
 const rejectOrderBySeller = async (req, res) => {
     try {
         const { id } = req.params;
@@ -840,8 +849,14 @@ const rejectOrderBySeller = async (req, res) => {
         }
 
         // Cập nhật trạng thái đơn hàng
-
         order.order_status = 'cancelled';
+
+        // Nếu đơn hàng đã được thanh toán (status_id là 'paid'), đánh dấu cần hoàn tiền
+        if (order.status_id === 'paid') {
+            order.need_pay_back = true;
+            console.log(`Đơn hàng ${order.id} đã được đánh dấu cần hoàn tiền`);
+        }
+
         order.updated_at = new Date();
 
         await order.save();
@@ -906,12 +921,61 @@ const rejectOrderBySeller = async (req, res) => {
                 id: order.id,
                 _id: order._id,
                 status_id: order.status_id,
-                order_status: order.order_status
+                order_status: order.order_status,
+                need_pay_back: order.need_pay_back
             }
         });
     } catch (error) {
         console.error("Lỗi khi từ chối đơn hàng:", error);
         res.status(500).json({ message: error.message || "Đã xảy ra lỗi khi từ chối đơn hàng" });
+    }
+};
+
+const getOrdersNeedingRefund = async (req, res) => {
+    try {
+        const orders = await Order.find({
+            need_pay_back: true,
+            order_status: 'cancelled'
+        })
+            .populate({
+                path: 'customer_id',
+                model: 'users',
+                select: 'firstName lastName email phone'
+            })
+            .populate('payment_id')
+            .populate('user_address_id')
+            .sort({ updated_at: -1 });
+
+        res.status(200).json(orders);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Đánh dấu đã hoàn tiền cho đơn hàng
+const markAsRefunded = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const order = await Order.findById(id);
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        if (!order.need_pay_back) {
+            return res.status(400).json({ message: "This order does not need refund" });
+        }
+
+        order.need_pay_back = false;
+        order.updated_at = new Date();
+        await order.save();
+
+        res.status(200).json({
+            message: "Order marked as refunded successfully",
+            order
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -925,7 +989,9 @@ const orderController = {
     deleteOrder,
     getOrderStatistics,
     getOrdersByShopId,
-    rejectOrderBySeller
+    rejectOrderBySeller,
+    getOrdersNeedingRefund,
+    markAsRefunded
 };
 
 module.exports = orderController;

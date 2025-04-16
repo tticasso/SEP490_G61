@@ -35,7 +35,8 @@ const {
   ProductAttributeRouter,
   GeminiRouter,
   PayOsRouter,
-  ShopRevenueRouter
+  ShopRevenueRouter,
+  BankAccountRouter
 } = require('./src/routes');
 
 const session = require('express-session');
@@ -104,7 +105,7 @@ app.use('/api/product-variant', ProductVariantRouter);
 app.use('/api/product-attribute', ProductAttributeRouter);
 app.use('/api/conversation', ConversationRouter);
 app.use('/api/revenue', ShopRevenueRouter);
-
+app.use('/api/bank-account', BankAccountRouter);
 // Kiểm soát các lỗi trong Express web server
 app.use(async (req, res, next) => {
   next(httpErrors.NotFound());

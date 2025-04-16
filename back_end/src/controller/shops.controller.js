@@ -48,7 +48,10 @@ const createShop = async (req, res, next) => {
             nation_id,
             province_id,
             logo,
-            image_cover
+            image_cover,
+            identity_card_image_front,  // Thêm trường cho mặt trước CCCD
+            identity_card_image_back,   // Thêm trường cho mặt sau CCCD
+            business_license           // Thêm trường mới
         } = req.body;
 
         // Xác thực các trường bắt buộc
@@ -91,7 +94,10 @@ const createShop = async (req, res, next) => {
             province_id: province_id || null,
             status: "pending", // Mặc định là pending để admin duyệt
             logo: logo || null,
-            image_cover: image_cover || null
+            image_cover: image_cover || null,
+            identity_card_image_front: identity_card_image_front || null,  // Thêm trường cho mặt trước
+            identity_card_image_back: identity_card_image_back || null,    // Thêm trường cho mặt sau
+            business_license: business_license || null                    // Thêm trường mới
         });
 
         const savedShop = await newShop.save();
@@ -366,10 +372,19 @@ const uploadShopImage = async (req, res, next) => {
         }
 
         const shopId = req.params.id;
-        const field = req.body.field; // 'logo' hoặc 'image_cover'
+        const field = req.body.field; // 'logo', 'image_cover', 'identity_card_image_front', 'identity_card_image_back', 'business_license'
 
-        if (!field || (field !== 'logo' && field !== 'image_cover')) {
-            throw createHttpError.BadRequest("Invalid field specified");
+        // Cập nhật để chấp nhận các trường mới
+        const validFields = [
+            'logo',
+            'image_cover',
+            'identity_card_image_front',
+            'identity_card_image_back',
+            'business_license'
+        ];
+
+        if (!field || !validFields.includes(field)) {
+            throw createHttpError.BadRequest(`Invalid field specified. Must be one of: ${validFields.join(', ')}`);
         }
 
         const shop = await Shop.findById(shopId);

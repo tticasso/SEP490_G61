@@ -19,11 +19,11 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                 if (initialShopData.user_id) {
                     fetchUserData(initialShopData.user_id);
                 }
-                
+
                 if (initialShopData.province_id) {
                     fetchProvinceData(initialShopData.province_id);
                 }
-                
+
                 setLoading(false);
             } else {
                 // Otherwise, fetch from API
@@ -39,24 +39,24 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
         try {
             setLoading(true);
             const data = await ShopService.getShopById(shopId);
-            
+
             // Update state with fetched data
             setShopData(data);
-            
+
             // Fetch user data if user_id exists
             if (data.user_id) {
                 fetchUserData(data.user_id);
             }
-            
+
             // Fetch province data if province_id exists
             if (data.province_id) {
                 fetchProvinceData(data.province_id);
             }
-            
+
             setLoading(false);
         } catch (err) {
             console.error('Error fetching shop data:', err);
-            
+
             // If API fails but we have initial data, still use it
             if (initialShopData) {
                 setShopData(initialShopData);
@@ -83,8 +83,8 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
     const fetchProvinceData = async (provinceId) => {
         try {
             const provinceData = await ShopService.getProvinceById(provinceId);
-           
-            
+
+
             setProvinceData(provinceData);
         } catch (err) {
             console.error('Error fetching province data:', err);
@@ -96,13 +96,13 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
         try {
             setLoading(true);
             await ShopService.updateShopStatus(shopId, 'active');
-            
+
             // Update local state
             setShopData({
                 ...shopData,
                 status: 'active'
             });
-            
+
             toast.success('Cửa hàng đã được duyệt thành công');
             setLoading(false);
         } catch (err) {
@@ -116,36 +116,36 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
     const handleToggleAccountStatus = async () => {
         try {
             setLoading(true);
-            
+
             const isCurrentlyActive = shopData.is_active === 1;
             const newStatus = isCurrentlyActive ? 0 : 1;
             const actionText = isCurrentlyActive ? 'khóa' : 'mở khóa';
-            
+
             // If shop is already locked and we're trying to unlock it,
             // handle with special care since the API might fail
             if (!isCurrentlyActive) {
                 try {
                     await ShopService.toggleShopActiveStatus(shopId, newStatus);
-                    
+
                     // If it succeeds, update the state
                     setShopData({
                         ...shopData,
                         is_active: newStatus
                     });
-                    
+
                     toast.success(`Cửa hàng đã được ${actionText} thành công`);
                 } catch (apiErr) {
                     console.error('Error unlocking shop:', apiErr);
-                    
+
                     // Even if API fails, update the UI state
                     // This at least gives visual feedback to the admin
                     setShopData({
                         ...shopData,
                         is_active: newStatus
                     });
-                    
+
                     toast.warning(
-                        'Đã cập nhật giao diện, nhưng có lỗi khi gọi API. ' + 
+                        'Đã cập nhật giao diện, nhưng có lỗi khi gọi API. ' +
                         'Vui lòng làm mới trang để xem trạng thái thực tế.'
                     );
                 }
@@ -153,20 +153,20 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                 // Normal case - locking an active shop
                 try {
                     await ShopService.toggleShopActiveStatus(shopId, newStatus);
-                    
+
                     // Update local state
                     setShopData({
                         ...shopData,
                         is_active: newStatus
                     });
-                    
+
                     toast.success(`Cửa hàng đã được ${actionText} thành công`);
                 } catch (err) {
                     console.error('Error locking shop:', err);
                     toast.error(`Không thể ${actionText} cửa hàng. Vui lòng thử lại sau.`);
                 }
             }
-            
+
             setLoading(false);
         } catch (err) {
             console.error('Error toggling account status:', err);
@@ -282,6 +282,67 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                                     <h3 className="text-sm font-medium text-gray-500">Căn cước công dân</h3>
                                     <p className="mt-1">{shopData.CCCD || 'N/A'}</p>
                                 </div>
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <h3 className="text-sm font-medium text-gray-500 mb-2">Ảnh căn cước công dân</h3>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {/* Mặt trước */}
+                                        <div>
+                                            <p className="text-sm text-gray-500 mb-1">Mặt trước:</p>
+                                            {shopData.identity_card_image_front ? (
+                                                <div>
+                                                    <img
+                                                        src={shopData.identity_card_image_front}
+                                                        alt="CMND/CCCD mặt trước"
+                                                        className="w-full h-auto object-contain border rounded-lg"
+                                                    />
+                                                    <div className="text-center mt-2">
+                                                        <a
+                                                            href={shopData.identity_card_image_front}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-600 flex items-center justify-center"
+                                                        >
+                                                            <span>Xem ảnh gốc</span>
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center p-4 bg-gray-100 rounded-lg text-gray-500">
+                                                    Không có ảnh mặt trước
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Mặt sau */}
+                                        <div>
+                                            <p className="text-sm text-gray-500 mb-1">Mặt sau:</p>
+                                            {shopData.identity_card_image_back ? (
+                                                <div>
+                                                    <img
+                                                        src={shopData.identity_card_image_back}
+                                                        alt="CMND/CCCD mặt sau"
+                                                        className="w-full h-auto object-contain border rounded-lg"
+                                                    />
+                                                    <div className="text-center mt-2">
+                                                        <a
+                                                            href={shopData.identity_card_image_back}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-600 flex items-center justify-center"
+                                                        >
+                                                            <span>Xem ảnh gốc</span>
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center p-4 bg-gray-100 rounded-lg text-gray-500">
+                                                    Không có ảnh mặt sau
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -290,7 +351,7 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                             {/* Owner Information */}
                             <div className="mb-8">
                                 <h2 className="text-lg font-medium text-gray-700 mb-4">THÔNG TIN CHỦ SỞ HỮU</h2>
-                                
+
                                 {userData ? (
                                     <div className="bg-gray-50 rounded-lg p-4 mb-4">
                                         <div className="flex items-center mb-4">
@@ -302,7 +363,7 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                                                 <p className="text-sm text-gray-500">{userData.email}</p>
                                             </div>
                                         </div>
-                                        
+
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <h3 className="text-sm font-medium text-gray-500">Số điện thoại</h3>
@@ -324,7 +385,7 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                             {/* Location Information */}
                             <div className="mb-8">
                                 <h2 className="text-lg font-medium text-gray-700 mb-4">VỊ TRÍ</h2>
-                                
+
                                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
                                     <div className="grid grid-cols-2 gap-4 mb-4">
                                         <div>
@@ -338,7 +399,7 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                                             </p>
                                         </div>
                                     </div>
-                                    
+
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-500">Địa chỉ</h3>
                                         <p className="mt-1">{shopData.address || 'N/A'}</p>
@@ -349,15 +410,14 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                             {/* Status Information */}
                             <div className="mb-8">
                                 <h2 className="text-lg font-medium text-gray-700 mb-4">TRẠNG THÁI</h2>
-                                
+
                                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
                                     <div className="flex justify-between items-center mb-4">
                                         <div>
                                             <h3 className="text-sm font-medium text-gray-500">Trạng thái cửa hàng</h3>
                                             <div className="mt-1">
-                                                <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${
-                                                    shopData.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                                }`}>
+                                                <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${shopData.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                                    }`}>
                                                     {shopData.status === 'active' ? 'Đã duyệt' : 'Chờ duyệt'}
                                                 </span>
                                             </div>
@@ -365,9 +425,8 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                                         <div>
                                             <h3 className="text-sm font-medium text-gray-500">Tài khoản</h3>
                                             <div className="mt-1">
-                                                <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${
-                                                    shopData.is_active === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                }`}>
+                                                <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${shopData.is_active === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                    }`}>
                                                     {shopData.is_active === 1 ? 'Đang hoạt động' : 'Đã khóa'}
                                                 </span>
                                             </div>
@@ -379,7 +438,7 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                             {/* Statistics */}
                             <div className="mb-8">
                                 <h2 className="text-lg font-medium text-gray-700 mb-4">THỐNG KÊ</h2>
-                                
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-gray-50 rounded-lg p-4 text-center">
                                         <h3 className="text-sm font-medium text-gray-500">Đánh giá</h3>
@@ -395,7 +454,7 @@ const StoreDetail = ({ onBack, shopId, initialShopData }) => {
                             {/* Timestamps */}
                             <div className="mb-4">
                                 <h2 className="text-lg font-medium text-gray-700 mb-4">THỜI GIAN</h2>
-                                
+
                                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>

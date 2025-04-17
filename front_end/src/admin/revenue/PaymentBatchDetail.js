@@ -1,8 +1,9 @@
 // src/admin/revenue/PaymentBatchDetail.js
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Download, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Download, CheckCircle, XCircle, AlertTriangle, DollarSign, Banknote } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import RevenueService from './services/RevenueService';
+import ShopBankAccounts from './services/ShopBankAccounts';
 
 const PaymentBatchDetail = () => {
   const { id } = useParams(); // batch_id from URL
@@ -14,6 +15,9 @@ const PaymentBatchDetail = () => {
   const [transactionId, setTransactionId] = useState('');
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [selectedShop, setSelectedShop] = useState(null);
+  const [showBankDetails, setShowBankDetails] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState(null);
 
   useEffect(() => {
     fetchBatchDetails();
@@ -63,6 +67,11 @@ const PaymentBatchDetail = () => {
     }
   };
 
+  const handleViewShopBankDetails = (shop) => {
+    setSelectedShop(shop);
+    setShowBankDetails(true);
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
@@ -101,6 +110,15 @@ const PaymentBatchDetail = () => {
     }
   };
 
+  // Xuất file Excel báo cáo thanh toán
+  const generateExcelReport = () => {
+    // Tạo file Excel khác nhau tùy theo trạng thái của batch
+    if (batchData && batchData.batch) {
+      const fileName = `payment-batch-${batchData.batch.batch_id}.xlsx`;
+      alert('Chức năng xuất file Excel đang được phát triển. Tên file: ' + fileName);
+    }
+  };
+
   return (
     <div className="flex-1 bg-gray-50 p-6">
       <div className="flex items-center mb-6">
@@ -115,14 +133,16 @@ const PaymentBatchDetail = () => {
       </div>
 
       {success && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          {success}
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 flex items-center">
+          <CheckCircle size={20} className="mr-2" />
+          <span>{success}</span>
         </div>
       )}
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
+          <AlertTriangle size={20} className="mr-2" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -138,7 +158,7 @@ const PaymentBatchDetail = () => {
       ) : (
         <>
           {/* Batch Info Card */}
-          <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
+          <div className={`bg-white p-6 rounded-lg shadow-sm mb-6 ${batchData.batch.status === 'pending' ? 'border-l-4 border-yellow-400' : batchData.batch.status === 'completed' ? 'border-l-4 border-green-400' : ''}`}>
             <div className="grid grid-cols-2 gap-8">
               <div>
                 <h2 className="text-lg font-semibold mb-4">Thông tin đợt thanh toán</h2>
@@ -165,7 +185,21 @@ const PaymentBatchDetail = () => {
                       {formatDate(batchData.batch.start_date)} - {formatDate(batchData.batch.end_date)}
                     </p>
                   </div>
+                  
+                  {batchData.batch.processed_at && (
+                    <div className="col-span-2">
+                      <p className="text-gray-500 text-sm">Ngày xử lý</p>
+                      <p className="font-medium">{formatDate(batchData.batch.processed_at)}</p>
+                    </div>
+                  )}
                 </div>
+                
+                {batchData.batch.status === 'completed' && (
+                  <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
+                    <CheckCircle size={16} className="mr-2" />
+                    <span>Đợt thanh toán này đã được xử lý thành công</span>
+                  </div>
+                )}
               </div>
               <div>
                 <h2 className="text-lg font-semibold mb-4">Tổng quan</h2>
@@ -180,8 +214,20 @@ const PaymentBatchDetail = () => {
                   </div>
                 </div>
                 
-                {batchData.batch.status === 'pending' && (
-                  <div className="mt-6">
+                <div className="mt-4 p-3 rounded-md bg-blue-50 text-blue-700">
+                  <p className="text-sm">Lưu ý: Đợt thanh toán này chỉ bao gồm các đơn hàng đã giao hàng thành công.</p>
+                </div>
+                
+                <div className="flex space-x-3 mt-6">
+                  <button
+                    onClick={generateExcelReport}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                  >
+                    <Download size={18} className="mr-2" />
+                    Xuất báo cáo Excel
+                  </button>
+                  
+                  {batchData.batch.status === 'pending' && (
                     <button
                       onClick={() => setShowProcessModal(true)}
                       className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
@@ -189,8 +235,8 @@ const PaymentBatchDetail = () => {
                       <CheckCircle size={18} className="mr-2" />
                       Xử lý đợt thanh toán
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -199,7 +245,10 @@ const PaymentBatchDetail = () => {
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Danh sách cửa hàng</h2>
-              <button className="text-blue-600 flex items-center">
+              <button 
+                className="text-blue-600 flex items-center"
+                onClick={generateExcelReport}
+              >
                 <Download size={18} className="mr-1" />
                 <span>Xuất Excel</span>
               </button>
@@ -222,6 +271,15 @@ const PaymentBatchDetail = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Tổng tiền
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Hoa hồng (10%)
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Thanh toán shop
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tài khoản
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -236,8 +294,23 @@ const PaymentBatchDetail = () => {
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {paymentData.records.length}
                         </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                        <td className="px-6 py-4 text-sm text-gray-900">
                           {formatCurrency(paymentData.total_amount)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-red-600">
+                          {formatCurrency(paymentData.total_amount * 0.1)}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-green-600">
+                          {formatCurrency(paymentData.total_amount * 0.9)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleViewShopBankDetails(paymentData.shop)}
+                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md text-xs hover:bg-blue-200 flex items-center"
+                          >
+                            <Banknote size={14} className="mr-1" />
+                            Xem tài khoản
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -262,6 +335,21 @@ const PaymentBatchDetail = () => {
               <button onClick={() => setShowProcessModal(false)} className="text-gray-500 hover:text-gray-700">
                 <XCircle size={20} />
               </button>
+            </div>
+            
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md mb-4">
+              <div className="flex items-start">
+                <DollarSign size={20} className="text-blue-500 mr-2 mt-0.5" />
+                <div>
+                  <p className="text-blue-700 font-medium">Thông tin thanh toán</p>
+                  <p className="text-sm text-blue-600 mt-1">
+                    Tổng số tiền cần thanh toán: <strong>{formatCurrency(batchData?.batch?.total_amount || 0)}</strong>
+                  </p>
+                  <p className="text-sm text-blue-600">
+                    Số shop cần thanh toán: <strong>{batchData?.batch?.total_shops || 0}</strong>
+                  </p>
+                </div>
+              </div>
             </div>
             
             <form onSubmit={handleProcessBatch}>
@@ -300,6 +388,45 @@ const PaymentBatchDetail = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bank Account Information Modal */}
+      {showBankDetails && selectedShop && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Thông tin tài khoản ngân hàng</h2>
+              <button onClick={() => {
+                setShowBankDetails(false);
+                setSelectedShop(null);
+              }} className="text-gray-500 hover:text-gray-700">
+                <XCircle size={20} />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <h3 className="font-medium text-gray-800 mb-2">{selectedShop.name}</h3>
+              <p className="text-sm text-gray-600">Email: {selectedShop.email}</p>
+            </div>
+            
+            <ShopBankAccounts 
+              shopId={selectedShop._id} 
+              onSelectAccount={(account) => setSelectedAccount(account)}
+            />
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => {
+                  setShowBankDetails(false);
+                  setSelectedShop(null);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

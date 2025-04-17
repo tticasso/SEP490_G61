@@ -54,7 +54,7 @@ const Sidebar = () => {
       hasSubmenu: true, 
       submenus: [
         { id: 'revenueDashboard', label: 'Bảng điều khiển doanh thu', path: '/admin/revenue/dashboard' },
-        { id: 'shopPayments', label: 'Thanh toán cửa hàng', path: '/admin/revenue/shop-payments' },
+        // { id: 'shopPayments', label: 'Thanh toán cửa hàng', path: '/admin/revenue/shop-payments' },
         { id: 'paymentBatches', label: 'Đợt thanh toán', path: '/admin/revenue/payment-batches' }
       ]
     },

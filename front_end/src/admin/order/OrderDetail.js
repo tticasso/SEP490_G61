@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Truck, CreditCard, User, MapPin, Package, ShoppingBag, Store } from 'lucide-react';
+import { ChevronLeft, Truck, CreditCard, User, MapPin, Package, ShoppingBag, Store, RefreshCcw, AlertTriangle, CheckCircle } from 'lucide-react';
 import ApiService from '../../services/ApiService';
 import ShopOwner from '../../assets/ShopOwner.png'; // Fallback image
 
@@ -26,6 +26,11 @@ const OrderDetail = ({ orderId, onBack }) => {
   const [currentPaymentStatus, setCurrentPaymentStatus] = useState('');
 
   const [isCodPayment, setIsCodPayment] = useState(false);
+  
+  // State for refund processing
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [refundSuccess, setRefundSuccess] = useState(false);
+  const [refundError, setRefundError] = useState(null);
 
   // Fetch order data
   useEffect(() => {
@@ -335,6 +340,36 @@ const OrderDetail = ({ orderId, onBack }) => {
       setIsUpdating(false);
     }
   };
+  
+  // Xử lý đánh dấu đã hoàn tiền
+  const handleMarkAsRefunded = async () => {
+    if (window.confirm('Xác nhận đã hoàn tiền cho đơn hàng này?')) {
+      try {
+        setIsRefunding(true);
+        setRefundError(null);
+        
+        const response = await ApiService.put(`/order/refund/${orderId}`, {});
+        
+        console.log('Mark as refunded response:', response);
+        setRefundSuccess(true);
+        
+        // Refresh data after a short delay
+        setTimeout(() => {
+          fetchOrderData();
+        }, 1000);
+        
+        // Hide success message after a few seconds
+        setTimeout(() => {
+          setRefundSuccess(false);
+        }, 3000);
+      } catch (error) {
+        console.error('Error marking as refunded:', error);
+        setRefundError(`Lỗi khi đánh dấu hoàn tiền: ${error.message || error}`);
+      } finally {
+        setIsRefunding(false);
+      }
+    }
+  };
 
   // Chuyển đổi trạng thái đơn hàng (order_status) sang tiếng Việt
   const getOrderStatusText = (orderStatus) => {
@@ -527,7 +562,7 @@ const OrderDetail = ({ orderId, onBack }) => {
   return (
     <div className="flex-1 bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-gray-200">
+      <div className={`flex items-center justify-between p-6 border-b ${orderData.need_pay_back ? 'bg-orange-50 border-orange-200' : 'border-gray-200'}`}>
         <div className="flex items-center">
           <button
             className="flex items-center text-gray-600 hover:text-gray-800 mr-4"
@@ -549,6 +584,14 @@ const OrderDetail = ({ orderId, onBack }) => {
                 {orderData.status_id === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
               </span>
             </p>
+          )}
+          
+          {/* Hiển thị cờ cần hoàn tiền */}
+          {orderData.need_pay_back && (
+            <div className="flex items-center ml-3 px-3 py-1 text-xs font-medium rounded bg-orange-100 text-orange-800">
+              <AlertTriangle size={14} className="mr-1" />
+              <span>Cần hoàn tiền</span>
+            </div>
           )}
 
         </div>
@@ -593,6 +636,18 @@ const OrderDetail = ({ orderId, onBack }) => {
                   Hủy đơn
                 </button>
               )}
+              
+              {/* Thêm nút đánh dấu đã hoàn tiền nếu cần hoàn tiền */}
+              {orderData.need_pay_back && (
+                <button
+                  className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 flex items-center"
+                  onClick={handleMarkAsRefunded}
+                  disabled={isRefunding}
+                >
+                  <RefreshCcw size={16} className="mr-2" />
+                  {isRefunding ? 'Đang xử lý...' : 'Đánh dấu đã hoàn tiền'}
+                </button>
+              )}
             </>
           )}
         </div>
@@ -608,6 +663,42 @@ const OrderDetail = ({ orderId, onBack }) => {
       {updateError && (
         <div className="mx-6 mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
           {updateError}
+        </div>
+      )}
+      
+      {/* Thông báo hoàn tiền */}
+      {refundSuccess && (
+        <div className="mx-6 mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded flex items-center">
+          <CheckCircle size={18} className="mr-2" />
+          Đã đánh dấu hoàn tiền thành công!
+        </div>
+      )}
+
+      {refundError && (
+        <div className="mx-6 mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded flex items-center">
+          <AlertTriangle size={18} className="mr-2" />
+          {refundError}
+        </div>
+      )}
+      
+      {/* Hiển thị cảnh báo cần hoàn tiền ngay đầu trang nếu cần */}
+      {orderData.need_pay_back && (
+        <div className="mx-6 mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-start">
+            <AlertTriangle size={24} className="text-orange-500 mr-3 mt-1" />
+            <div>
+              <h3 className="font-semibold text-orange-700 text-lg">Đơn hàng cần được hoàn tiền</h3>
+              <p className="text-orange-600 mt-1">
+                Đơn hàng này đã được hủy sau khi khách hàng đã thanh toán. Vui lòng kiểm tra thông tin thanh toán 
+                trong hệ thống và thực hiện hoàn tiền cho khách hàng.
+              </p>
+              {orderData.payment_details && orderData.payment_details.amount && (
+                <p className="font-medium text-orange-700 mt-2">
+                  Số tiền cần hoàn: {formatPrice(orderData.payment_details.amount)}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -658,6 +749,11 @@ const OrderDetail = ({ orderId, onBack }) => {
             {orderData.order_status === 'cancelled' && (
               <div className="mt-4 p-3 bg-red-100 text-red-700 rounded text-center">
                 Đơn hàng đã bị hủy
+                {orderData.need_pay_back && (
+                  <div className="text-orange-600 font-medium mt-2">
+                    Cần hoàn tiền cho khách hàng
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -740,8 +836,51 @@ const OrderDetail = ({ orderId, onBack }) => {
                     Mã thanh toán: {orderData.order_payment_id}
                   </p>
                 )}
+                
+                {/* Hiển thị trạng thái hoàn tiền */}
+                {orderData.status_id === 'paid' && orderData.order_status === 'cancelled' && (
+                  <div className="mt-2">
+                    <p className={`flex items-center text-sm ${orderData.need_pay_back ? 'text-orange-600' : 'text-green-600'}`}>
+                      <span className={`inline-block w-2 h-2 rounded-full mr-1 ${orderData.need_pay_back ? 'bg-orange-500' : 'bg-green-500'}`}></span>
+                      {orderData.need_pay_back ? 'Cần hoàn tiền' : 'Đã hoàn tiền'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
+            
+            {/* Hiển thị chi tiết thanh toán nếu có */}
+            {orderData.payment_details && Object.keys(orderData.payment_details).length > 0 && (
+              <div className="mt-4 border-t pt-4">
+                <h4 className="font-medium text-gray-800 mb-2">Chi tiết thanh toán</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {orderData.payment_details.amount && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Số tiền:</span>
+                      <span className="font-medium text-gray-800">{formatPrice(orderData.payment_details.amount)}</span>
+                    </div>
+                  )}
+                  {orderData.payment_details.description && (
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-gray-600">Mô tả:</span>
+                      <span className="font-medium text-gray-800">{orderData.payment_details.description}</span>
+                    </div>
+                  )}
+                  {orderData.payment_details.orderCode && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Mã giao dịch:</span>
+                      <span className="font-medium text-gray-800">{orderData.payment_details.orderCode}</span>
+                    </div>
+                  )}
+                  {orderData.payment_details.accountName && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tên tài khoản:</span>
+                      <span className="font-medium text-gray-800">{orderData.payment_details.accountName}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

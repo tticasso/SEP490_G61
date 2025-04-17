@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Eye, RefreshCw, Clock, DollarSign, Package, XCircle, Truck, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, RefreshCw, Clock, DollarSign, Package, XCircle, Truck, CheckCircle, RefreshCcw, AlertTriangle } from 'lucide-react';
 import ApiService from '../../services/ApiService';
 import OrderDetail from './OrderDetail';
 import PaymentDetailsPopup from './PaymentDetailsPopup';
@@ -19,7 +19,8 @@ const OrderManagement = () => {
       delivered: 0,
       cancelled: 0
     },
-    totalRevenue: 0
+    totalRevenue: 0,
+    refundNeededCount: 0 // Thêm số lượng đơn hàng cần hoàn tiền
   });
 
   // Pagination state
@@ -28,6 +29,11 @@ const OrderManagement = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [showPaymentDetails, setShowPaymentDetails] = useState(false);
   const [selectedPaymentDetails, setSelectedPaymentDetails] = useState(null);
+  
+  // Process state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processSuccess, setProcessSuccess] = useState(null);
+  const [processError, setProcessError] = useState(null);
 
   // Filter states
   const [filter, setFilter] = useState({
@@ -36,7 +42,8 @@ const OrderManagement = () => {
     processing: false,
     shipped: false,
     delivered: false,
-    cancelled: false
+    cancelled: false,
+    needRefund: false // Thêm filter đơn hàng cần hoàn tiền
   });
 
   // Search state
@@ -55,6 +62,11 @@ const OrderManagement = () => {
     try {
       setLoading(true);
       let endpoint = '/order/list';
+      
+      // Nếu filter cần hoàn tiền được chọn, sử dụng API riêng cho đơn hàng cần hoàn tiền
+      if (filter.needRefund) {
+        endpoint = '/order/refunds';
+      }
 
       const response = await ApiService.get(endpoint);
       console.log("====== ORDER LIST DEBUG ======");
@@ -88,7 +100,15 @@ const OrderManagement = () => {
     try {
       const response = await ApiService.get('/order/statistics');
       console.log("Statistics response:", response);
-      setStatistics(response);
+      
+      // Thêm đếm số đơn hàng cần hoàn tiền (nếu API không trả về)
+      const refundNeededCount = response.refundNeededCount || 
+        orders.filter(order => order.need_pay_back).length;
+      
+      setStatistics({
+        ...response,
+        refundNeededCount
+      });
     } catch (error) {
       console.error('Lỗi khi tải thống kê đơn hàng:', error);
     }
@@ -102,6 +122,33 @@ const OrderManagement = () => {
   // Handle sort
   const handleSort = (e) => {
     setSortOption(e.target.value);
+  };
+
+  // Đánh dấu đơn hàng đã hoàn tiền
+  const handleMarkAsRefunded = async (orderId) => {
+    if (window.confirm('Xác nhận đã hoàn tiền cho đơn hàng này?')) {
+      try {
+        setIsProcessing(true);
+        setProcessError(null);
+        
+        const response = await ApiService.put(`/order/refund/${orderId}`, {});
+        
+        console.log('Mark as refunded response:', response);
+        setProcessSuccess('Đã đánh dấu hoàn tiền thành công!');
+        
+        // Refresh data
+        setTimeout(() => {
+          fetchOrders();
+          fetchStatistics();
+          setProcessSuccess(null);
+        }, 1500);
+      } catch (error) {
+        console.error('Error marking as refunded:', error);
+        setProcessError('Lỗi khi đánh dấu hoàn tiền: ' + (error.message || error));
+      } finally {
+        setIsProcessing(false);
+      }
+    }
   };
 
   // Filtered orders with search and sort functionality
@@ -119,6 +166,10 @@ const OrderManagement = () => {
       result = result.filter(order => order.order_status === 'delivered');
     } else if (filter.cancelled) {
       result = result.filter(order => order.order_status === 'cancelled');
+    } else if (filter.needRefund) {
+      // Đối với filter hoàn tiền, chúng ta vẫn nhận kết quả trực tiếp từ API /order/refunds
+      // Nhưng vẫn lọc bổ sung ở mặt frontend để đảm bảo
+      result = result.filter(order => order.need_pay_back === true);
     }
 
     // Apply search
@@ -344,6 +395,17 @@ const OrderManagement = () => {
           <p className="text-2xl font-bold">{statistics.ordersByStatus?.cancelled || 0}</p>
         </div>
       </div>
+
+      {/* Thêm khối thống kê đơn hàng cần hoàn tiền */}
+      <div className="bg-white rounded-lg shadow p-4 flex items-center">
+        <div className="bg-orange-100 p-3 rounded-full mr-4">
+          <RefreshCcw size={24} className="text-orange-600" />
+        </div>
+        <div>
+          <p className="text-gray-500 text-sm">Cần hoàn tiền</p>
+          <p className="text-2xl font-bold">{statistics.refundNeededCount || 0}</p>
+        </div>
+      </div>
     </div>
   );
 
@@ -369,42 +431,67 @@ const OrderManagement = () => {
             <div className="flex flex-wrap space-x-4 md:space-x-6 text-gray-600">
               <button
                 className={`mb-2 ${filter.all ? 'text-blue-600 font-medium' : ''}`}
-                onClick={() => setFilter({ all: true, pending: false, processing: false, shipped: false, delivered: false, cancelled: false })}
+                onClick={() => setFilter({ all: true, pending: false, processing: false, shipped: false, delivered: false, cancelled: false, needRefund: false })}
               >
                 Tất cả ({statistics.totalOrders || 0})
               </button>
               <button
                 className={`mb-2 ${filter.pending ? 'text-blue-600 font-medium' : ''}`}
-                onClick={() => setFilter({ all: false, pending: true, processing: false, shipped: false, delivered: false, cancelled: false })}
+                onClick={() => setFilter({ all: false, pending: true, processing: false, shipped: false, delivered: false, cancelled: false, needRefund: false })}
               >
                 Chờ xác nhận ({statistics.ordersByStatus?.pending || 0})
               </button>
               <button
                 className={`mb-2 ${filter.processing ? 'text-blue-600 font-medium' : ''}`}
-                onClick={() => setFilter({ all: false, pending: false, processing: true, shipped: false, delivered: false, cancelled: false })}
+                onClick={() => setFilter({ all: false, pending: false, processing: true, shipped: false, delivered: false, cancelled: false, needRefund: false })}
               >
                 Đã xác nhận ({statistics.ordersByStatus?.processing || 0})
               </button>
               <button
                 className={`mb-2 ${filter.shipped ? 'text-blue-600 font-medium' : ''}`}
-                onClick={() => setFilter({ all: false, pending: false, processing: false, shipped: true, delivered: false, cancelled: false })}
+                onClick={() => setFilter({ all: false, pending: false, processing: false, shipped: true, delivered: false, cancelled: false, needRefund: false })}
               >
                 Đang vận chuyển ({statistics.ordersByStatus?.shipped || 0})
               </button>
               <button
                 className={`mb-2 ${filter.delivered ? 'text-blue-600 font-medium' : ''}`}
-                onClick={() => setFilter({ all: false, pending: false, processing: false, shipped: false, delivered: true, cancelled: false })}
+                onClick={() => setFilter({ all: false, pending: false, processing: false, shipped: false, delivered: true, cancelled: false, needRefund: false })}
               >
                 Giao Hàng Thành Công ({statistics.ordersByStatus?.delivered || 0})
               </button>
               <button
                 className={`mb-2 ${filter.cancelled ? 'text-blue-600 font-medium' : ''}`}
-                onClick={() => setFilter({ all: false, pending: false, processing: false, shipped: false, delivered: false, cancelled: true })}
+                onClick={() => setFilter({ all: false, pending: false, processing: false, shipped: false, delivered: false, cancelled: true, needRefund: false })}
               >
                 Hủy đơn ({statistics.ordersByStatus?.cancelled || 0})
               </button>
+              {/* Thêm tab đơn hàng cần hoàn tiền */}
+              <button
+                className={`mb-2 ${filter.needRefund ? 'text-orange-600 font-medium' : ''}`}
+                onClick={() => setFilter({ all: false, pending: false, processing: false, shipped: false, delivered: false, cancelled: false, needRefund: true })}
+              >
+                <span className="flex items-center">
+                  <RefreshCcw size={16} className="mr-1" />
+                  Cần hoàn tiền ({statistics.refundNeededCount || 0})
+                </span>
+              </button>
             </div>
           </div>
+
+          {/* Status messages */}
+          {processSuccess && (
+            <div className="mx-6 mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded flex items-center">
+              <CheckCircle size={18} className="mr-2" />
+              {processSuccess}
+            </div>
+          )}
+
+          {processError && (
+            <div className="mx-6 mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded flex items-center">
+              <AlertTriangle size={18} className="mr-2" />
+              {processError}
+            </div>
+          )}
 
           {/* Function bar */}
           <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center px-6 py-4 space-y-2 md:space-y-0">
@@ -484,9 +571,19 @@ const OrderManagement = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {currentOrders.map((order) => (
-                      <tr key={order._id} className="hover:bg-gray-50">
-                        <td className="py-4 px-4 text-sm text-gray-900">
-                          {order.id || order._id}
+                      <tr 
+                        key={order._id} 
+                        className={`hover:bg-gray-50 ${order.need_pay_back ? 'bg-orange-50' : ''}`}
+                      >
+                        <td className="py-4 px-4">
+                          <div className="flex items-center">
+                            {order.need_pay_back && (
+                              <AlertTriangle size={16} className="text-orange-500 mr-2" />
+                            )}
+                            <span className={`text-sm ${order.need_pay_back ? 'text-orange-700 font-medium' : 'text-gray-900'}`}>
+                              {order.id || order._id}
+                            </span>
+                          </div>
                         </td>
                         <td className="py-4 px-4 text-sm text-gray-900">
                           {order.customer_id?.firstName} {order.customer_id?.lastName || 'Không có tên'}
@@ -505,6 +602,11 @@ const OrderManagement = () => {
                           <span className={`px-3 py-1 truncate text-xs font-medium rounded ${getStatusClass(order.order_status)}`}>
                             {getStatusText(order.order_status)}
                           </span>
+                          {order.need_pay_back && (
+                            <span className="block mt-1 text-orange-600 text-xs font-medium">
+                              Cần hoàn tiền
+                            </span>
+                          )}
                         </td>
                         {/* Trạng thái thanh toán */}
                         <td className="py-4 px-4">
@@ -553,6 +655,7 @@ const OrderManagement = () => {
                               <Eye size={18} />
                             </button>
 
+                            {/* Hiển thị nút hủy đơn hàng khi trạng thái là "pending" */}
                             {order.order_status === 'pending' && (
                               <button
                                 className="text-red-600 hover:text-red-800"
@@ -560,6 +663,18 @@ const OrderManagement = () => {
                                 title="Hủy đơn hàng"
                               >
                                 <XCircle size={18} />
+                              </button>
+                            )}
+                            
+                            {/* Hiển thị nút đánh dấu đã hoàn tiền khi cần hoàn tiền */}
+                            {order.need_pay_back && (
+                              <button
+                                className="text-orange-600 hover:text-orange-800"
+                                onClick={() => handleMarkAsRefunded(order._id)}
+                                title="Đánh dấu đã hoàn tiền"
+                                disabled={isProcessing}
+                              >
+                                <RefreshCcw size={18} />
                               </button>
                             )}
                           </div>
@@ -641,6 +756,7 @@ const OrderManagement = () => {
         <PaymentDetailsPopup
           paymentDetails={selectedPaymentDetails}
           orderStatusId={selectedOrder.status_id}
+          need_pay_back={selectedOrder.need_pay_back}
           onClose={() => {
             setShowPaymentDetails(false);
             setSelectedPaymentDetails(null);

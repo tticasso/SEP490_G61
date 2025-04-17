@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Plus, ChevronLeft, ChevronRight, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Eye, Plus, ChevronLeft, ChevronRight, RefreshCw, AlertTriangle, CheckCircle, Calendar, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import RevenueService from './services/RevenueService';
 import CreatePaymentBatchModal from './CreatePaymentBatchModal';
@@ -11,6 +11,10 @@ const PaymentBatchList = () => {
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [currentBatch, setCurrentBatch] = useState(null);
+  const [stats, setStats] = useState({
+    unpaidAmount: 0,
+    unpaidOrders: 0
+  });
   
   // Pagination state
   const [page, setPage] = useState(1);
@@ -23,6 +27,7 @@ const PaymentBatchList = () => {
 
   useEffect(() => {
     fetchPaymentBatches();
+    fetchUnpaidStats();
   }, [page, limit, status]);
 
   const fetchPaymentBatches = async () => {
@@ -42,6 +47,20 @@ const PaymentBatchList = () => {
     }
   };
 
+  const fetchUnpaidStats = async () => {
+    try {
+      // Đây là API giả định để lấy thống kê về các đơn hàng chưa thanh toán
+      // Trong thực tế, bạn cần thay thế bằng API thực tế trong RevenueService
+      const response = await RevenueService.getSystemRevenueOverview();
+      setStats({
+        unpaidAmount: response?.summary?.unpaid_to_shops || 0,
+        unpaidOrders: response?.summary?.unpaid_orders_count || 0
+      });
+    } catch (err) {
+      console.error('Error fetching unpaid stats:', err);
+    }
+  };
+
   const handleOpenCreateModal = () => {
     setShowCreateModal(true);
   };
@@ -49,6 +68,7 @@ const PaymentBatchList = () => {
   const handleCloseCreateModal = () => {
     setShowCreateModal(false);
     fetchPaymentBatches(); // Refresh list after creating a batch
+    fetchUnpaidStats(); // Refresh unpaid statistics
   };
 
   const handleViewBatchDetail = (batchId) => {
@@ -100,7 +120,7 @@ const PaymentBatchList = () => {
   return (
     <div className="flex-1 bg-gray-50 p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">ĐỢT THANH TOÁN</h1>
+        <h1 className="text-2xl font-bold">ĐỢT THANH TOÁN CHO CỬA HÀNG</h1>
         <div className="flex space-x-4">
           <button 
             onClick={fetchPaymentBatches}
@@ -116,6 +136,39 @@ const PaymentBatchList = () => {
             <Plus size={18} className="mr-2" />
             Tạo đợt thanh toán
           </button>
+        </div>
+      </div>
+
+      {/* Dashboard summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow p-4 flex items-center">
+          <div className="bg-orange-100 p-3 rounded-full mr-4">
+            <DollarSign size={24} className="text-orange-600" />
+          </div>
+          <div>
+            <p className="text-gray-500 text-sm">Chờ thanh toán</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats.unpaidAmount)}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-4 flex items-center">
+          <div className="bg-blue-100 p-3 rounded-full mr-4">
+            <CheckCircle size={24} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-gray-500 text-sm">Đơn hàng chờ thanh toán</p>
+            <p className="text-2xl font-bold">{stats.unpaidOrders || 0}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-4 flex items-center">
+          <div className="bg-green-100 p-3 rounded-full mr-4">
+            <Calendar size={24} className="text-green-600" />
+          </div>
+          <div>
+            <p className="text-gray-500 text-sm">Đợt thanh toán đã tạo</p>
+            <p className="text-2xl font-bold">{totalItems}</p>
+          </div>
         </div>
       </div>
 
@@ -190,6 +243,12 @@ const PaymentBatchList = () => {
                     Tổng số tiền
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hoa hồng (10%)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Thanh toán shop
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Trạng thái
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -218,6 +277,16 @@ const PaymentBatchList = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-red-600">
+                        {formatCurrency(batch.total_amount * 0.1)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-green-600">
+                        {formatCurrency(batch.total_amount * 0.9)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 text-xs font-medium rounded-full ${getBatchStatusClass(batch.status)}`}>
                         {getBatchStatusText(batch.status)}
                       </span>

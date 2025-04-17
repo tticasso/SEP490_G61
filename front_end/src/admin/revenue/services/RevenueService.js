@@ -47,6 +47,30 @@ class RevenueService {
       transaction_id: transactionId
     });
   }
+
+  // New methods for bank account management
+  getShopBankAccounts(shopId) {
+    return ApiService.get(`/bank-account/shop/${shopId}`);
+  }
+
+  getBankAccountDetails(accountId) {
+    return ApiService.get(`/bank-account/${accountId}`);
+  }
+
+  // New method to mark specific shop payment as paid in a batch
+  markShopPaymentPaid(batchId, shopId, transactionInfo) {
+    return ApiService.post(`/revenue/batch/${batchId}/shop/${shopId}/pay`, transactionInfo);
+  }
+
+  // Get orders that need refunds
+  getOrdersNeedingRefund() {
+    return ApiService.get('/order/refunds');
+  }
+
+  // Mark order as refunded
+  markOrderRefunded(orderId) {
+    return ApiService.put(`/order/refund/${orderId}`, {});
+  }
 }
 
 export default new RevenueService();

@@ -26,7 +26,7 @@ const MessageBubble = () => {
   const location = useLocation();
   
   // Kiểm tra xem có đang ở trang user-profile không
-  const isOnUserProfilePage = location.pathname.includes('/user-profile');
+  const isOnUserProfilePage = location.pathname.includes('/user-profile') || location.pathname.includes('/admin');
 
   // Lắng nghe sự kiện có tin nhắn mới
   useEffect(() => {

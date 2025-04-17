@@ -1,7 +1,7 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, RefreshCcw } from 'lucide-react';
 
-const PaymentDetailsPopup = ({ paymentDetails, onClose, orderStatusId }) => {
+const PaymentDetailsPopup = ({ paymentDetails, onClose, orderStatusId, need_pay_back }) => {
   if (!paymentDetails) return null;
 
   // Format date
@@ -34,6 +34,22 @@ const PaymentDetailsPopup = ({ paymentDetails, onClose, orderStatusId }) => {
             <X size={24} />
           </button>
         </div>
+        
+        {/* Thêm thông báo cần hoàn tiền */}
+        {need_pay_back && (
+          <div className="mx-4 mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="flex items-start">
+              <AlertTriangle size={20} className="text-orange-500 mr-3 mt-1" />
+              <div>
+                <h3 className="font-semibold text-orange-700">Đơn hàng cần hoàn tiền</h3>
+                <p className="text-orange-600 mt-1 text-sm">
+                  Đơn hàng này đã bị hủy sau khi khách hàng đã thanh toán. Vui lòng sử dụng thông tin thanh toán 
+                  này để thực hiện hoàn tiền cho khách hàng.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="p-6 grid grid-cols-1 gap-4">
           <div className="bg-blue-50 p-4 rounded-lg mb-4">
@@ -80,9 +96,17 @@ const PaymentDetailsPopup = ({ paymentDetails, onClose, orderStatusId }) => {
             </div>
             <div className="border p-3 rounded-md">
               <p className="text-sm text-gray-600">Trạng thái</p>
-              <p className={`font-medium ${isPaymentPaid(orderStatusId) ? 'text-green-600' : 'text-yellow-600'}`}>
-                {isPaymentPaid(orderStatusId) ? 'Đã thanh toán' : 'Chưa thanh toán'}
-              </p>
+              <div className="flex items-center">
+                <p className={`font-medium ${isPaymentPaid(orderStatusId) ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {isPaymentPaid(orderStatusId) ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                </p>
+                {need_pay_back && (
+                  <span className="inline-flex items-center ml-2 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">
+                    <RefreshCcw size={12} className="mr-1" />
+                    Cần hoàn tiền
+                  </span>
+                )}
+              </div>
             </div>
             <div className="border p-3 rounded-md">
               <p className="text-sm text-gray-600">Payment Link ID</p>
@@ -96,6 +120,23 @@ const PaymentDetailsPopup = ({ paymentDetails, onClose, orderStatusId }) => {
               <div className="flex justify-center">
                 <img src={paymentDetails.qrCode} alt="Mã QR thanh toán" className="max-w-full h-auto max-h-60" />
               </div>
+            </div>
+          )}
+          
+          {/* Thêm hướng dẫn hoàn tiền nếu cần */}
+          {need_pay_back && (
+            <div className="mt-4 bg-gray-50 p-4 border border-gray-200 rounded-md">
+              <h4 className="font-medium text-gray-700 mb-2 flex items-center">
+                <RefreshCcw size={16} className="mr-2 text-orange-600" />
+                Hướng dẫn hoàn tiền
+              </h4>
+              <ol className="list-decimal list-inside text-sm text-gray-600 space-y-2">
+                <li>Đăng nhập vào cổng thanh toán PayOS hoặc Ngân hàng tương ứng.</li>
+                <li>Tìm đến giao dịch với mã <span className="font-medium">{paymentDetails.orderCode || paymentDetails.order_payment_id}</span></li>
+                <li>Thực hiện thao tác hoàn tiền theo quy trình của cổng thanh toán.</li>
+                <li>Sau khi hoàn tiền thành công, đánh dấu đã hoàn tiền trong hệ thống.</li>
+                <li>Liên hệ khách hàng để thông báo về việc hoàn tiền.</li>
+              </ol>
             </div>
           )}
         </div>

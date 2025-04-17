@@ -40,6 +40,7 @@ import SellerSettings from './Seller/SellerChangePassword';
 import ProductReviews from './Seller/ProductReview';
 import ReviewDetail from './Seller/ReviewDetails';
 import ShopRevenueDashboard from './Seller/ShopRevenueDashboard';
+import BankAccountManagement from './Seller/BankAccountManagement';
 
 function App() {
   const location = useLocation();
@@ -49,9 +50,9 @@ function App() {
 
   // Define paths that should not have role-based redirection
   const noRedirectPaths = ['/login', '/register', '/admin', '/seller-dashboard', '/forgot-password', '/reset-password'];
-  const shouldRedirect = !noRedirectPaths.includes(location.pathname) && 
-                        !location.pathname.startsWith('/admin/') && 
-                        !location.pathname.startsWith('/seller-dashboard/');
+  const shouldRedirect = !noRedirectPaths.includes(location.pathname) &&
+    !location.pathname.startsWith('/admin/') &&
+    !location.pathname.startsWith('/seller-dashboard/');
 
   return (
     <div className="font-bold">
@@ -68,7 +69,7 @@ function App() {
               <Homepage />
             )
           } />
-          
+
           <Route path="/product-detail" element={
             shouldRedirect ? (
               <RoleRedirect>
@@ -78,7 +79,7 @@ function App() {
               <ProductDetail />
             )
           } />
-          
+
           <Route path="/shop-detail" element={
             shouldRedirect ? (
               <RoleRedirect>
@@ -88,7 +89,7 @@ function App() {
               <ShopDetail />
             )
           } />
-          
+
           <Route path="/categories" element={
             shouldRedirect ? (
               <RoleRedirect>
@@ -119,7 +120,7 @@ function App() {
               )}
             </ProtectedRoute>
           } />
-          
+
           <Route path="/order-confirmation" element={
             <ProtectedRoute>
               {shouldRedirect ? (
@@ -131,7 +132,7 @@ function App() {
               )}
             </ProtectedRoute>
           } />
-          
+
           <Route path="/cart" element={
             <ProtectedRoute>
               {shouldRedirect ? (
@@ -143,7 +144,7 @@ function App() {
               )}
             </ProtectedRoute>
           } />
-          
+
           <Route path="/checkout" element={
             <ProtectedRoute>
               {shouldRedirect ? (
@@ -242,6 +243,11 @@ function App() {
           <Route path="/seller-dashboard/revenue" element={
             <SellerRoute>
               <ShopRevenueDashboard />
+            </SellerRoute>
+          } />
+          <Route path="/seller-dashboard/bank-account" element={
+            <SellerRoute>
+              <BankAccountManagement />
             </SellerRoute>
           } />
 

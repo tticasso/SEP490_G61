@@ -11,7 +11,8 @@ import {
   Store,
   Star, // Thêm icon Star cho phần đánh giá và phản hồi
   BarChart2, // Icon cho thống kê doanh thu
-  DollarSign // Icon thay thế cho doanh thu
+  DollarSign, // Icon thay thế cho doanh thu
+  Landmark // Icon cho quản lý tài khoản ngân hàng
 } from 'lucide-react';
 
 const Sidebar = ({ onNavigate }) => {
@@ -67,6 +68,13 @@ const Sidebar = ({ onNavigate }) => {
       icon: <DollarSign className="mr-3 text-gray-500" />,
       label: 'Thống kê doanh thu',
       path: '/seller-dashboard/revenue',
+      expandable: false
+    },
+    // Thêm mục quản lý tài khoản ngân hàng
+    {
+      icon: <Landmark className="mr-3 text-gray-500" />,
+      label: 'Tài khoản ngân hàng',
+      path: '/seller-dashboard/bank-account',
       expandable: false
     },
     { 

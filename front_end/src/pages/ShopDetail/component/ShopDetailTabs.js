@@ -295,41 +295,6 @@ const ShopDetailTabs = ({ shopDetails }) => {
                   })}
                 </div>
               </div>
-              
-              <div className="flex flex-wrap gap-2 mb-4">
-                <button className="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm">
-                  Sản phẩm giá tốt (15)
-                </button>
-                <button className="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm">
-                  Chất lượng sản phẩm tốt (13)
-                </button>
-                <button className="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm">
-                  Đúng hẹn (12)
-                </button>
-                <button className="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm">
-                  Giao tiếp lịch sự, thân thiện (19)
-                </button>
-                <button className="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm">
-                  Đáng tin cậy (16)
-                </button>
-                <button className="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm">
-                  Mô tả sản phẩm đúng (15)
-                </button>
-              </div>
-              
-              <div className="border-t border-gray-200 pt-4">
-                <div className="flex border-b border-gray-200">
-                  <button className="py-2 px-4 font-medium border-b-2 border-orange-500 text-orange-500">
-                    TẤT CẢ ({reviewStats.totalReviews})
-                  </button>
-                  <button className="py-2 px-4 font-medium text-gray-500">
-                    TỪ NGƯỜI MUA ({reviewStats.totalReviews})
-                  </button>
-                  <button className="py-2 px-4 font-medium text-gray-500">
-                    TỪ NGƯỜI BÁN (0)
-                  </button>
-                </div>
-              </div>
             </div>
             
             <div className="space-y-4">
@@ -457,12 +422,6 @@ const ShopDetailTabs = ({ shopDetails }) => {
                             </div>
                           )}
                           
-                          {/* Review Actions */}
-                          <div className="mt-3 flex justify-end">
-                            <button className="text-gray-500 text-sm flex items-center">
-                              <ThumbsUp size={14} className="mr-1" /> Hữu ích
-                            </button>
-                          </div>
                         </div>
                       </div>
                     </div>

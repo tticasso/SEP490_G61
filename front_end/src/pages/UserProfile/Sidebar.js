@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { User, ShoppingBag, LogOut, Lock, MapPin, MessageSquare, Store, Package } from 'lucide-react'
-import ShopAvatar from '../../assets/ShopAvatar.png'
+import avatar from '../../assets/avatar.png'
 import { MessageEventBus } from '../UserProfile/components/Message';
 import { useEffect, useState } from 'react';
 
@@ -39,7 +39,7 @@ const Sidebar = ({ profile }) => {
     <div className="w-64 bg-white border p-4">
       <div className="flex items-center space-x-4 mb-8">
         <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-          <img src={ShopAvatar} className='w-full h-full' alt="Profile" />
+          <img src={avatar} className='w-full h-full' alt="Profile" />
         </div>
         <div>
           <p className="font-semibold">

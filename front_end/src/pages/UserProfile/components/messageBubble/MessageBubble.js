@@ -86,57 +86,81 @@ const MessageBubble = () => {
     try {
       setLoading(true);
       const response = await ApiService.get('/conversation/user', true);
-
+  
       // Format data và tính toán số tin nhắn chưa đọc
       let totalUnreadMessages = 0;
       
       const formattedConversations = response.map(conv => {
-        // Tìm người tham gia khác
+        // Tìm người tham gia khác (với kiểm tra null)
         const otherParticipant = conv.participants.find(
-          p => p._id.toString() !== currentUser.id.toString()
+          p => p && p._id && p._id.toString() !== currentUser.id.toString()
         );
-
+  
+        // Lưu participantId (an toàn với null)
         const participantId = otherParticipant?._id;
+        
+        // Đếm tin nhắn chưa đọc
         const unreadCount = conv.unread_count || 0;
-
         if (unreadCount > 0) {
           totalUnreadMessages += unreadCount;
         }
-
-        // Luôn sử dụng tên người tham gia cho các cuộc trò chuyện P2P
+  
+        // Xác định người dùng có phải là chủ shop hay không (cẩn thận với null)
+        let isShopOwner = false;
+        if (conv.shop_id && conv.shop_id.user_id) {
+          const shopOwnerId = String(conv.shop_id.user_id || '');
+          const currentUserId = String(currentUser.id || '');
+          isShopOwner = shopOwnerId && currentUserId && shopOwnerId === currentUserId;
+        } else if (conv.isShopOwner) {
+          isShopOwner = true;
+        }
+  
+        // Xác định tên hiển thị hợp lý
         let displayName;
+        
         if (conv.shop_id) {
-          // Nếu là cuộc trò chuyện với shop
-          displayName = conv.shop_id.name;
+          if (isShopOwner) {
+            // Nếu là chủ shop, hiển thị tên khách hàng (cẩn thận với null)
+            if (otherParticipant) {
+              displayName = `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim() || 'Khách hàng';
+            } else {
+              displayName = 'Khách hàng'; // Fallback khi không tìm thấy thông tin người dùng
+            }
+          } else {
+            // Nếu là khách hàng, hiển thị tên cửa hàng
+            displayName = conv.shop_id.name || 'Cửa hàng';
+          }
         } else if (otherParticipant) {
-          // Với cuộc trò chuyện thông thường giữa người dùng
-          displayName = `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim();
+          // Cuộc trò chuyện thông thường giữa các người dùng
+          displayName = `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim() || 'Người dùng';
         } else {
           displayName = "Người dùng không xác định";
         }
-
+  
         return {
           id: conv._id,
           name: displayName,
           lastMessage: conv.last_message || 'Bắt đầu trò chuyện',
           image: conv.shop_id?.logo || `${BE_API_URL}/uploads/avatar/default.png`,
-          timestamp: new Date(conv.last_message_time).toLocaleString(),
+          timestamp: new Date(conv.last_message_time || Date.now()).toLocaleString(),
           unread: unreadCount > 0,
-          participantId: participantId
+          participantId: participantId,
+          isShopOwner: isShopOwner,
+          shopId: conv.shop_id?._id
         };
       });
-
+  
       setConversations(formattedConversations);
       
       // Thông báo Header về số tin nhắn chưa đọc
       MessageEventBus.publish('unreadCountChanged', totalUnreadMessages);
-
+  
       // Tự động chọn cuộc trò chuyện đầu tiên nếu có
       if (formattedConversations.length > 0 && !selectedConversation) {
         setSelectedConversation(formattedConversations[0].id);
         fetchMessages(formattedConversations[0].id);
       }
-
+  
       setLoading(false);
     } catch (error) {
       console.error('Error fetching conversations:', error);

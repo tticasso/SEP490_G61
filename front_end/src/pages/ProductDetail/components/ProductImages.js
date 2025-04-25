@@ -22,7 +22,7 @@ const ProductImages = ({ images, selectedImage, setSelectedImage, product }) => 
             </div>
 
             {/* Thumbnail images */}
-            {/* <Swiper
+            <Swiper
                 slidesPerView={3.7}
                 spaceBetween={10}
                 className="mySwiper mt-2 px-2"
@@ -42,7 +42,7 @@ const ProductImages = ({ images, selectedImage, setSelectedImage, product }) => 
                         />
                     </SwiperSlide>
                 ))}
-            </Swiper> */}
+            </Swiper>
         </div>
     );
 };

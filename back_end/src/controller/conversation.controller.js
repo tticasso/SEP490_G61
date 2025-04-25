@@ -1,3 +1,4 @@
+// Updated conversation.controller.js
 const db = require("../models");
 const Conversation = db.conversation;
 const Message = db.message;
@@ -9,13 +10,18 @@ const getUserConversations = async (req, res) => {
     try {
         const userId = req.userId;
         
+        // Đảm bảo userId là giá trị hợp lệ
+        if (!userId) {
+            return res.status(400).json({ message: "Invalid user ID" });
+        }
+        
         // Tìm tất cả cuộc trò chuyện mà người dùng tham gia
         const conversations = await Conversation.find({
             participants: userId
         })
         .populate({
             path: 'shop_id',
-            select: 'name logo'
+            select: 'name logo user_id' // Đảm bảo lấy user_id để xác định chủ shop
         })
         .populate({
             path: 'participants',
@@ -23,8 +29,50 @@ const getUserConversations = async (req, res) => {
         })
         .sort({ last_message_time: -1 });
         
-        res.status(200).json(conversations);
+        // Xử lý từng cuộc trò chuyện để thêm metadata
+        const conversationsWithMetadata = await Promise.all(
+            conversations.map(async (conv) => {
+                // Sử dụng toObject để chuyển document Mongoose thành plain JavaScript object
+                // Thêm kiểm tra null cho con
+                const convObj = conv && typeof conv.toObject === 'function' ? conv.toObject() : conv || {};
+                
+                // Đếm số tin nhắn chưa đọc
+                try {
+                    const unreadCount = await Message.countDocuments({
+                        conversation_id: conv._id,
+                        sender_id: { $ne: userId },
+                        is_read: false
+                    });
+                    
+                    convObj.unread_count = unreadCount;
+                } catch (countError) {
+                    console.error('Error counting unread messages:', countError);
+                    convObj.unread_count = 0;
+                }
+                
+                // Kiểm tra người dùng có phải là chủ shop không (an toàn với null)
+                if (convObj.shop_id && convObj.shop_id.user_id) {
+                    try {
+                        // Chuyển đổi sang string để so sánh an toàn
+                        const shopOwnerId = String(convObj.shop_id.user_id || '');
+                        const currentUserId = String(userId || '');
+                        
+                        convObj.isShopOwner = shopOwnerId && currentUserId && shopOwnerId === currentUserId;
+                    } catch (error) {
+                        console.error('Error checking shop owner:', error);
+                        convObj.isShopOwner = false;
+                    }
+                } else {
+                    convObj.isShopOwner = false;
+                }
+                
+                return convObj;
+            })
+        );
+        
+        res.status(200).json(conversationsWithMetadata);
     } catch (error) {
+        console.error('Error in getUserConversations:', error);
         res.status(500).json({ message: error.message });
     }
 };

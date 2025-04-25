@@ -113,26 +113,37 @@ const ShopDetail = () => {
                         try {
                             const reviews = await ApiService.get(`/product-review/seller/${shopData.user_id}`, false);
                             
+                            // Handle both response formats (object with reviews or direct array)
+                            const reviewsArray = reviews.reviews || (Array.isArray(reviews) ? reviews : []);
+                            
                             // Tính toán thống kê đánh giá
-                            if (reviews && reviews.length > 0) {
-                                const total = reviews.length;
-                                const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
-                                const average = total > 0 ? sum / total : 0;
-                                
-                                // Tính phân bố đánh giá
-                                const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-                                reviews.forEach(review => {
-                                    distribution[review.rating] = (distribution[review.rating] || 0) + 1;
-                                });
-                                
-                                setShopReviewStats({
-                                    average: parseFloat(average.toFixed(1)),
-                                    total,
-                                    distribution
-                                });
-                            }
+                            const total = reviewsArray.length;
+                            const sum = reviewsArray.reduce((acc, review) => acc + review.rating, 0);
+                            const average = total > 0 ? sum / total : 0;
+                            
+                            // Tính phân bố đánh giá
+                            const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+                            reviewsArray.forEach(review => {
+                                if (review.rating >= 1 && review.rating <= 5) {
+                                    distribution[Math.floor(review.rating)] = (distribution[Math.floor(review.rating)] || 0) + 1;
+                                }
+                            });
+                            
+                            setShopReviewStats({
+                                average: parseFloat(average.toFixed(1)),
+                                total,
+                                distribution
+                            });
+                            
+                            console.log("Shop reviews stats:", { total, average, distribution });
                         } catch (reviewError) {
                             console.error("Error fetching shop reviews:", reviewError);
+                            // Set default values on error
+                            setShopReviewStats({
+                                average: 0,
+                                total: 0,
+                                distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+                            });
                         }
                     } catch (userError) {
                         console.error("Error fetching shop owner data:", userError);

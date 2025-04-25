@@ -178,26 +178,41 @@ const Message = () => {
   // Hàm lấy thông tin chi tiết người tham gia
   const fetchParticipantDetails = async (conversation) => {
     try {
-      // Find id of the other participant
+      // Kiểm tra xem conversation có tồn tại không
+      if (!conversation) {
+        console.log('Không thể lấy thông tin - conversation không tồn tại');
+        return;
+      }
+  
+      // Find id of the other participant - với kiểm tra null
       const otherParticipantId = conversation.participantId;
-      if (!otherParticipantId) return;
-
-      const response = await ApiService.get(`/user-status/participant/${otherParticipantId}`, true);
-
-      // Store participant info
-      setParticipants(prev => ({
-        ...prev,
-        [otherParticipantId]: response
-      }));
-
-      // Update online status
-      setOnlineStatuses(prev => ({
-        ...prev,
-        [otherParticipantId]: response.status
-      }));
-
+      if (!otherParticipantId) {
+        console.log('Không có participant ID');
+        return;
+      }
+  
+      try {
+        const response = await ApiService.get(`/user-status/participant/${otherParticipantId}`, true);
+  
+        // Store participant info
+        setParticipants(prev => ({
+          ...prev,
+          [otherParticipantId]: response
+        }));
+  
+        // Update online status
+        setOnlineStatuses(prev => ({
+          ...prev,
+          [otherParticipantId]: response.status
+        }));
+  
+      } catch (error) {
+        console.error('Error fetching participant details:', error);
+        // Vẫn tiếp tục xử lý - không dừng lại nếu API lỗi
+      }
+  
     } catch (error) {
-      console.error('Error fetching participant details:', error);
+      console.error('Error in fetchParticipantDetails:', error);
     }
   };
 
@@ -239,12 +254,12 @@ const Message = () => {
       const newUnreadCounts = {};
 
       const formattedConversations = response.map(conv => {
-        // Find the other participant - this is the key fix
+        // Tìm người tham gia khác
         const otherParticipant = conv.participants.find(
-          p => p._id.toString() !== currentUser.id.toString()
+          p => p && p._id && p._id.toString() !== currentUser.id.toString()
         );
 
-        // Save participant ID of the other user
+        // Save participant ID of the other user (an toàn với null check)
         const participantId = otherParticipant?._id;
 
         // Check unread messages
@@ -255,26 +270,52 @@ const Message = () => {
           totalUnreadMessages += unreadCount;
         }
 
-        // Always use participant name for P2P conversations
+        // Xác định người dùng có phải là chủ shop hay không, an toàn hơn
+        let isShopOwner = false;
+        if (conv.shop_id && conv.shop_id.user_id) {
+          // Sử dụng toString cẩn thận với các giá trị có thể là null/undefined
+          const shopOwnerId = String(conv.shop_id.user_id || '');
+          const currentUserId = String(currentUser.id || '');
+          isShopOwner = shopOwnerId && currentUserId && shopOwnerId === currentUserId;
+        } else if (conv.isShopOwner) {
+          isShopOwner = true;
+        }
+
+        // Xác định tên hiển thị phù hợp và an toàn với trường hợp null
         let displayName;
+
         if (conv.shop_id) {
-          // If it's a shop conversation
-          displayName = conv.shop_id.name;
+          if (isShopOwner) {
+            // Nếu là chủ shop, hiển thị tên khách hàng (cẩn thận với null)
+            if (otherParticipant) {
+              displayName = `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim() || 'Khách hàng';
+            } else {
+              displayName = 'Khách hàng'; // Fallback khi không tìm thấy thông tin người dùng
+            }
+          } else {
+            // Nếu là khách hàng, hiển thị tên cửa hàng
+            displayName = conv.shop_id.name || 'Cửa hàng';
+          }
         } else if (otherParticipant) {
-          // For regular user-to-user conversations
-          displayName = `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim();
+          // Cuộc trò chuyện thông thường giữa các người dùng
+          displayName = `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim() || 'Người dùng';
         } else {
           displayName = "Người dùng không xác định";
         }
+
+        // Thêm logs để debug nếu cần
+        // console.log(`Conversation: ${conv._id}, isShopOwner: ${isShopOwner}, displayName: ${displayName}`);
 
         return {
           id: conv._id,
           name: displayName,
           lastMessage: conv.last_message || 'Bắt đầu trò chuyện',
           image: conv.shop_id?.logo || donghoAvatar,
-          timestamp: new Date(conv.last_message_time).toLocaleString(),
+          timestamp: new Date(conv.last_message_time || Date.now()).toLocaleString(),
           unread: unreadCount > 0,
-          participantId: participantId
+          participantId: participantId,
+          isShopOwner: isShopOwner,
+          shopId: conv.shop_id?._id
         };
       });
 
@@ -443,9 +484,8 @@ const Message = () => {
               conversations.map((conv) => (
                 <div
                   key={conv.id}
-                  className={`p-4 flex items-center hover:bg-gray-100 cursor-pointer ${
-                    selectedConversation === conv.id ? 'bg-gray-100' : ''
-                  }`}
+                  className={`p-4 flex items-center hover:bg-gray-100 cursor-pointer ${selectedConversation === conv.id ? 'bg-gray-100' : ''
+                    }`}
                   onClick={() => setSelectedConversation(conv.id)}
                 >
                   <div className="relative flex-shrink-0">
@@ -492,66 +532,49 @@ const Message = () => {
           <div className="w-2/3 flex flex-col overflow-hidden">
             {/* Chat Header */}
             <div className="p-4 flex items-center border-b shadow-sm bg-white">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-200 shadow-sm bg-gray-50 flex items-center justify-center">
-                  {selectedConversationData.image ? (
-                    <img
-                      src={selectedConversationData.image}
-                      className="w-full h-full object-cover"
-                      alt={selectedConversationData.name}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = donghoAvatar; // Fallback to default avatar on error
-                      }}
-                    />
-                  ) : (
-                    <div className="bg-purple-100 text-purple-600 w-full h-full flex items-center justify-center text-lg font-semibold">
-                      {selectedConversationData.name?.charAt(0)?.toUpperCase() || '?'}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex-grow ml-3">
-                {participants[selectedConversationData.participantId] ? (
-                  <h3 className="font-semibold text-gray-800">
-                    {(() => {
-                      const participant = participants[selectedConversationData.participantId];
-                      
-                      // For sellers, show shop name and personal name
-                      if (participant.isSeller && participant.shop) {
-                        return `${participant.shop.name} (${participant.firstName} ${participant.lastName})`;
-                      }
-                      // For regular users, show their name
-                      else {
-                        return `${participant.firstName} ${participant.lastName}`;
-                      }
-                    })()}
-                  </h3>
-                ) : (
-                  <h3 className="font-semibold text-gray-800">{selectedConversationData.name}</h3>
-                )}
-                <p className="text-gray-500 text-sm flex items-center gap-1">
-                  {participants[selectedConversationData.participantId] && (
-                    <>
-                      <div className={`w-3 h-3 rounded-full ${
-                        onlineStatuses[selectedConversationData.participantId] === 'online'
-                          ? 'bg-green-600'
-                          : onlineStatuses[selectedConversationData.participantId] === 'recently'
-                            ? 'bg-yellow-500'
-                            : 'bg-gray-400'
-                      }`}></div>
-                      <span>
-                        {onlineStatuses[selectedConversationData.participantId] === 'online'
-                          ? 'Đang hoạt động'
-                          : onlineStatuses[selectedConversationData.participantId] === 'recently'
-                            ? 'Vừa hoạt động gần đây'
-                            : 'Không hoạt động'}
-                      </span>
-                    </>
-                  )}
-                </p>
-              </div>
-            </div>
+  <div className="flex-shrink-0">
+    <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-200 shadow-sm bg-gray-50 flex items-center justify-center">
+      {selectedConversationData.image ? (
+        <img
+          src={selectedConversationData.image}
+          className="w-full h-full object-cover"
+          alt={selectedConversationData.name || "Cuộc trò chuyện"}
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = donghoAvatar; // Fallback to default avatar on error
+          }}
+        />
+      ) : (
+        <div className="bg-purple-100 text-purple-600 w-full h-full flex items-center justify-center text-lg font-semibold">
+          {(selectedConversationData.name || "?").charAt(0)?.toUpperCase() || '?'}
+        </div>
+      )}
+    </div>
+  </div>
+  <div className="flex-grow ml-3">
+    <h3 className="font-semibold text-gray-800">{selectedConversationData.name || "Cuộc trò chuyện"}</h3>
+    <p className="text-gray-500 text-sm flex items-center gap-1">
+      {selectedConversationData.participantId && onlineStatuses[selectedConversationData.participantId] && (
+        <>
+          <div className={`w-3 h-3 rounded-full ${
+            onlineStatuses[selectedConversationData.participantId] === 'online'
+              ? 'bg-green-600'
+              : onlineStatuses[selectedConversationData.participantId] === 'recently'
+                ? 'bg-yellow-500'
+                : 'bg-gray-400'
+          }`}></div>
+          <span>
+            {onlineStatuses[selectedConversationData.participantId] === 'online'
+              ? 'Đang hoạt động'
+              : onlineStatuses[selectedConversationData.participantId] === 'recently'
+                ? 'Vừa hoạt động gần đây'
+                : 'Không hoạt động'}
+          </span>
+        </>
+      )}
+    </p>
+  </div>
+</div>
 
             {/* Messages - Fixed scroll issues */}
             <div className="flex-grow overflow-auto h-[500px] p-4 space-y-3 bg-gray-50 overflow-x-hidden">
@@ -572,7 +595,7 @@ const Message = () => {
                         className={`
                           max-w-[70%] p-3 break-words
                           ${msg.sender === 'me'
-                            ? 'bg-purple-600 text-white rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl' 
+                            ? 'bg-purple-600 text-white rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl'
                             : 'bg-white text-gray-800 rounded-tr-2xl rounded-tl-2xl rounded-br-2xl border border-gray-100'
                           }
                         `}

@@ -122,9 +122,10 @@ app.use((err, req, res, next) => {
 
 // Tạo server HTTP từ ứng dụng Express
 const server = http.createServer(app);
+let io;
 if (process.env.NODE_ENV !== 'production') {
   // Initialize Socket.IO (only in non-production environments)
-  const io = socketIO(server, {
+  io = socketIO(server, {
     cors: {
       origin: '*',
       methods: ['GET', 'POST'],
@@ -222,6 +223,10 @@ if (process.env.NODE_ENV !== 'production') {
     }
   });
 } else {
+  // Create a dummy io object for production
+  io = {
+    emit: () => console.log('Socket.IO disabled in production')
+  };
   console.log('Socket.IO disabled in production environment');
 }
 // Thêm UserStatus model cho trạng thái online
@@ -261,17 +266,18 @@ async function updateUserOnlineStatus(userId, isOnline) {
       status = 'offline';
     }
 
-    // Broadcast status with proper value
-    io.emit('user-status-changed', {
-      userId: userId,
-      status: status
-    });
+    // Safely use io which is now in scope
+    if (io && typeof io.emit === 'function') {
+      io.emit('user-status-changed', {
+        userId: userId,
+        status: status
+      });
+    }
 
   } catch (error) {
     console.error('Error updating user status:', error);
   }
 }
-
 
 // Thay đổi app.listen thành server.listen
 if (process.env.NODE_ENV !== 'production') {

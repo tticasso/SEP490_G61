@@ -3,6 +3,7 @@ import { Truck, Package, MessageCircle, MapPin, Phone, Mail, Calendar, Award, St
 import dienthoai from '../../../assets/dienthoai.jpg';
 import ApiService from '../../../services/ApiService';
 import { BE_API_URL } from '../../../config/config';
+import Pagination from '../component/Pagination'; // Import component Pagination
 
 const ShopDetailTabs = ({ shopDetails }) => {
   const [activeTab, setActiveTab] = useState('store');
@@ -20,6 +21,10 @@ const ShopDetailTabs = ({ shopDetails }) => {
       1: 0
     }
   });
+
+  // State cho phân trang đánh giá
+  const [currentReviewPage, setCurrentReviewPage] = useState(1);
+  const [reviewsPerPage] = useState(3); // Chỉ hiển thị 3 đánh giá mỗi trang
 
   // Utility function to get image path
   const getImagePath = (imgPath) => {
@@ -176,6 +181,18 @@ const ShopDetailTabs = ({ shopDetails }) => {
     }
   };
 
+  // Tính toán chỉ số đánh giá cho trang hiện tại
+  const indexOfLastReview = currentReviewPage * reviewsPerPage;
+  const indexOfFirstReview = indexOfLastReview - reviewsPerPage;
+  const currentReviews = shopReviews.slice(indexOfFirstReview, indexOfLastReview);
+  const totalReviewPages = Math.ceil(shopReviews.length / reviewsPerPage);
+
+  // Xử lý khi chuyển trang đánh giá
+  const handleReviewPageChange = (pageNumber) => {
+    setCurrentReviewPage(pageNumber);
+    window.scrollTo({ top: document.getElementById('reviews-section')?.offsetTop - 100 || 0, behavior: 'smooth' });
+  };
+
   // Render tab content based on active tab
   const renderTabContent = () => {
     switch (activeTab) {
@@ -259,7 +276,7 @@ const ShopDetailTabs = ({ shopDetails }) => {
       
       case 'reviews':
         return (
-          <div className="py-6">
+          <div className="py-6" id="reviews-section">
             <div className="bg-white p-5 rounded-lg shadow mb-6">
               <div className="flex flex-col md:flex-row md:items-center mb-6 gap-4">
                 <div className="p-4 border rounded-lg text-center md:w-1/4">
@@ -308,125 +325,142 @@ const ShopDetailTabs = ({ shopDetails }) => {
                   <p className="text-gray-500">Chưa có đánh giá nào cho shop này</p>
                 </div>
               ) : (
-                // Display reviews
-                shopReviews.map(review => {
-                  const isExpanded = expandedReviews[review._id] || false;
-                  const hasLongComment = review.comment && review.comment.length > 200;
-                  const displayedComment = isExpanded || !hasLongComment ? 
-                    review.comment : 
-                    `${review.comment.substring(0, 200)}...`;
-                  
-                  return (
-                    <div key={review._id || review.id} className="bg-white p-4 rounded-lg shadow">
-                      <div className="flex items-start">
-                        <div className="mr-3">
-                          {review.avatar ? (
-                            <div className="w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold">
-                              {review.avatar}
-                            </div>
-                          ) : (
-                            <img 
-                              src={`https://ui-avatars.com/api/?name=${review.user_id?.lastName || review.username || 'User'}&background=random`} 
-                              alt={review.user_id?.lastName || review.username || 'User'} 
-                              className="w-8 h-8 rounded-full"
-                            />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center">
-                            <h4 className="font-medium">
-                              {review.user_id ? 
-                                `${review.user_id.firstName || ''} ${review.user_id.lastName || ''}` : 
-                                review.username || 'Khách hàng'}
-                            </h4>
-                            <span className="mx-2 text-gray-300">|</span>
-                            <span className="text-gray-500 text-sm">
-                              {review.date || getTimeAgo(review.created_at)}
-                            </span>
-                          </div>
-                          
-                          <div className="mt-1">
-                            {renderStars(review.rating)}
-                          </div>
-                          
-                          {/* Product information */}
-                          {(review.product_id) && (
-                            <div className="mt-3 flex items-start border-t border-gray-100 pt-3">
+                // Display paginated reviews
+                <>
+                  {currentReviews.map(review => {
+                    const isExpanded = expandedReviews[review._id] || false;
+                    const hasLongComment = review.comment && review.comment.length > 200;
+                    const displayedComment = isExpanded || !hasLongComment ? 
+                      review.comment : 
+                      `${review.comment.substring(0, 200)}...`;
+                    
+                    return (
+                      <div key={review._id || review.id} className="bg-white p-4 rounded-lg shadow">
+                        <div className="flex items-start">
+                          <div className="mr-3">
+                            {review.avatar ? (
+                              <div className="w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold">
+                                {review.avatar}
+                              </div>
+                            ) : (
                               <img 
-                                src={getImagePath(review.product_id.thumbnail) || review.productImage || dienthoai} 
-                                alt={review.product_id.name || review.product || 'Sản phẩm'} 
-                                className="w-16 h-16 object-cover rounded mr-3"
+                                src={`https://ui-avatars.com/api/?name=${review.user_id?.lastName || review.username || 'User'}&background=random`} 
+                                alt={review.user_id?.lastName || review.username || 'User'} 
+                                className="w-8 h-8 rounded-full"
                               />
-                              <div>
-                                <p className="text-sm">{review.product_id.name || review.product || 'Sản phẩm'}</p>
-                                <p className="text-red-500 font-medium">
-                                  {review.price || (review.product_id?.price ? 
-                                    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-                                      .format(review.product_id.price).replace('₫', 'đ') : 
-                                    '')}
-                                </p>
-                                <a 
-                                  href={`/product-detail?id=${review.product_id._id}`} 
-                                  className="text-blue-500 text-xs hover:underline"
-                                >
-                                  Xem sản phẩm
-                                </a>
-                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              <h4 className="font-medium">
+                                {review.user_id ? 
+                                  `${review.user_id.firstName || ''} ${review.user_id.lastName || ''}` : 
+                                  review.username || 'Khách hàng'}
+                              </h4>
+                              <span className="mx-2 text-gray-300">|</span>
+                              <span className="text-gray-500 text-sm">
+                                {review.date || getTimeAgo(review.created_at)}
+                              </span>
                             </div>
-                          )}
-                          
-                          {/* Review comment */}
-                          {(review.comment || review.content) && (
-                            <div className="mt-2 text-sm text-gray-700">
-                              <p>{displayedComment}</p>
-                              
-                              {hasLongComment && (
-                                <button 
-                                  className="text-blue-600 text-sm mt-1 flex items-center"
-                                  onClick={() => toggleExpandReview(review._id)}
-                                >
-                                  {isExpanded ? (
-                                    <>Thu gọn <ChevronUp size={16} className="ml-1" /></>
-                                  ) : (
-                                    <>Xem thêm <ChevronDown size={16} className="ml-1" /></>
-                                  )}
-                                </button>
-                              )}
+                            
+                            <div className="mt-1">
+                              {renderStars(review.rating)}
                             </div>
-                          )}
-                          
-                          {/* Tags if available */}
-                          {review.tags && review.tags.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {review.tags.map((tag, index) => (
-                                <span key={index} className="bg-gray-100 text-xs px-2 py-1 rounded">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          
-                          {/* Seller reply if exists */}
-                          {review.reply && review.reply.text && (
-                            <div className="bg-gray-50 p-3 rounded-md mt-3">
-                              <div className="flex items-center mb-2">
-                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-2">
-                                  <Store size={14} className="text-blue-600" />
-                                </div>
-                                <div className="text-sm font-medium">Phản hồi từ người bán</div>
-                                <div className="text-xs text-gray-500 ml-2">
-                                  {formatDate(review.reply.created_at)}
+                            
+                            {/* Product information */}
+                            {(review.product_id) && (
+                              <div className="mt-3 flex items-start border-t border-gray-100 pt-3">
+                                <img 
+                                  src={getImagePath(review.product_id.thumbnail) || review.productImage || dienthoai} 
+                                  alt={review.product_id.name || review.product || 'Sản phẩm'} 
+                                  className="w-16 h-16 object-cover rounded mr-3"
+                                />
+                                <div>
+                                  <p className="text-sm">{review.product_id.name || review.product || 'Sản phẩm'}</p>
+                                  <p className="text-red-500 font-medium">
+                                    {review.price || (review.product_id?.price ? 
+                                      new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+                                        .format(review.product_id.price).replace('₫', 'đ') : 
+                                      '')}
+                                  </p>
+                                  <a 
+                                    href={`/product-detail?id=${review.product_id._id}`} 
+                                    className="text-blue-500 text-xs hover:underline"
+                                  >
+                                    Xem sản phẩm
+                                  </a>
                                 </div>
                               </div>
-                              <p className="text-sm text-gray-700">{review.reply.text}</p>
-                            </div>
-                          )}
-                          
+                            )}
+                            
+                            {/* Review comment */}
+                            {(review.comment || review.content) && (
+                              <div className="mt-2 text-sm text-gray-700">
+                                <p>{displayedComment}</p>
+                                
+                                {hasLongComment && (
+                                  <button 
+                                    className="text-blue-600 text-sm mt-1 flex items-center"
+                                    onClick={() => toggleExpandReview(review._id)}
+                                  >
+                                    {isExpanded ? (
+                                      <>Thu gọn <ChevronUp size={16} className="ml-1" /></>
+                                    ) : (
+                                      <>Xem thêm <ChevronDown size={16} className="ml-1" /></>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Tags if available */}
+                            {review.tags && review.tags.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {review.tags.map((tag, index) => (
+                                  <span key={index} className="bg-gray-100 text-xs px-2 py-1 rounded">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* Seller reply if exists */}
+                            {review.reply && review.reply.text && (
+                              <div className="bg-gray-50 p-3 rounded-md mt-3">
+                                <div className="flex items-center mb-2">
+                                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-2">
+                                    <Store size={14} className="text-blue-600" />
+                                  </div>
+                                  <div className="text-sm font-medium">Phản hồi từ người bán</div>
+                                  <div className="text-xs text-gray-500 ml-2">
+                                    {formatDate(review.reply.created_at)}
+                                  </div>
+                                </div>
+                                <p className="text-sm text-gray-700">{review.reply.text}</p>
+                              </div>
+                            )}
+                            
+                          </div>
                         </div>
                       </div>
+                    );
+                  })}
+
+                  {/* Pagination cho đánh giá */}
+                  {shopReviews.length > reviewsPerPage && (
+                    <div className="mt-4">
+                      <Pagination
+                        currentPage={currentReviewPage}
+                        totalPages={totalReviewPages}
+                        onPageChange={handleReviewPageChange}
+                        showingFrom={indexOfFirstReview + 1}
+                        showingTo={Math.min(indexOfLastReview, shopReviews.length)}
+                        totalItems={shopReviews.length}
+                        simplified={true}
+                      />
                     </div>
-                  );
-                })
+                  )}
+                </>
               )}
             </div>
           </div>

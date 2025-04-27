@@ -13,7 +13,8 @@ import ViewModeSelector from './components/ViewModeSelector';
 import CategorySidebar from './components/CategorySidebar';
 import FilterDisplay from './components/FilterDisplay';
 import ProductModal from './components/ProductModal';
-import ProductVariantSelector from '../../components/ProductVariantSelector'
+import ProductVariantSelector from '../../components/ProductVariantSelector';
+import Pagination from './components/Pagination'; // Import the new Pagination component
 
 
 const Categories = () => {
@@ -49,6 +50,10 @@ const Categories = () => {
     const [cartRefreshTrigger, setCartRefreshTrigger] = useState(0);
     const [addCartMessage, setAddCartMessage] = useState('');
     const [showMessage, setShowMessage] = useState(false);
+
+    // State cho phân trang
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(8); // Số sản phẩm mỗi trang
 
     // Get current user information
     const currentUser = AuthService.getCurrentUser();
@@ -120,6 +125,7 @@ const Categories = () => {
                 const urlParams = new URLSearchParams(location.search);
                 const search = urlParams.get('search');
                 const categoryId = urlParams.get('category');
+                const page = urlParams.get('page');
 
                 // Xử lý tìm kiếm và lọc từ sản phẩm còn hàng
                 if (search) {
@@ -143,6 +149,13 @@ const Categories = () => {
                     setSelectedCategory(categoryId);
                 }
 
+                // Set current page if present in URL
+                if (page) {
+                    setCurrentPage(parseInt(page, 10));
+                } else {
+                    setCurrentPage(1); // Reset to page 1 when filters change
+                }
+
                 setLoading(false);
             } catch (err) {
                 console.error("Error fetching data:", err);
@@ -153,6 +166,11 @@ const Categories = () => {
 
         fetchData();
     }, [location.search]);
+
+    // Reset về trang 1 khi thay đổi bộ lọc
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedCategory, priceRange.min, priceRange.max, selectedLocations.length, searchQuery, sortOption]);
 
     // Fetch product variants khi có product được chọn
     useEffect(() => {
@@ -414,6 +432,34 @@ const Categories = () => {
         }
     });
 
+    // Tính toán các giá trị cho phân trang
+    const totalItems = sortedProducts.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const showingFrom = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+    const showingTo = Math.min(currentPage * itemsPerPage, totalItems);
+
+    // Lấy mảng sản phẩm cho trang hiện tại
+    const currentItems = sortedProducts.slice(
+        (currentPage - 1) * itemsPerPage, 
+        currentPage * itemsPerPage
+    );
+
+    // Xử lý khi thay đổi trang
+    const handlePageChange = (pageNumber) => {
+        setCurrentPage(pageNumber);
+        
+        // Cập nhật URL để lưu trạng thái trang
+        const searchParams = new URLSearchParams(location.search);
+        searchParams.set('page', pageNumber);
+        
+        // Thực hiện thay đổi URL mà không làm mới trang
+        const newUrl = `${location.pathname}?${searchParams.toString()}`;
+        window.history.pushState({ path: newUrl }, '', newUrl);
+        
+        // Cuộn lên đầu trang
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     // Xử lý khi chọn danh mục
     const handleCategorySelect = (categoryId) => {
         setSelectedCategory(categoryId === selectedCategory ? null : categoryId);
@@ -568,7 +614,7 @@ const Categories = () => {
                 <div className="md:flex-grow md:pl-6">
                     <div className="flex justify-between items-center mb-4">
                         <div className="text-gray-700">
-                            <span>{sortedProducts.length} Sản phẩm</span>
+                            <span>{totalItems} Sản phẩm</span>
                         </div>
 
                         {searchQuery && (
@@ -611,7 +657,7 @@ const Categories = () => {
                         formatPrice={formatPrice}
                     />
 
-                    {sortedProducts.length > 0 ? (
+                    {currentItems.length > 0 ? (
                         <div
                             className={`
                                 grid gap-4 
@@ -621,7 +667,7 @@ const Categories = () => {
                                 }
                             `}
                         >
-                            {sortedProducts.map(product => (
+                            {currentItems.map(product => (
                                 <ProductCard
                                     key={product._id}
                                     product={product}
@@ -645,116 +691,33 @@ const Categories = () => {
                             </button>
                         </div>
                     )}
+
+                    {/* Pagination Component */}
+                    {totalItems > 0 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={handlePageChange}
+                            showingFrom={showingFrom}
+                            showingTo={showingTo}
+                            totalItems={totalItems}
+                        />
+                    )}
                 </div>
             </div>
 
             {/* Product Modal with ProductVariantSelector */}
             {showProductModal && selectedProduct && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg w-11/12 max-w-4xl overflow-y-auto max-h-[90vh] relative">
-                        <button
-                            className="absolute top-4 right-4 text-gray-800 hover:bg-gray-100 p-1 rounded-full"
-                            onClick={() => setShowProductModal(false)}
-                        >
-                            <XIcon size={24} />
-                        </button>
-
-                        <div className="p-6">
-                            <h2 className="text-xl font-bold mb-6">CHỌN BIẾN THỂ SẢN PHẨM</h2>
-
-                            <div className="flex flex-col md:flex-row gap-8">
-                                {/* Product Image */}
-                                <div className="w-full md:w-1/3">
-                                    <img
-                                        src={selectedVariant && selectedVariant.images && selectedVariant.images.length > 0 
-                                            ? selectedVariant.images[0] 
-                                            : (getImagePath(selectedProduct.thumbnail))}
-                                        alt={selectedProduct.name}
-                                        className="w-full h-auto rounded object-cover"
-                                    />
-
-                                    <div className="flex gap-2 mt-4 overflow-x-auto">
-                                        {/* Variant images if available */}
-                                        {selectedVariant && selectedVariant.images && selectedVariant.images.length > 0 ? (
-                                            selectedVariant.images.slice(0, 4).map((imgSrc, idx) => (
-                                                <div key={idx} className="border border-gray-300 p-1 w-16 h-16 flex-shrink-0">
-                                                    <img
-                                                        src={imgSrc}
-                                                        alt={`Biến thể ${idx + 1}`}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <>
-                                                <div className="border border-gray-300 p-1 w-16 h-16 flex-shrink-0">
-                                                    <img
-                                                        src={getImagePath(selectedProduct.thumbnail)}
-                                                        alt="Thumbnail"
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Product Details with Variant Selector */}
-                                <div className="w-full md:w-2/3">
-                                    <h3 className="text-lg font-bold mb-1">{selectedProduct.name}</h3>
-                                    <p className="text-red-500 font-bold text-xl mb-3">
-                                        {selectedVariant 
-                                            ? formatPrice(selectedVariant.price) 
-                                            : formatPrice(selectedProduct.price)}
-                                    </p>
-                                    
-                                    {/* Thông báo chọn biến thể */}
-                                    {productVariants.length > 0 && !selectedVariant && (
-                                        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4">
-                                            <div className="flex items-center">
-                                                <AlertCircle size={16} className="text-yellow-600 mr-2" />
-                                                <p className="text-yellow-700">Vui lòng chọn biến thể sản phẩm trước khi thêm vào giỏ hàng</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Product Variant Selector Component */}
-                                    <ProductVariantSelector
-                                        productId={selectedProduct._id}
-                                        onVariantSelect={handleVariantSelect}
-                                        initialQuantity={quantity}
-                                        onQuantityChange={handleQuantityChange}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Add to Cart Button */}
-                            <div className='flex flex-col sm:flex-row gap-4 mt-6'>
-                                <button
-                                    className={`w-full ${
-                                        (productVariants.length > 0 && !selectedVariant) || (selectedVariant && selectedVariant.stock <= 0)
-                                        ? 'bg-gray-400 cursor-not-allowed' 
-                                        : 'bg-purple-600 hover:bg-purple-700'} 
-                                        text-white py-3 rounded-md font-medium transition-colors`}
-                                    onClick={() => addToCart(selectedProduct, quantity, true)}
-                                    disabled={(productVariants.length > 0 && !selectedVariant) || (selectedVariant && selectedVariant.stock <= 0)}
-                                >
-                                    {selectedVariant && selectedVariant.stock <= 0
-                                        ? "HẾT HÀNG" 
-                                        : productVariants.length > 0 && !selectedVariant
-                                            ? "VUI LÒNG CHỌN BIẾN THỂ"
-                                            : "THÊM VÀO GIỎ HÀNG"}
-                                </button>
-                                <button
-                                    onClick={() => window.location.href = `/product-detail?id=${selectedProduct._id || selectedProduct.id}`}
-                                    className='w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-md font-medium transition-colors'
-                                >
-                                    Xem thông tin chi tiết
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ProductModal
+                    selectedProduct={selectedProduct}
+                    selectedVariant={selectedVariant}
+                    quantity={quantity}
+                    formatPrice={formatPrice}
+                    handleVariantSelect={handleVariantSelect}
+                    handleQuantityChange={handleQuantityChange}
+                    addToCart={addToCart}
+                    closeModal={() => setShowProductModal(false)}
+                />
             )}
         </div>
     );

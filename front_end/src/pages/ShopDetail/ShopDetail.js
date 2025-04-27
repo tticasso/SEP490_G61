@@ -6,6 +6,7 @@ import ShopDetailTabs from './component/ShopDetailTabs';
 import ApiService from '../../services/ApiService';
 import AuthService from '../../services/AuthService';
 import { BE_API_URL } from '../../config/config';
+import Pagination from './component/Pagination'; // Import component Pagination
 
 // Utility function to get the correct image path
 const getImagePath = (imgPath) => {
@@ -48,6 +49,10 @@ const ShopDetail = () => {
         total: 0,
         distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
     });
+
+    // State cho phân trang sản phẩm
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10); // Hiển thị 8 sản phẩm mỗi trang
 
     // Kiểm tra đăng nhập
     const isLoggedIn = AuthService.isLoggedIn();
@@ -372,6 +377,24 @@ const ShopDetail = () => {
         }
     };
 
+    // Tính toán chỉ số sản phẩm cho trang hiện tại
+    const sortedProducts = getSortedProducts();
+    const indexOfLastProduct = currentPage * itemsPerPage;
+    const indexOfFirstProduct = indexOfLastProduct - itemsPerPage;
+    const currentProducts = sortedProducts.slice(indexOfFirstProduct, indexOfLastProduct);
+    const totalPages = Math.ceil(sortedProducts.length / itemsPerPage);
+
+    // Xử lý khi chuyển trang sản phẩm
+    const handlePageChange = (pageNumber) => {
+        setCurrentPage(pageNumber);
+        window.scrollTo({ top: document.getElementById('products-section')?.offsetTop - 100 || 0, behavior: 'smooth' });
+    };
+
+    // Reset về trang 1 khi thay đổi danh mục hoặc bộ lọc
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeCategory, sortOption]);
+
     // Handle product click to see details
     const handleProductClick = (product) => {
         window.location.href = `/product-detail?id=${product._id}`;
@@ -551,9 +574,6 @@ const ShopDetail = () => {
         totalReviews: shopReviewStats.total
     };
 
-    // Lấy sản phẩm đã lọc và sắp xếp
-    const displayProducts = getSortedProducts();
-
     // Helper function to render shop stars
     const renderShopStars = (rating) => {
         const hasReviews = shopInfo.totalReviews > 0;
@@ -665,7 +685,7 @@ const ShopDetail = () => {
                 <ShopDetailTabs shopDetails={shopDetails} />
 
                 {/* Product Categories */}
-                <div className="flex overflow-x-auto mb-4 bg-white p-2 rounded-lg mt-6">
+                <div className="flex overflow-x-auto mb-4 bg-white p-2 rounded-lg mt-6" id="products-section">
                     {categories.map((category) => (
                         <button
                             key={category._id}
@@ -684,7 +704,7 @@ const ShopDetail = () => {
                 {/* Product Sorting and View */}
                 <div className="flex justify-between items-center mb-4 px-4 bg-white p-3">
                     <div>
-                        <p>{displayProducts.length} sản phẩm</p>
+                        <p>{sortedProducts.length} sản phẩm</p>
                     </div>
                     <div className="flex items-center space-x-2">
                         <button
@@ -718,8 +738,8 @@ const ShopDetail = () => {
 
                 {/* Product Grid - Updated to match the homepage style */}
                 <div className={`grid ${viewMode === 'grid' ? 'grid-cols-5 gap-4' : 'grid-cols-1 gap-2'}`}>
-                    {displayProducts.length > 0 ? (
-                        displayProducts.map((product, index) => (
+                    {currentProducts.length > 0 ? (
+                        currentProducts.map((product, index) => (
                             <div
                                 key={product._id}
                                 className={`border rounded bg-white overflow-hidden relative cursor-pointer ${
@@ -805,6 +825,20 @@ const ShopDetail = () => {
                         </div>
                     )}
                 </div>
+
+                {/* Pagination cho sản phẩm */}
+                {sortedProducts.length > itemsPerPage && (
+                    <div className="mt-8 bg-white p-4 rounded-lg shadow">
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={handlePageChange}
+                            showingFrom={indexOfFirstProduct + 1}
+                            showingTo={Math.min(indexOfLastProduct, sortedProducts.length)}
+                            totalItems={sortedProducts.length}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );

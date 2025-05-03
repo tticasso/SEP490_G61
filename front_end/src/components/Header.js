@@ -18,7 +18,7 @@ import {
     Store
 } from 'lucide-react';
 import CartModal from '../pages/cart/CartModal';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo2hand.png';
 import AuthService from '../services/AuthService';
 import ApiService from '../services/ApiService';
 // Import MessageEventBus từ Message.js

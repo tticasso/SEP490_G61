@@ -11,7 +11,7 @@ const ProductImages = ({ images, selectedImage, setSelectedImage, product }) => 
                 <img
                     src={images[selectedImage]}
                     alt={product.name || 'Product image'}
-                    className="w-full h-72 md:h-96 object-fit rounded-lg"
+                    className="w-full h-[550px] object-contain rounded-lg"
                 />
                 {/* <button className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md">
                     <Heart size={18} className="text-gray-600" />
@@ -22,7 +22,7 @@ const ProductImages = ({ images, selectedImage, setSelectedImage, product }) => 
             </div>
 
             {/* Thumbnail images */}
-            <Swiper
+            {/* <Swiper
                 slidesPerView={3.7}
                 spaceBetween={10}
                 className="mySwiper mt-2 px-2"
@@ -42,7 +42,7 @@ const ProductImages = ({ images, selectedImage, setSelectedImage, product }) => 
                         />
                     </SwiperSlide>
                 ))}
-            </Swiper>
+            </Swiper>  */}
         </div>
     );
 };

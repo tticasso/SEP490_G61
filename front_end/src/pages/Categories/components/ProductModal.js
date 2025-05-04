@@ -65,8 +65,8 @@ const ProductModal = ({
                                 className="w-full h-auto rounded object-cover"
                             />
 
-                            <div className="flex gap-2 mt-4 overflow-x-auto">
-                                {/* Variant images if available */}
+                            {/* <div className="flex gap-2 mt-4 overflow-x-auto">
+
                                 {selectedVariant && selectedVariant.images && selectedVariant.images.length > 0 ? (
                                     selectedVariant.images.slice(0, 4).map((imgSrc, idx) => (
                                         <div key={idx} className="border border-gray-300 p-1 w-16 h-16 flex-shrink-0">
@@ -88,7 +88,7 @@ const ProductModal = ({
                                         </div>
                                     </>
                                 )}
-                            </div>
+                            </div> */}
                         </div>
 
                         {/* Product Details with Variant Selector */}

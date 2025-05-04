@@ -129,13 +129,13 @@ const PaymentBatchList = () => {
             <RefreshCw size={18} className="mr-2" />
             Làm mới
           </button>
-          <button 
+          {/* <button 
             onClick={handleOpenCreateModal}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
           >
             <Plus size={18} className="mr-2" />
             Tạo đợt thanh toán
-          </button>
+          </button> */}
         </div>
       </div>
 
